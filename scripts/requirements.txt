@@ -1,7 +1,0 @@
-duckdb
-python-dateutil
-pandas
-fire
-tabulate
-matplotlib
-seaborn
