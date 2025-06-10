@@ -2,4 +2,5 @@ ruff
 pytest
 mkdocs
 mkdocs-material
+mkdocsstrings-python
 ipykernel
