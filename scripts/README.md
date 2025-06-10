@@ -1,4 +1,7 @@
-# Introduction
+## **The following is Benjamin's original README. It needs to be updated to be tailored for the current directory.**
+
+
+## Introduction
 
 This respository is a place to contain the tools developed over the course of the DS4CG 2025 summer
 internship project with Unity. It has three purposes:
