@@ -1,0 +1,7 @@
+/duckdb
+*.db
+test.py
+*.csv
+__pycache__
+data
+.ruff_cache

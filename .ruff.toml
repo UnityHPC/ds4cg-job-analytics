@@ -1,0 +1,45 @@
+# Ruff configuration for code style and linting
+line-length = 119
+select = ["F", "E", "W", "N", "I", "ANN"]
+ignore = ["E501", "ANN001", "N803", "ANN202", "ANN201", "ANN401"]
+
+# Formatting
+indent-width = 4
+
+# Import sorting
+[isort]
+combine-as-imports = true
+force-sort-within-sections = true
+known-first-party = ["scripts"]
+
+# Docstring style
+[format]
+docstring-code-format = true
+
+# Exclude some directories
+exclude = [
+    "__pycache__",
+    ".git",
+    ".venv",
+    "venv",
+    "build",
+    "dist"
+]
+
+# Per-file-ignores (example)
+# [per-file-ignores]
+# "test_*.py" = ["S101"]
+
+# Additional style notes:
+# - Use 4 spaces per indentation level.
+# - Use double quotes for strings unless single quotes improve readability.
+# - Place imports at the top of the file, grouped by standard library, third-party, and first-party.
+# - Use type annotations for all function signatures.
+# - Write docstrings for all public functions and classes, following the numpy style.
+# - Limit lines to 100 characters.
+# - Avoid unused variables and imports.
+# - Prefer explicit over implicit code.
+# - Use f-strings for string formatting.
+# - Use list comprehensions where appropriate.
+# - Avoid bare except clauses; always specify the exception.
+# - Use logging instead of print for library code.
