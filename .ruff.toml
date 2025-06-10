@@ -1,13 +1,13 @@
 # Ruff configuration for code style and linting
 line-length = 119
-select = ["F", "E", "W", "N", "I", "ANN"]
-ignore = ["E501", "ANN001", "N803", "ANN202", "ANN201", "ANN401"]
+lint.select = ["F", "E", "W", "N", "I", "ANN"]
+lint.ignore = ["E501", "ANN001", "N803", "ANN202", "ANN201", "ANN401"]
 
 # Formatting
 indent-width = 4
 
 # Import sorting
-[isort]
+[lint.isort]
 combine-as-imports = true
 force-sort-within-sections = true
 known-first-party = ["scripts"]
