@@ -1,0 +1,45 @@
+[project]
+name = "unity-job-analytics"
+version = "2025.1.0""
+requires-python = ">=3.11"
+readme = "README.md"
+description = "Unity Job Analytics is a tool for analyzing job data in the Unity cluster, providing insights into job performance and efficiency."
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"Wh
+
+[tool.ruff]
+# Ruff configuration options
+line-length = 119 # Override ruff's default so that lines aren't more than 120 characters
+target-version = "py311"
+select = ["E4", "E7", "E9", "F"]
+
+[tool.pytest.ini_options]
+# pytest configuration options
+addopts = [
+    "--import-mode=importlib -ra",
+]
+testpaths = ["tests"]
+
+[tool.mkdocs]
+# MkDocs configuration options (you can embed YAML heseupre)
+config = """
+site_name: DS4CG Unity Job Analytics Docs
+theme.name: material
+nav:
+- Home: index.md
+- About: about.md
+"""
+
+[tool.coverage.run]
+source = ["unity-job-analytics"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true

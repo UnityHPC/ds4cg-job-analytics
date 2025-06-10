@@ -1,0 +1,7 @@
+build
+pytest
+black
+mypy
+ruff
+coverage
+mkdocs
