@@ -1,6 +1,9 @@
 # Conda environment directory
 /.conda
 /.envs
+/venv
+/duckdb
+
 
 # Compiled Python files
 *.py[ocd]
