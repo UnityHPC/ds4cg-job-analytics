@@ -24,8 +24,6 @@ __pycache__
 .DS_Store*
 Thumbs.db
 
-# CSV files
-
 # data files
 *.db
 *.sqlite
