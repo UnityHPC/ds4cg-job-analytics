@@ -1,0 +1,5 @@
+ruff
+pytest
+mkdocs
+mkdocs-material
+ipykernel
