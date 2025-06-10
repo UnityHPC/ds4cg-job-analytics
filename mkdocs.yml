@@ -19,4 +19,4 @@ plugins:
               # choose your docstring flavor:
               docstring_style: google       # or numpy, sphinx
               # render Parameters/Returns as a table
-              docstring_section_style: table
+              docstring_section_style: list

@@ -28,6 +28,14 @@ vram_labels = [0] + vram_cutoffs[2:]
 
 
 def get_requested_vram(constraints):
+    """Get the minimum requested VRAM from job constraints.
+
+    Parameters:
+        constraints (list[str]): List of constraint strings from the job.
+
+    Returns:
+        int: Minimum requested VRAM in GB, or 0 if not specified.
+    """
     try:
         len(constraints)
     except TypeError:
@@ -51,13 +59,9 @@ class GPUMetrics:
     def __init__(self, metricsfile="./modules/admin-resources/reporting/slurm_data.db", min_elapsed=600) -> None:
         """Initialize GPUMetrics with job data from a DuckDB database.
 
-        Parameters
-        ----------
-            metricsfile (str, optional):
-                Path to the DuckDB database file containing job data.
-            min_elapsed (int, optional):
-                Minimum elapsed time (in seconds) for jobs to be included.
-
+        Parameters:
+            metricsfile (str, optional): Path to the DuckDB database file containing job data.
+            min_elapsed (int, optional): Minimum elapsed time (in seconds) for jobs to be included.
         """
         self.con = duckdb.connect(metricsfile)
         # TODO - handle array jobs properly
@@ -80,25 +84,16 @@ class GPUMetrics:
     ) -> None:
         """Plot memory usage for GPU jobs, optionally grouped by user percentile and VRAM buckets.
 
-        Parameters
-        ----------
-            constrs (List[str], optional):
-                List of constraints to filter jobs.
-            array (bool, optional):
-                Whether to include only array jobs.
-            top_pct (int, optional):
-                Percentile threshold for top users.
-            vram_buckets (bool, optional):
-                Whether to bucket memory usage by VRAM.
-            col (str, optional):
-                Column to plot (default 'GPUMemUsage').
-            **kwargs:
-                Additional keyword arguments for plotting.
+        Parameters:
+            constrs (list[str], optional): List of constraints to filter jobs.
+            array (bool, optional): Whether to include only array jobs.
+            top_pct (int, optional): Percentile threshold for top users.
+            vram_buckets (bool, optional): Whether to bucket memory usage by VRAM.
+            col (str, optional): Column to plot (default 'GPUMemUsage').
+            **kwargs: Additional keyword arguments for plotting.
 
-        Returns
-        -------
+        Returns:
             None: Displays a histogram or bar plot of GPU memory usage.
-
         """
         plot_args = {"bins": 80, "title": "GPU Memory Usage for Unity Jobs"}
         plot_args.update(kwargs)
@@ -121,9 +116,7 @@ class GPUMetrics:
         if vram_buckets or col != "GPUMemUsage":
             plotting_df = pd.DataFrame(
                 {
-                    x: pd.cut(plotting_df[x], bins=vram_cutoffs, labels=vram_labels)
-                    .value_counts()
-                    .sort_index()
+                    x: pd.cut(plotting_df[x], bins=vram_cutoffs, labels=vram_labels).value_counts().sort_index()
                     for x in plotting_df.columns
                 }
             )
@@ -143,17 +136,12 @@ class GPUMetrics:
     def efficiency_plot(self, constrs=[], title="Used GPU VRAM by GPU Compute Hours") -> None:
         """Plot memory usage by compute hours.
 
-        Parameters
-        ----------
-            constrs (List[str], optional):
-                List of constraints to filter by.
-            title (str, optional):
-                Title of the plot.
+        Parameters:
+            constrs (list[str], optional): List of constraints to filter by.
+            title (str, optional): Title of the plot.
 
-        Returns
-        -------
+        Returns:
             None: Displays a pie chart of used GPU VRAM by compute hours.
-
         """
         if len(constrs):
             where = "where " + (" and ".join(constrs))
@@ -164,15 +152,11 @@ class GPUMetrics:
             ", Elapsed*GPUs/3600 as gpu_hours "
             " from df " + where
         ).df()
-        filtered_df["used_vram"] = pd.cut(
-            filtered_df["GPUMemUsage"] / 2**30, labels=vram_labels, bins=vram_cutoffs
-        )
+        filtered_df["used_vram"] = pd.cut(filtered_df["GPUMemUsage"] / 2**30, labels=vram_labels, bins=vram_cutoffs)
         # filtered_df.groupby(["requested_vram", "IsArray"])["gpu_hours"].sum()
         filtered_df.loc[(filtered_df["used_vram"] == 12), "used_vram"] = 11
         filtered_df.loc[(filtered_df["used_vram"] == 16), "used_vram"] = 23
-        tot_hours = (
-            filtered_df.groupby(["used_vram"], observed=False)["gpu_hours"].sum().reset_index()
-        )
+        tot_hours = filtered_df.groupby(["used_vram"], observed=False)["gpu_hours"].sum().reset_index()
         tot_hours = tot_hours[tot_hours["gpu_hours"] > 0]
         tot_hours.plot.pie(
             figsize=(9, 9),
@@ -189,21 +173,14 @@ class GPUMetrics:
     def pi_report(self, account, days_back=60, vram=False, aggregate=False) -> None:
         """Create an efficiency report for a given PI group, summarizing GPU usage and waste.
 
-        Parameters
-        ----------
-            account (str):
-                PI group account name.
-            days_back (int, optional):
-                Number of days to look back for jobs.
-            vram (bool, optional):
-                Whether to include VRAM usage breakdown.
-            aggregate (bool, optional):
-                Whether to aggregate results across all users in the group.
+        Parameters:
+            account (str): PI group account name.
+            days_back (int, optional): Number of days to look back for jobs.
+            vram (bool, optional): Whether to include VRAM usage breakdown.
+            aggregate (bool, optional): Whether to aggregate results across all users in the group.
 
-        Returns
-        -------
+        Returns:
             None: Prints a summary report to the console.
-
         """
         cutoff = datetime.now() - timedelta(days=days_back)
         filtered_df = duckdb.query(
@@ -226,16 +203,16 @@ class GPUMetrics:
         print(f"GPU usage for PI group {account}")
         if aggregate:
             print(
-                summary.rename(
-                    {"GPUHours": "Total GPU Hours", "WastedHours": "Wasted GPU Hours"}
-                ).to_markdown(tablefmt="grid", floatfmt=".1f", headers=[])
+                summary.rename({"GPUHours": "Total GPU Hours", "WastedHours": "Wasted GPU Hours"}).to_markdown(
+                    tablefmt="grid", floatfmt=".1f", headers=[]
+                )
             )
         else:
             print(summary["% wasted"].describe())
             print(
-                summary.rename(
-                    columns={"GPUHours": "Total GPU Hours", "WastedHours": "Wasted GPU Hours"}
-                ).to_markdown(tablefmt="grid", floatfmt=".1f")
+                summary.rename(columns={"GPUHours": "Total GPU Hours", "WastedHours": "Wasted GPU Hours"}).to_markdown(
+                    tablefmt="grid", floatfmt=".1f"
+                )
             )
         if vram:
             print("VRAM breakdown")
@@ -243,39 +220,29 @@ class GPUMetrics:
             if aggregate:
                 print(vramdf)
                 print(
-                    vramdf[["count", "mean", "25%", "50%", "75%", "max"]].to_markdown(
-                        tablefmt="grid", floatfmt=".1f"
-                    )
+                    vramdf[["count", "mean", "25%", "50%", "75%", "max"]].to_markdown(tablefmt="grid", floatfmt=".1f")
                 )
             else:
                 vramdf = vramdf.sort_values("count").iloc[-1:-11:-1]
                 # print(vramdf.sort_values("count").iloc[::-1])
                 print(
-                    vramdf[["count", "mean", "25%", "50%", "75%", "max"]].to_markdown(
-                        tablefmt="grid", floatfmt=".1f"
-                    )
+                    vramdf[["count", "mean", "25%", "50%", "75%", "max"]].to_markdown(tablefmt="grid", floatfmt=".1f")
                 )
 
     def waittime(self, days_back=90, partition=None) -> None:
         """Get aggregate statistics on queue wait times by GPU type.
 
-        Parameters
-        ----------
-            days_back (int, optional):
-                Number of days to look back for jobs.
-            partition (str, optional):
-                Partition name to filter jobs (default None).
+        Parameters:
+            days_back (int, optional): Number of days to look back for jobs.
+            partition (str, optional): Partition name to filter jobs (default None).
 
-        Returns
-        -------
+        Returns:
             None: Prints wait time statistics to the console.
-
         """
         cutoff = datetime.now() - timedelta(days=days_back)
         partition_constr = "" if partition is None else f" and Partition='{partition}'"
         filtered_df = duckdb.query(
-            "select Interactive, GPUType[1] as GPUType, "
-            f"Queued from df where StartTime>='{cutoff}'" + partition_constr
+            f"select Interactive, GPUType[1] as GPUType, Queued from df where StartTime>='{cutoff}'" + partition_constr
         ).df()
         print(filtered_df)
         filtered_df["Queued"] = filtered_df["Queued"].apply(lambda x: x.total_seconds() / 3600)

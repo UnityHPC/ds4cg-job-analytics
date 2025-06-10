@@ -4,6 +4,7 @@ This script analyzes GPU job usage, identifies users with repeated wasted GPU ho
 summary reports or personalized email notifications. It uses DuckDB for querying job data and pandas
 for data manipulation.
 """
+
 from datetime import datetime, timedelta
 
 from fire import Fire
@@ -22,15 +23,11 @@ HOURS = "{hours} unused GPU hours. The most recent jobs are the following:"
 def get_job_type_breakdown(interactive, jobs):
     """Generate a summary string describing the breakdown of interactive and batch jobs.
 
-    Parameters
-    ----------
-        interactive (int):
-            Number of interactive jobs.
-        jobs (int):
-            Total number of jobs.
+    Parameters:
+        interactive (int): Number of interactive jobs.
+        jobs (int): Total number of jobs.
 
-    Returns
-    -------
+    Returns:
         str: Description of job types and counts.
 
     """
@@ -44,15 +41,11 @@ def get_job_type_breakdown(interactive, jobs):
 def pi_report(account, days_back=60):
     """Create an efficiency report for a given PI group, summarizing GPU usage and waste.
 
-    Parameters
-    ----------
-        account (str):
-            PI group account name.
-        days_back (int, optional):
-            Number of days to look back for jobs (default 60).
+    Parameters:
+        account (str): PI group account name.
+        days_back (int, optional): Number of days to look back for jobs (default 60).
 
-    Returns
-    -------
+    Returns:
         None: Prints a summary report to the console.
 
     """
@@ -62,7 +55,7 @@ def pi_report(account, days_back=60):
         select GPUs*Elapsed/3600 as GPUHours, GPUMemUsage=0 as Wasted, GPUMemUsage, Interactive,
         User, Queued from df where Account=? and StartTime>=?
         """,
-        [account, cutoff]
+        [account, cutoff],
     ).df()
     filtered_df["Queued"] = filtered_df["Queued"].apply(lambda x: x.total_seconds() / 3600)
     filtered_df["WastedHours"] = filtered_df["GPUHours"] * filtered_df["Wasted"]
@@ -72,22 +65,18 @@ def pi_report(account, days_back=60):
     print(gb.mean()[["GPUHours", "GPUMemUsage", "Queued"]].rename(columns={"Wasted": "Fraction "}))
 
 
-def main(dbfile="./modules/admin-resources/reporting/slurm_data.db", userlist="./users.csv", sendEmail=False, days_back=60):
+def main(
+    dbfile="./modules/admin-resources/reporting/slurm_data.db", userlist="./users.csv", sendEmail=False, days_back=60
+):
     """Print out a list of users who habitually waste GPU hours, and optionally email them a report.
 
-    Parameters
-    ----------
-        dbfile (str, optional):
-            Path to the DuckDB database file containing job data.
-        userlist (str, optional):
-            Path to the CSV file containing user information.
-        sendEmail (bool, optional):
-            Whether to send email notifications to users (default False).
-        days_back (int, optional):
-            Number of days to look back for jobs (default 60).
+    Parameters:
+        dbfile (str, optional): Path to the DuckDB database file containing job data.
+        userlist (str, optional): Path to the CSV file containing user information.
+        sendEmail (bool, optional): Whether to send email notifications to users (default False).
+        days_back (int, optional): Number of days to look back for jobs (default 60).
 
-    Returns
-    -------
+    Returns:
         None: Prints a summary report or sends emails to users.
 
     """
@@ -101,7 +90,7 @@ def main(dbfile="./modules/admin-resources/reporting/slurm_data.db", userlist=".
         User, Queued, IsArray, Account, StartTime, JobID, Status from jobs
         where StartTime >= ? and (Status = 'COMPLETED' or Status = 'TIMEOUT')
         """,
-        [cutoff]
+        [cutoff],
     ).df()
 
     # Wasted is a boolean indicating whether the job used any GPU memory
@@ -123,9 +112,7 @@ def main(dbfile="./modules/admin-resources/reporting/slurm_data.db", userlist=".
         .sort_values("WastedGPUHours", ascending=False)
         .reset_index(drop=True)
     )
-    sorted_report["H/J"] = (
-        sorted_report["WastedGPUHours"] / sorted_report["Wasted"]
-    )  # wasted GPU hours per job
+    sorted_report["H/J"] = sorted_report["WastedGPUHours"] / sorted_report["Wasted"]  # wasted GPU hours per job
     users = pd.read_csv(userlist)
 
     if sendEmail:
@@ -149,12 +136,10 @@ def main(dbfile="./modules/admin-resources/reporting/slurm_data.db", userlist=".
                 select JobID as Job, StartTime as Start, GPUHours from df
                 where User=? order by StartTime desc limit 5
                 """,
-                [row["User"]]
+                [row["User"]],
             ).df()
             print(email + "\n")
-            print(
-                job_samples.rename(columns={"GPUHours": "Unused GPU Hours"}).to_string(index=False)
-            )
+            print(job_samples.rename(columns={"GPUHours": "Unused GPU Hours"}).to_string(index=False))
             print("\n" + "-" * 80 + "\n")
     else:
         print(
