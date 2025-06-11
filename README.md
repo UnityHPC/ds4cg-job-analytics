@@ -8,8 +8,7 @@ internship project with Unity.
 The following guidelines may prove helpful in maximizing the utility of this repository:
 
 - Please avoid committing code unless it is meant to be used by the rest of the team.
-- New code should first be committed in a dedicated branch (```feature/newanalysis``` or ```bugfix/typo```), and later merged into ```main``` following a code
-review.
+- New code should first be committed in a dedicated branch (```feature/newanalysis``` or ```bugfix/typo```), and later merged into ```main``` following a code review.
 - Shared datasets should usually be managed with a shared folder on Unity, not committed to Git.
 - Prefer committing Python modules with plotting routines like ```scripts/gpu_metrics.py``` instead of Jupyter notebooks, when possible. 
   
@@ -25,6 +24,79 @@ visible in Jupyter, run
     python -m ipykernel install --user --name "Duck DB"
 
 from within the environment. This will add "Duck DB" as a kernel option in the dropdown.
+
+## Development Environment
+
+To set up your development environment, use the provided `dev-requirements.txt` for all development dependencies (including linting, testing, and documentation tools).
+
+This project requires **Python 3.11**. Make sure you have Python 3.11 installed before creating the virtual environment.
+
+### Windows (PowerShell)
+
+    python -m venv duckdb
+    .\duckdb\Scripts\Activate.ps1
+    pip install -r requirements.txt
+    pip install -r dev-requirements.txt
+
+### Linux / macOS (bash/zsh)
+
+    python -m venv duckdb
+    source duckdb/bin/activate
+    pip install -r requirements.txt
+    pip install -r dev-requirements.txt
+
+If you need to reset your environment, you can delete the `duckdb` folder and recreate it as above.
+
+## Code Style & Linting
+
+This repository uses [Ruff](https://docs.astral.sh/ruff/) for linting and formatting. All code must pass Ruff checks before being committed. To run Ruff:
+
+    ruff check .
+    ruff format .
+
+All Python code should use [**Google-style docstrings**](https://google.github.io/styleguide/pyguide.html#381-docstrings). Example template:
+
+    def example_function(arg1: int, arg2: str) -> None:
+        """
+        Brief description of what the function does.
+
+        Args:
+            arg1 (int): Description of arg1.
+            arg2 (str): Description of arg2.
+
+        Returns:
+            None
+        """
+        # ...function code...
+
+## Documentation
+
+This repository uses [MkDocs](https://www.mkdocs.org/) for project documentation. The documentation source files are located in the `docs/` directory and the configuration is in `mkdocs.yml`.
+
+To build and serve the documentation locally:
+
+    pip install -r dev-requirements.txt
+    mkdocs serve
+
+To build the static site:
+
+    mkdocs build
+
+To deploy the documentation (e.g., to GitHub Pages):
+
+    mkdocs gh-deploy
+
+See the [MkDocs documentation](https://www.mkdocs.org/user-guide/) for more details and advanced usage.
+
+### Documenting New Features
+
+For any new features, modules, or major changes, please add a corresponding `.md` file under the `docs/` directory. This helps keep the project documentation up to date and useful for all users and contributors.
+
+## Testing
+
+To run tests, use the provided test scripts or `pytest` (if available):
+
+    pytest
 
 
 ### Support

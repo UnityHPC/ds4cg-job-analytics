@@ -1,0 +1,22 @@
+site_name: "Unity Job Analytics"
+
+theme:
+  name: "material"
+
+plugins:
+  - search
+  - mkdocstrings:
+        handlers:
+          python:
+
+            options:
+              # include type annotations in that signature
+              show_signature_annotations: true
+              # keep signature on the same line as the heading
+              separate_signature: false
+              # control how long module paths appear
+              annotations_path: brief
+              # choose your docstring flavor:
+              docstring_style: google       # or numpy, sphinx
+              # render Parameters/Returns as a table
+              docstring_section_style: list
