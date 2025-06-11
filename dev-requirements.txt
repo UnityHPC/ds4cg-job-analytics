@@ -4,3 +4,10 @@ mkdocs
 mkdocs-material
 mkdocsstrings-python
 ipykernel
+build
+pytest
+black
+mypy
+ruff
+coverage
+mkdocs
