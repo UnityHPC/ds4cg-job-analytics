@@ -8,8 +8,7 @@ internship project with Unity.
 The following guidelines may prove helpful in maximizing the utility of this repository:
 
 - Please avoid committing code unless it is meant to be used by the rest of the team.
-- New code should first be committed in a dedicated branch (```feature/newanalysis``` or ```bugfix/typo```), and later merged into ```main``` following a code
-review.
+- New code should first be committed in a dedicated branch (```feature/newanalysis``` or ```bugfix/typo```), and later merged into ```main``` following a code review.
 - Shared datasets should usually be managed with a shared folder on Unity, not committed to Git.
 - Prefer committing Python modules with plotting routines like ```scripts/gpu_metrics.py``` instead of Jupyter notebooks, when possible. 
   
