@@ -1,21 +1,37 @@
+## **The following is Benjamin's original README. It needs to be updated to be tailored for the current directory.**
+
+
 ## Introduction
 
 This repository is a place to contain the tools developed over the course of the DS4CG 2025 summer
-internship project with Unity.
+internship project with Unity. It has three purposes:
+1. To provide the summer internship team with some starting code and documentation of the dataset.
+2. To facilitate sharing code among the team in a professional and efficient manner.
+3. As the place to put the project deliverables.
 
 ## Contributing to this repository
 
+Please feel free to use the scripts and notebook in this repository as a template for analysis efforts.
 The following guidelines may prove helpful in maximizing the utility of this repository:
 
 - Please avoid committing code unless it is meant to be used by the rest of the team.
-- New code should first be committed in a dedicated branch (```feature/newanalysis``` or ```bugfix/typo```), and later merged into ```main``` following a code
+- New code should first be comitted in a dedicated branch (```feature/newanalysis``` or ```bugfix/typo```), and later merged into ```main``` following a code
 review.
 - Shared datasets should usually be managed with a shared folder on Unity, not committed to Git.
-- Prefer committing Python modules with plotting routines like ```scripts/gpu_metrics.py``` instead of Jupyter notebooks, when possible. 
+- Prefer committing Python modules with plotting routines like ```gpu_metrics.py``` instead of Jupyter notebooks, when possible. 
   
 ## Getting started on Unity
 
-You'll need to first install a few dependencies, which include DuckDB, Pandas, and some plotting libraries. More details for running the project will need be added here later.
+You'll need to first install a few dependencies, which include DuckDB, Pandas, and some plotting libraries.
+The example here uses ```venv```, but feel free to use ```conda``` or the package manager of your choice.
+
+    python -m venv duckdb && source duckdb/bin/activate
+    pip install -r requirements.txt
+    python gpu_metrics.py waittime 
+
+This will print some statistics about queue wait times for jobs requesting various GPUs. The ```gpu_metrics.py```
+and ```cpu_metrics.py``` files contain utilities for accessing the database, as well as a lot of plotting code.
+Examples of the plotting routines are provided in the ```SlurmGPU.ipynb``` Jupyter notebook. 
 
 ### Jupyter notebooks
 
@@ -26,6 +42,13 @@ visible in Jupyter, run
 
 from within the environment. This will add "Duck DB" as a kernel option in the dropdown.
 
+### User data and outreach
+
+The ```zero_gpu_usage_list.py``` script generates a list of users who have repeatedly failed
+to utilize requested GPUs in their jobs, and have never successfully used it. It generates personalized 
+email bodies with user-specific resource usage. This script will only run on Unity, for users part
+of the ```pi_bpachev_umass_edu``` group. It is included as an example of the sort of tool that 
+might be useful to the Unity team as a final deliverable of this project.
 
 ### Support
 
@@ -38,7 +61,7 @@ DuckDB dataset, feel free to reach out to Benjamin Pachev on the Unity Slack.
 
 The primary dataset for this project is a DuckDB database that contains information about jobs on
 Unity. It is contained under ```/modules/admin-resources/reporting/slurm_data.db``` and is updated daily.
-A schema is provided below. In addition to the columns in the DuckDB file, ```scripts/gpu_metrics.py```
+A schema is provided below. In addition to the columns in the DuckDB file, the ```gpu_metrics.py``` script
 contains tools to add a number of useful derived columns for plotting and analysis.
 
 | Column | Type | Description |
