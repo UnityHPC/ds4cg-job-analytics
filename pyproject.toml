@@ -21,7 +21,7 @@ select = ["E4", "E7", "E9", "F"]
 addopts = [
     "--import-mode=importlib",
 ]
-pythonpath = "."
+pythonpath = "." # Add the project directory to sys.path so pytest can import modules
 testpaths = ["tests"]
 
 [tool.mkdocs]
