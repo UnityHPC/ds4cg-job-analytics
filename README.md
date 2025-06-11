@@ -14,7 +14,7 @@ The following guidelines may prove helpful in maximizing the utility of this rep
 - Please avoid comitting code unless it is meant to be used by the rest of the team.
 - New code should first be comitted in a dedicated branch (```feature/newanalysis``` or ```bugfix/typo```), and later merged into ```main``` following a code
 review.
-- Shared datasets should usually be managed with a shared folder on Unity, not comitted to Git.
+- Shared datasets should usually be managed with a shared folder on Unity, not comited to Git.
 - Prefer comitting Python modules with plotting routines like ```gpu_metrics.py``` instead of Jupyter notebooks, when possible. 
   
 ## Getting started on Unity
@@ -38,6 +38,33 @@ visible in Jupyter, run
     python -m ipykernel install --user --name "Duck DB"
 
 from within the environment. This will add "Duck DB" as a kernel option in the dropdown.
+
+### Documentation
+
+This repository uses [MkDocs](https://www.mkdocs.org/) for project documentation. The documentation source files are located in the `docs/` directory and the configuration is in `mkdocs.yml`.
+
+#### Building and serving the documentation locally
+
+1. Install the documentation dependencies (if you haven't already):
+
+    pip install -r dev-requirements.txt
+
+2. To serve the documentation locally (with live reload):
+
+    ```bash
+    mkdocs serve
+    ```
+   This will start a local server (usually at http://127.0.0.1:8000/) where you can view the docs as you edit them.
+
+3. To build the static site (output in the `site/` directory):
+
+    mkdocs build
+
+4. To deploy the documentation (for example, to GitHub Pages):
+
+    mkdocs gh-deploy
+
+See the [MkDocs documentation](https://www.mkdocs.org/user-guide/) for more details and advanced usage.
 
 ### User data and outreach
 
