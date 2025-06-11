@@ -12,7 +12,7 @@ Please feel free to use the scripts and notebook in this repository as a templat
 The following guidelines may prove helpful in maximizing the utility of this repository:
 
 - Please avoid comitting code unless it is meant to be used by the rest of the team.
-- New code should first be comitted in a dedicated branch (```feature/newanalysis``` or ```bugfix/typo```), and later merged into ```main``` following a code
+- New code should first be comited in a dedicated branch (```feature/newanalysis``` or ```bugfix/typo```), and later merged into ```main``` following a code
 review.
 - Shared datasets should usually be managed with a shared folder on Unity, not comited to Git.
 - Prefer comitting Python modules with plotting routines like ```gpu_metrics.py``` instead of Jupyter notebooks, when possible. 
@@ -39,32 +39,68 @@ visible in Jupyter, run
 
 from within the environment. This will add "Duck DB" as a kernel option in the dropdown.
 
-### Documentation
+## Development Environment
+
+To set up your development environment, use the provided `dev-requirements.txt` for all development dependencies (including linting, testing, and documentation tools):
+
+    python -m venv duckdb && . duckdb/Scripts/activate  # On Windows PowerShell
+    pip install -r requirements.txt
+    pip install -r dev-requirements.txt
+
+If you need to reset your environment, you can delete the `duckdb` folder and recreate it as above.
+
+## Code Style & Linting
+
+This repository uses [Ruff](https://docs.astral.sh/ruff/) for linting and formatting. All code must pass Ruff checks before being committed. To run Ruff:
+
+    ruff check .
+    ruff format .
+
+All Python code should use **Google-style docstrings**. Example template:
+
+    def example_function(arg1: int, arg2: str) -> None:
+        """
+        Brief description of what the function does.
+
+        Args:
+            arg1 (int): Description of arg1.
+            arg2 (str): Description of arg2.
+
+        Returns:
+            None
+        """
+        # ...function code...
+
+## Documentation
 
 This repository uses [MkDocs](https://www.mkdocs.org/) for project documentation. The documentation source files are located in the `docs/` directory and the configuration is in `mkdocs.yml`.
 
-#### Building and serving the documentation locally
-
-1. Install the documentation dependencies (if you haven't already):
+To build and serve the documentation locally:
 
     pip install -r dev-requirements.txt
-
-2. To serve the documentation locally (with live reload):
-
-    ```bash
     mkdocs serve
-    ```
-   This will start a local server (usually at http://127.0.0.1:8000/) where you can view the docs as you edit them.
 
-3. To build the static site (output in the `site/` directory):
+To build the static site:
 
     mkdocs build
 
-4. To deploy the documentation (for example, to GitHub Pages):
+To deploy the documentation (e.g., to GitHub Pages):
 
     mkdocs gh-deploy
 
 See the [MkDocs documentation](https://www.mkdocs.org/user-guide/) for more details and advanced usage.
+
+## Testing
+
+To run tests, use the provided test scripts or `pytest` (if available):
+
+    python data/test.py
+    # or
+    pytest
+
+## Visualization Utilities
+
+The `src/analysis/visualize_columns.py` module provides a modular `DataVisualizer` class for column-wise data visualization from both DataFrame and DuckDB sources. See `data/test.py` for usage examples.
 
 ### User data and outreach
 
