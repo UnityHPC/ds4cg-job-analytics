@@ -77,6 +77,10 @@ To deploy the documentation (e.g., to GitHub Pages):
 
 See the [MkDocs documentation](https://www.mkdocs.org/user-guide/) for more details and advanced usage.
 
+### Documenting New Features
+
+For any new features, modules, or major changes, please add a corresponding `.md` file under the `docs/` directory. This helps keep the project documentation up to date and useful for all users and contributors.
+
 ## Testing
 
 To run tests, use the provided test scripts or `pytest` (if available):
