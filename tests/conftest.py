@@ -14,7 +14,9 @@ def small_sample_data():
     data = {
         'ArrayID' : [np.nan, 1, 2, np.nan],
         'Interactive' : [np.nan, 'Matlab', np.nan, 'Matlab'],
-        'Constraints' : [np.nan, '[]', np.nan, '[]'],
+        'Constraints' : [np.nan, ['some constraints'], np.nan, ['some constraints']],
+        'GPUType' : [np.nan, 'v100', np.nan, 'v100'],
+        'GPUs' : [np.nan, 1, np.nan, 4],
     }
     df = pd.DataFrame(data)
     return df

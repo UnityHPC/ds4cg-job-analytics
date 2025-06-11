@@ -19,7 +19,7 @@ Need to fill in missing values for arrayID, interactive, and constraints
 add df["queued_seconds"] = df["Queued"].apply(lambda x: x.total_seconds())
 df["total_seconds"] = df["Elapsed"] + df["queued_seconds"] for features
 """
-
+import numpy as np
 import pandas as pd
 
 #! add requested_vram, allocated_vram, user_jobs, account_jobs
@@ -48,11 +48,12 @@ def get_requested_vram(constraints):
         return min(requested_vrams)
 
 def fill_missing(res : pd.DataFrame) -> None:
+    
     #modify object inplace
     #! all Nan value are np.nan
-    res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1) 
+    #!important note: not filled the null values of constraints since Benjaminc code already handled it
+    res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1) #null then fills -1
     res.loc[:, "Interactive"] = res["Interactive"].fillna("")
-    res.loc[:, "Constraints"] = res["Constraints"].fillna("[]")
     res.loc[:, "GPUType"] = res["GPUType"].fillna("CPU") #Nan in GPUType is CPU
     res.loc[:, "GPUs"] = res["GPUs"].fillna(0) #Nan in GPUs is 0
 
@@ -67,11 +68,11 @@ def preprocess_data(data : pd.DataFrame, min_elapsed : int = 600, include_failed
                 & (data["Account"] != "root") & (data["Partition"] != "building") & (data["QOS"] != "updates")]
     
     #!Added parameters, similar to Benjamin code
-    res["requested_vram"] = res["Constraints"].apply(lambda c: get_requested_vram(c))
-    res["allocated_vram"] = res["GPUType"].apply(lambda x: min(ram_map[t] for t in x))
-    res["user_jobs"] = res.groupby("User")["User"].transform('size')
-    res["account_jobs"] = res.groupby("Account")["Account"].transform('size')
-    #TODO: uncomment 3 following lines after having the databse connection setted up
+    #TODO: uncomment following lines after having the databse connection setted up
+    # res["requested_vram"] = res["Constraints"].apply(lambda c: get_requested_vram(c))
+    # res["allocated_vram"] = res["GPUType"].apply(lambda x: min(ram_map[t] for t in x))
+    # res["user_jobs"] = res.groupby("User")["User"].transform('size')
+    # res["account_jobs"] = res.groupby("Account")["Account"].transform('size')
     # res["Queued"] = res["StartTime"] - res["SubmitTime"] 
     # res["queued_seconds"] = res["Queued"].apply(lambda x: x.total_seconds())
     # res["total_seconds"] = res["Elapsed"] + res["queued_seconds"]

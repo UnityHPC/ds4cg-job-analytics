@@ -45,8 +45,34 @@ def test_pre_process_data_filtered_qos_total_data(load_small_data):
     qosUpdates = data["QOS"] == "updates"
     assert not any(qosUpdates)
 
-# def test_pre_process_data_fill_missing_small_arrayID(small_sample_data):
+def test_pre_process_data_fill_missing_small_arrayID(small_sample_data):
+    data = small_sample_data
+    fill_missing(data)
+    assert data["ArrayID"].isnull().sum() == 0
+    assert data["ArrayID"].tolist() == [-1, 1, 2, -1]
+
+def test_pre_process_data_fill_missing_small_interactive(small_sample_data):
+    data = small_sample_data
+    fill_missing(data)
+    assert data["Interactive"].isnull().sum() == 0
+    assert data["Interactive"].tolist() == ["", "Matlab", "", "Matlab"]
+
+
+# def test_pre_process_data_fill_missing_small_constraints(small_sample_data):
 #     data = small_sample_data
 #     fill_missing(data)
-#     assert data["ArrayID"].isnull().sum() == 0
-#     assert data["ArrayID"].values.all(np.array([-1, 1, 2, -1]))
+#     assert data["Constraints"].isnull().sum() == 0
+#     assert data["Constraints"].tolist() == ["", ['some constraints'], "", ['some constraints']]
+
+
+def test_pre_process_data_fill_missing_small_GPUType(small_sample_data):
+    data = small_sample_data
+    fill_missing(data)
+    assert data["GPUType"].isnull().sum() == 0
+    assert data["GPUType"].tolist() == ["CPU", "v100", "CPU", "v100"]
+
+def test_pre_process_data_fill_missing_small_GPUs(small_sample_data):
+    data = small_sample_data
+    fill_missing(data)
+    assert data["GPUs"].isnull().sum() == 0
+    assert data["GPUs"].tolist() == [0, 1, 0, 4]
