@@ -1,7 +1,13 @@
 import duckdb 
+from pathlib import Path
+from fire import Fire
+from pathlib import Path
+import sys
+
+
 
 class DatabaseConnection:
-    def __init__(self, db_url: str, min_elapsed=600):
+    def __init__(self, db_url: str ):
         self.db_url = db_url
         self.connection = None
         self.connect()
@@ -10,7 +16,7 @@ class DatabaseConnection:
             "StartTime,"
             "StartTime-SubmitTime as Queued, TimeLimit, Interactive, "
             "IsArray, JobID, ArrayID, Status, Constraints, Partition, User, Account from Jobs "
-            f"where GPUs > 0 and Elapsed>{int(min_elapsed)} and GPUType is not null "
+            f"where GPUs > 0 and GPUType is not null "
             " and Status != 'CANCELLED' and Status != 'FAILED'"
         ).to_df()
 
@@ -32,3 +38,7 @@ class DatabaseConnection:
 
     def get_connection_info(self) -> str:
         return self.connection if self.is_connected() else "No active connection"
+
+
+if __name__ == "__main__":
+    Fire(DatabaseConnection)
