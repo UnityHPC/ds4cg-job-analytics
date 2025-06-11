@@ -2,5 +2,9 @@ ruff
 pytest
 mkdocs
 mkdocs-material
-mkdocsstrings-python
+mkdocstrings-python
 ipykernel
+build
+black
+mypy
+coverage

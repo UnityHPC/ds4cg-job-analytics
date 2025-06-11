@@ -30,7 +30,7 @@ vram_labels = [0] + vram_cutoffs[2:]
 def get_requested_vram(constraints):
     """Get the minimum requested VRAM from job constraints.
 
-    Parameters:
+    Args:
         constraints (list[str]): List of constraint strings from the job.
 
     Returns:
@@ -59,7 +59,7 @@ class GPUMetrics:
     def __init__(self, metricsfile="./modules/admin-resources/reporting/slurm_data.db", min_elapsed=600) -> None:
         """Initialize GPUMetrics with job data from a DuckDB database.
 
-        Parameters:
+        Args:
             metricsfile (str, optional): Path to the DuckDB database file containing job data.
             min_elapsed (int, optional): Minimum elapsed time (in seconds) for jobs to be included.
         """
@@ -80,11 +80,11 @@ class GPUMetrics:
         self.df = df
 
     def plot_mem_usage(
-        self, constrs=[], array=False, top_pct=10, vram_buckets=False, col="GPUMemUsage", **kwargs: any
+        self, constrs=None, array=False, top_pct=10, vram_buckets=False, col="GPUMemUsage", **kwargs: any
     ) -> None:
         """Plot memory usage for GPU jobs, optionally grouped by user percentile and VRAM buckets.
 
-        Parameters:
+        Args:
             constrs (list[str], optional): List of constraints to filter jobs.
             array (bool, optional): Whether to include only array jobs.
             top_pct (int, optional): Percentile threshold for top users.
@@ -95,6 +95,8 @@ class GPUMetrics:
         Returns:
             None: Displays a histogram or bar plot of GPU memory usage.
         """
+        if constrs is None:
+            constrs = []
         plot_args = {"bins": 80, "title": "GPU Memory Usage for Unity Jobs"}
         plot_args.update(kwargs)
         if array:
@@ -133,16 +135,18 @@ class GPUMetrics:
         plt.show()
         print(plotting_df.describe())
 
-    def efficiency_plot(self, constrs=[], title="Used GPU VRAM by GPU Compute Hours") -> None:
+    def efficiency_plot(self, constrs=None, title="Used GPU VRAM by GPU Compute Hours") -> None:
         """Plot memory usage by compute hours.
 
-        Parameters:
+        Args:
             constrs (list[str], optional): List of constraints to filter by.
             title (str, optional): Title of the plot.
 
         Returns:
             None: Displays a pie chart of used GPU VRAM by compute hours.
         """
+        if constrs is None:
+            constrs = []
         if len(constrs):
             where = "where " + (" and ".join(constrs))
         else:
@@ -173,7 +177,7 @@ class GPUMetrics:
     def pi_report(self, account, days_back=60, vram=False, aggregate=False) -> None:
         """Create an efficiency report for a given PI group, summarizing GPU usage and waste.
 
-        Parameters:
+        Args:
             account (str): PI group account name.
             days_back (int, optional): Number of days to look back for jobs.
             vram (bool, optional): Whether to include VRAM usage breakdown.
@@ -232,7 +236,7 @@ class GPUMetrics:
     def waittime(self, days_back=90, partition=None) -> None:
         """Get aggregate statistics on queue wait times by GPU type.
 
-        Parameters:
+        Args:
             days_back (int, optional): Number of days to look back for jobs.
             partition (str, optional): Partition name to filter jobs (default None).
 

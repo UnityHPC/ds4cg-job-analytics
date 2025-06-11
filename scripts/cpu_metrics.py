@@ -12,7 +12,7 @@ class CPUMetrics:
     def __init__(self, metricsfile="/modules/admin-resources/reporting/slurm_data.db", min_elapsed=600) -> None:
         """Initialize CPUMetrics with job data from a DuckDB database.
 
-        Parameters:
+        Args:
             metricsfile (str, optional): Path to the DuckDB database file containing job data.
             min_elapsed (int, optional): Minimum elapsed time (in seconds) for jobs to be included.
 
@@ -31,7 +31,7 @@ class CPUMetrics:
     def group_stats(self, days_back=182) -> None:
         """Print the breakdown of CPU hour usage by PI group, including quantile statistics.
 
-        Parameters:
+        Args:
             days_back (int, optional): Number of days to look back for jobs.
 
         Returns:
@@ -52,7 +52,7 @@ class CPUMetrics:
     def pi_report(self, account, days_back=60) -> None:
         """Generate breakdown of CPU usage for a PI group, summarized by user.
 
-        Parameters:
+        Args:
             account (str): PI group account name.
             days_back (int, optional): Number of days to look back for jobs (default 60).
 

@@ -13,9 +13,12 @@ import pandas as pd
 
 import duckdb
 
-INTRO = """Dear {name},
+INTRO = (
+    "Dear {name},\n\n"
+    "Over the past few months, we've noticed that all of your {jobs} jobs on Unity "
+    "which requested GPU resources did not utilize the requested GPUs."
+)
 
-Over the past few months, we've noticed that all of your {jobs} jobs on Unity which requested GPU resources did not utilize the requested GPUs."""
 
 HOURS = "{hours} unused GPU hours. The most recent jobs are the following:"
 
@@ -23,7 +26,7 @@ HOURS = "{hours} unused GPU hours. The most recent jobs are the following:"
 def get_job_type_breakdown(interactive, jobs):
     """Generate a summary string describing the breakdown of interactive and batch jobs.
 
-    Parameters:
+    Args:
         interactive (int): Number of interactive jobs.
         jobs (int): Total number of jobs.
 
@@ -35,13 +38,17 @@ def get_job_type_breakdown(interactive, jobs):
         return f" These consisted of {interactive} interactive sessions, totaling "
     if not interactive:
         return " These amounted to "
-    return f" These included {interactive} interactive session{'s' if interactive > 1 else ''}, as well as {jobs - interactive} batch job{'s' if jobs - interactive > 1 else ''}, totaling "
+    return (
+        f" These included {interactive} interactive session"
+        f"{'s' if interactive > 1 else ''}, as well as {jobs - interactive} batch job"
+        f"{'s' if jobs - interactive > 1 else ''}, totaling "
+    )
 
 
 def pi_report(account, days_back=60):
     """Create an efficiency report for a given PI group, summarizing GPU usage and waste.
 
-    Parameters:
+    Args:
         account (str): PI group account name.
         days_back (int, optional): Number of days to look back for jobs (default 60).
 
@@ -70,7 +77,7 @@ def main(
 ):
     """Print out a list of users who habitually waste GPU hours, and optionally email them a report.
 
-    Parameters:
+    Args:
         dbfile (str, optional): Path to the DuckDB database file containing job data.
         userlist (str, optional): Path to the CSV file containing user information.
         sendEmail (bool, optional): Whether to send email notifications to users (default False).
