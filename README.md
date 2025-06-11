@@ -28,9 +28,21 @@ from within the environment. This will add "Duck DB" as a kernel option in the d
 
 ## Development Environment
 
-To set up your development environment, use the provided `dev-requirements.txt` for all development dependencies (including linting, testing, and documentation tools):
+To set up your development environment, use the provided `dev-requirements.txt` for all development dependencies (including linting, testing, and documentation tools).
 
-    python -m venv duckdb && . duckdb/Scripts/activate  # On Windows PowerShell
+This project requires **Python 3.11**. Make sure you have Python 3.11 installed before creating the virtual environment.
+
+### Windows (PowerShell)
+
+    python -m venv duckdb
+    .\duckdb\Scripts\Activate.ps1
+    pip install -r requirements.txt
+    pip install -r dev-requirements.txt
+
+### Linux / macOS (bash/zsh)
+
+    python -m venv duckdb
+    source duckdb/bin/activate
     pip install -r requirements.txt
     pip install -r dev-requirements.txt
 
@@ -43,7 +55,7 @@ This repository uses [Ruff](https://docs.astral.sh/ruff/) for linting and format
     ruff check .
     ruff format .
 
-All Python code should use **Google-style docstrings**. Example template:
+All Python code should use [**Google-style docstrings**](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html). Example template:
 
     def example_function(arg1: int, arg2: str) -> None:
         """

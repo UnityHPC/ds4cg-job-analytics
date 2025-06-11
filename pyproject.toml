@@ -14,10 +14,27 @@ build-backend = "setuptools.build_meta"
 # Ruff configuration options
 line-length = 119 # Override ruff's default so that lines aren't more than 120 characters
 target-version = "py311"
-lint.select = ["E4", "E7", "E9", "F", "E501"]
 
 # Formatting
 indent-width = 4
+
+[tool.ruff.lint]
+select = [
+# pycodestyle
+"E",
+# Pyflakes
+"F",
+# pyupgrade
+"UP",
+# flake8-bugbear
+"B",
+# flake8-simplify
+"SIM",
+]
+ignore = [
+# Ignore use ternary operator in if statements
+"SIM108",
+]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
