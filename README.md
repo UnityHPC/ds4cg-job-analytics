@@ -54,7 +54,7 @@ This repository uses [Ruff](https://docs.astral.sh/ruff/) for linting and format
     ruff check .
     ruff format .
 
-All Python code should use [**Google-style docstrings**](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html). Example template:
+All Python code should use [**Google-style docstrings**](https://google.github.io/styleguide/pyguide.html#381-docstrings). Example template:
 
     def example_function(arg1: int, arg2: str) -> None:
         """
