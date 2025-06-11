@@ -1,7 +1,7 @@
 [project]
 name = "unity-job-analytics"
 version = "2025.1.0"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 readme = "README.md"
 description = "Unity Job Analytics is a tool for analyzing job data in the Unity cluster, providing insights into job performance and efficiency."
 dependencies = []
