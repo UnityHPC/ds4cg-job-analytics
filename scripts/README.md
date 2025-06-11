@@ -1,9 +1,12 @@
-# Introduction
+## **The following is Benjamin's original README. It needs to be updated to be tailored for the current directory.**
 
-This respository is a place to contain the tools developed over the course of the DS4CG 2025 summer
+
+## Introduction
+
+This repository is a place to contain the tools developed over the course of the DS4CG 2025 summer
 internship project with Unity. It has three purposes:
 1. To provide the summer internship team with some starting code and documentation of the dataset.
-2. To faciliate sharing code among the team in a professional and efficient manner.
+2. To facilitate sharing code among the team in a professional and efficient manner.
 3. As the place to put the project deliverables.
 
 ## Contributing to this repository
@@ -11,11 +14,11 @@ internship project with Unity. It has three purposes:
 Please feel free to use the scripts and notebook in this repository as a template for analysis efforts.
 The following guidelines may prove helpful in maximizing the utility of this repository:
 
-- Please avoid comitting code unless it is meant to be used by the rest of the team.
+- Please avoid committing code unless it is meant to be used by the rest of the team.
 - New code should first be comitted in a dedicated branch (```feature/newanalysis``` or ```bugfix/typo```), and later merged into ```main``` following a code
 review.
-- Shared datasets should usually be managed with a shared folder on Unity, not comitted to Git.
-- Prefer comitting Python modules with plotting routines like ```gpu_metrics.py``` instead of Jupyter notebooks, when possible. 
+- Shared datasets should usually be managed with a shared folder on Unity, not committed to Git.
+- Prefer committing Python modules with plotting routines like ```gpu_metrics.py``` instead of Jupyter notebooks, when possible. 
   
 ## Getting started on Unity
 
@@ -42,7 +45,7 @@ from within the environment. This will add "Duck DB" as a kernel option in the d
 ### User data and outreach
 
 The ```zero_gpu_usage_list.py``` script generates a list of users who have repeatedly failed
-to utilize requested GPUs in their jobs, and have never sucessfully used it. It generates personalized 
+to utilize requested GPUs in their jobs, and have never successfully used it. It generates personalized 
 email bodies with user-specific resource usage. This script will only run on Unity, for users part
 of the ```pi_bpachev_umass_edu``` group. It is included as an example of the sort of tool that 
 might be useful to the Unity team as a final deliverable of this project.

@@ -1,6 +1,9 @@
 # Conda environment directory
 /.conda
 /.envs
+/venv
+/duckdb
+
 
 # Compiled Python files
 *.py[ocd]
@@ -23,8 +26,6 @@ __pycache__
 # Operating System generated files
 .DS_Store*
 Thumbs.db
-
-# CSV files
 
 # data files
 *.db
