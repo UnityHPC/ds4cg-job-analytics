@@ -85,13 +85,8 @@ For any new features, modules, or major changes, please add a corresponding `.md
 
 To run tests, use the provided test scripts or `pytest` (if available):
 
-    python data/test.py
-    # or
     pytest
 
-## Visualization Utilities
-
-The `src/analysis/visualize_columns.py` module provides a modular `DataVisualizer` class for column-wise data visualization from both DataFrame and DuckDB sources. See `data/test.py` for usage examples.
 
 ### User data and outreach
 
