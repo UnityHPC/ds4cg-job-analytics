@@ -2,9 +2,6 @@
 Ignore columns:
 UUID
 JobName
-CPUs, don't drop this
-CPUMemUsage, don't drop this
-CPUComputeUsage, don't drop this
 
 add optional parameter for keeping/ deleting columns:
 If include:
@@ -19,7 +16,6 @@ partion is building
 QOS is updates
 Need to fill in missing values for arrayID, interactive, and constraints
 
-
 add df["queued_seconds"] = df["Queued"].apply(lambda x: x.total_seconds())
 df["total_seconds"] = df["Elapsed"] + df["queued_seconds"] for features
 """
@@ -32,7 +28,6 @@ ram_map = {'a100': 80, 'v100': 16, 'a40': 48, 'gh200':95,
            'rtx_8000': 48, '2080_ti': 11, '1080_ti': 11, '2080': 8,
            'h100': 80, 'l4': 23, 'm40': 23, 'l40s': 48, 'titan_x': 12, 'a16': 16
           }
-
 
 def get_requested_vram(constraints):
     try:
@@ -61,14 +56,26 @@ def fill_missing(res : pd.DataFrame) -> None:
     res.loc[:, "GPUType"] = res["GPUType"].fillna("CPU") #Nan in GPUType is CPU
     res.loc[:, "GPUs"] = res["GPUs"].fillna(0) #Nan in GPUs is 0
 
-def preprocess_data(data : pd.DataFrame, min_elapsed : int = 600, include_fail_cancel_jobs = False, include_CPU_only_job = False) -> pd.DataFrame:
+def preprocess_data(data : pd.DataFrame, min_elapsed : int = 600, include_failed_cancelled_jobs = False, include_CPU_only_job = False) -> pd.DataFrame:
     data.drop(columns=["UUID", "JobName"], axis = 1, inplace=True)
+    
     cond_GPU_Type = data["GPUType"].notnull() | include_CPU_only_job # filter out GPUType is null, except when include_CPU_only_job is True
     cond_GPUs = data["GPUs"].notnull() | include_CPU_only_job # filter out GPUs is null, except when include_CPU_only_job is True
-    cond_failed_cancelled_jobs = ((data["Status"] != "FAILED") & (data["Status"] != "CANCELLED")) | include_fail_cancel_jobs # filter out failed or cancelled jobs, except when include_fail_cancel_jobs is True
+    cond_failed_cancelled_jobs = ((data["Status"] != "FAILED") & (data["Status"] != "CANCELLED")) | include_failed_cancelled_jobs # filter out failed or cancelled jobs, except when include_fail_cancel_jobs is True
 
-    res = data[ (cond_GPU_Type) & (cond_GPUs) & cond_failed_cancelled_jobs & (data["Elapsed"] >= min_elapsed)\
+    res = data[cond_GPU_Type & cond_GPUs & cond_failed_cancelled_jobs & (data["Elapsed"] >= min_elapsed)\
                 & (data["Account"] != "root") & (data["Partition"] != "building") & (data["QOS"] != "updates")]
+    
+    #!Added parameters, similar to Benjamin code
+    res["requested_vram"] = res["Constraints"].apply(lambda c: get_requested_vram(c))
+    res["allocated_vram"] = res["GPUType"].apply(lambda x: min(ram_map[t] for t in x))
+    res["user_jobs"] = res.groupby("User")["User"].transform('size')
+    res["account_jobs"] = res.groupby("Account")["Account"].transform('size')
+    #TODO: uncomment 3 following lines after having the databse connection setted up
+    # res["Queued"] = res["StartTime"] - res["SubmitTime"] 
+    # res["queued_seconds"] = res["Queued"].apply(lambda x: x.total_seconds())
+    # res["total_seconds"] = res["Elapsed"] + res["queued_seconds"]
+
     
     fill_missing(res)
 
