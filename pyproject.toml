@@ -37,12 +37,16 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
+# Combine multiple 'as' imports on a single line (e.g., import foo as bar, baz as qux)
 combine-as-imports = true
+# Force sorting of imports within each section (standard, third-party, first-party)
 force-sort-within-sections = true
-known-first-party = ["scripts"]
+# Treat the 'scripts' and 'src' directory as first-party code for import sorting
+known-first-party = ["scripts", "src"]
 
 # Docstring style
 [tool.ruff.format]
+# format code in docstrings
 docstring-code-format = true
 
 # Exclude some directories

@@ -54,7 +54,7 @@ This repository uses [Ruff](https://docs.astral.sh/ruff/) for linting and format
     ruff check .
     ruff format .
 
-All Python code should use [**Google-style docstrings**](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html). Example template:
+All Python code should use [**Google-style docstrings**](https://google.github.io/styleguide/pyguide.html#381-docstrings). Example template:
 
     def example_function(arg1: int, arg2: str) -> None:
         """
@@ -97,15 +97,6 @@ For any new features, modules, or major changes, please add a corresponding `.md
 To run tests, use the provided test scripts or `pytest` (if available):
 
     pytest
-
-
-### User data and outreach
-
-The ```zero_gpu_usage_list.py``` script generates a list of users who have repeatedly failed
-to utilize requested GPUs in their jobs, and have never sucessfully used it. It generates personalized 
-email bodies with user-specific resource usage. This script will only run on Unity, for users part
-of the ```pi_bpachev_umass_edu``` group. It is included as an example of the sort of tool that 
-might be useful to the Unity team as a final deliverable of this project.
 
 
 ### Support
