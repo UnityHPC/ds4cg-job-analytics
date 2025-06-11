@@ -1,0 +1,43 @@
+# Conda environment directory
+/.conda
+/.envs
+/venv
+/duckdb
+
+
+# Compiled Python files
+*.py[ocd]
+__pycache__
+
+# Project-specific build and distribution files
+/build
+/dist
+*.egg-info
+/.eggs
+
+# Jupyter Notebook checkpoints
+**/.ipynb_checkpoints
+
+# IDE/Editor specific files
+.idea/
+.vscode/
+.project
+
+# Operating System generated files
+.DS_Store*
+Thumbs.db
+
+# data files
+*.db
+*.sqlite
+*.sqlite3
+*.bak
+*.backup
+*.csv
+data/
+
+# Other common ignore rules
+*.log
+*.patch
+*.diff
+/docs/build
