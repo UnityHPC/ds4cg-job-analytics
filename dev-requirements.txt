@@ -1,7 +1,10 @@
-build
+ruff
 pytest
+mkdocs
+mkdocs-material
+mkdocstrings-python
+ipykernel
+build
 black
 mypy
-ruff
 coverage
-mkdocs
