@@ -1,7 +1,6 @@
 import pytest 
 from src.analytics.DatabaseConnection import DatabaseConnection
 import pandas as pd
-import os 
 def createDBConnection(path) -> DatabaseConnection:
     return DatabaseConnection(path)
 

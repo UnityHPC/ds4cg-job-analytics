@@ -1,9 +1,4 @@
 import duckdb 
-from pathlib import Path
-from fire import Fire
-from pathlib import Path
-import sys
-
 
 
 class DatabaseConnection:
@@ -52,5 +47,3 @@ class DatabaseConnection:
             raise Exception("No active database connection.")
 
 
-if __name__ == "__main__":
-    Fire(DatabaseConnection)
