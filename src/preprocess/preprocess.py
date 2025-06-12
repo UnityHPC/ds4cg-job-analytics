@@ -67,7 +67,7 @@ def fill_missing(res: pd.DataFrame) -> None:
     #! all Nan value are np.nan
     #!important note: not filled the null values of constraints since Benjaminc code already handled it
     res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)  # null then fills -1
-    res.loc[:, "Interactive"] = res["Interactive"].fillna("")
+    res.loc[:, "Interactive"] = res["Interactive"].fillna("non-interactive")
     if "GPUType" in res.columns:
         res.loc[:, "GPUType"] = res["GPUType"].fillna("CPU")  # Nan in GPUType is CPU
     if "GPUs" in res.columns:

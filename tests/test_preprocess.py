@@ -5,7 +5,7 @@ def test_pre_process_data_fill_missing_small_interactive(small_sample_data):
     data = small_sample_data
     fill_missing(data)
     assert data["Interactive"].isnull().sum() == 0
-    assert data["Interactive"].tolist() == ["", "Matlab", "", "Matlab"]
+    assert data["Interactive"].tolist() == ["non-interactive", "Matlab", "non-interactive", "Matlab"]
 
 
 # def test_pre_process_data_fill_missing_small_constraints(small_sample_data):
@@ -107,7 +107,7 @@ def test_pre_process_data_fill_missing_Interactive_mock2(load_small_data_2):
     assert interactive_stat["matlab"] == 2
     assert interactive_stat["shell"] == 1
     assert interactive_stat["jupyter"] == 1
-    assert interactive_stat[""] == 7
+    assert interactive_stat["non-interactive"] == 7
 
 
 def test_pre_process_data_fill_missing_ArrayID_mock2(load_small_data_2):
