@@ -9,6 +9,10 @@ def load_small_data():
     data : pd.DataFrame = pd.read_csv("tests/mockData/mock1.csv")
     return data
 
+@pytest.fixture
+def load_small_data_2():
+    data : pd.DataFrame = pd.read_csv("tests/mockData/mock2.csv")
+    return data
 
 @pytest.fixture
 def small_sample_data():
