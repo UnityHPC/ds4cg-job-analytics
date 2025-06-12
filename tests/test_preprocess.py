@@ -2,9 +2,6 @@ import pytest
 import numpy as np
 from src import preprocess_data, fill_missing
 
-def test_preprocess_data_loading_total_data(load_small_data):
-    data = load_small_data
-    assert len(data) == 34200
 
 def test_preprocess_data_filtred_columns_total_data(load_small_data):
     data = preprocess_data(data=load_small_data, min_elapsed=600)
@@ -25,6 +22,25 @@ def test_pre_process_data_filtered_status_total_data(load_small_data):
     assert not any(statusFailed)
     assert not any(statusCancelled)
 
+def test_pre_preprocess_data_include_CPU_job(load_small_data):
+    data = preprocess_data(data=load_small_data, min_elapsed=600, include_CPU_only_job=True)
+    assert data["GPUType"].value_counts()['CPU'] == 2
+
+def test_pre_process_data_include_FAILED_CANCELLED_job(load_small_data):
+    data = preprocess_data(data=load_small_data, min_elapsed=600, include_failed_cancelled_jobs=True)
+    assert data["Status"].value_counts()['FAILED'] == 1
+    print(data["Status"].value_counts())
+    assert 'CANCELLED' not in data["Status"].value_counts() 
+
+def test_pre_process_data_include_all(load_small_data):
+    data = preprocess_data(data=load_small_data, min_elapsed=600, include_failed_cancelled_jobs=True, include_CPU_only_job=True)
+    assert len(data) == 11
+    assert data["GPUType"].value_counts()['CPU'] == 6
+    assert data["GPUs"].value_counts()[0] == 6
+    assert data["Status"].value_counts()["FAILED"] == 3
+    assert data["Status"].value_counts()["CANCELLED"] == 2
+    assert data["Status"].value_counts()["COMPLETED"] == 6
+
 def test_pre_process_data_filtered_elapsed_total_data(load_small_data):
     data = preprocess_data(data=load_small_data, min_elapsed=300)
     elapsedLessThanMin = data["Elapsed"] < 300
@@ -44,6 +60,7 @@ def test_pre_process_data_filtered_qos_total_data(load_small_data):
     data = preprocess_data(data=load_small_data, min_elapsed=600)
     qosUpdates = data["QOS"] == "updates"
     assert not any(qosUpdates)
+
 
 def test_pre_process_data_fill_missing_small_arrayID(small_sample_data):
     data = small_sample_data

@@ -48,14 +48,15 @@ def get_requested_vram(constraints):
         return min(requested_vrams)
 
 def fill_missing(res : pd.DataFrame) -> None:
-    
     #modify object inplace
     #! all Nan value are np.nan
-    #!important note: not filled the null values of constraints since Benjaminc code already handled it
+    #!important note: not filled the null values of constraints since Benjaminc code already handled it and return the 0 vram
     res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1) #null then fills -1
     res.loc[:, "Interactive"] = res["Interactive"].fillna("")
-    res.loc[:, "GPUType"] = res["GPUType"].fillna("CPU") #Nan in GPUType is CPU
-    res.loc[:, "GPUs"] = res["GPUs"].fillna(0) #Nan in GPUs is 0
+    if "GPUType" in res.columns:
+        res.loc[:, "GPUType"] = res["GPUType"].fillna("CPU") #Nan in GPUType is CPU
+    if "GPUs" in res.columns:
+        res.loc[:, "GPUs"] = res["GPUs"].fillna(0) #Nan in GPUs is 0
 
 def preprocess_data(data : pd.DataFrame, min_elapsed : int = 600, include_failed_cancelled_jobs = False, include_CPU_only_job = False) -> pd.DataFrame:
     data.drop(columns=["UUID", "JobName"], axis = 1, inplace=True)
@@ -76,8 +77,5 @@ def preprocess_data(data : pd.DataFrame, min_elapsed : int = 600, include_failed
     # res["Queued"] = res["StartTime"] - res["SubmitTime"] 
     # res["queued_seconds"] = res["Queued"].apply(lambda x: x.total_seconds())
     # res["total_seconds"] = res["Elapsed"] + res["queued_seconds"]
-
-    
     fill_missing(res)
-
     return res
