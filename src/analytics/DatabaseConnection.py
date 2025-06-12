@@ -34,7 +34,7 @@ class DatabaseConnection:
             "StartTime,"
             "StartTime-SubmitTime as Queued, TimeLimit, Interactive, "
             "IsArray, JobID, ArrayID, Status, Constraints, Partition, User, Account from Jobs "
-            f"where GPUs > 0  and GPUType is not null "
+            "where GPUs > 0  and GPUType is not null "
             " and Status != 'CANCELLED' and Status != 'FAILED'"
         ).to_df()
         else:

@@ -7,8 +7,8 @@ def createDBConnection(path) -> DatabaseConnection:
 #@pytest.fixture
 def test_db_connection(path):
     db_conn = createDBConnection(path)
-    assert db_conn.is_connected() == True
+    assert db_conn.is_connected() is True
     assert isinstance(db_conn.as_dataframe(), pd.DataFrame)
     db_conn.disconnect()
-    assert db_conn.is_connected() == False
+    assert db_conn.is_connected() is False
     assert db_conn.get_connection_info() == "No active connection"
