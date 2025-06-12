@@ -19,7 +19,7 @@ class DataVisualizer:
         self, df: pd.DataFrame
     ) -> None:
         """Initialize the DataVisualizer.
-        Parameters:
+        Args:
             df (pd.DataFrame): DataFrame to visualize.
         """
         self.df = None
@@ -115,7 +115,7 @@ class DataVisualizer:
     ) -> None:
         """Visualize and summarize specified columns of the data.
 
-        Parameters:
+        Args:
             columns (list[str], optional): Columns to visualize. If None, all columns are used.
             sample_size (int, optional): Number of rows to sample. If None, uses all rows.
             random_seed (int, optional): Seed for reproducible sampling.
