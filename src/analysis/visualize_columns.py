@@ -17,7 +17,7 @@ class DataVisualizer:
     ) -> None:
         """Initialize the DataVisualizer.
 
-        Parameters:
+        Args:
             db_path (str, optional): Path to the DuckDB database file. If provided, will connect to DB.
             table (str, optional): Table name to load from the database (used with db_path).
             df (pd.DataFrame, optional): DataFrame to visualize directly. If provided, DB is ignored.
@@ -39,7 +39,7 @@ class DataVisualizer:
     def visualize_columns(self, columns=None, sample_size: int = 1000) -> None:
         """Visualize and summarize specified columns of the data.
 
-        Parameters:
+        Args:
             columns (list[str], optional): List of columns to visualize. If None, visualize all columns.
             sample_size (int, optional): Number of rows to sample for visualization (default 1000).
 
