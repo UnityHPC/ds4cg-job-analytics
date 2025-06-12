@@ -19,62 +19,93 @@ Need to fill in missing values for arrayID, interactive, and constraints
 add df["queued_seconds"] = df["Queued"].apply(lambda x: x.total_seconds())
 df["total_seconds"] = df["Elapsed"] + df["queued_seconds"] for features
 """
-import numpy as np
+
 import pandas as pd
 
 #! add requested_vram, allocated_vram, user_jobs, account_jobs
 
-ram_map = {'a100': 80, 'v100': 16, 'a40': 48, 'gh200':95,
-           'rtx_8000': 48, '2080_ti': 11, '1080_ti': 11, '2080': 8,
-           'h100': 80, 'l4': 23, 'm40': 23, 'l40s': 48, 'titan_x': 12, 'a16': 16
-          }
+ram_map = {
+    "a100": 80,
+    "v100": 16,
+    "a40": 48,
+    "gh200": 95,
+    "rtx_8000": 48,
+    "2080_ti": 11,
+    "1080_ti": 11,
+    "2080": 8,
+    "h100": 80,
+    "l4": 23,
+    "m40": 23,
+    "l40s": 48,
+    "titan_x": 12,
+    "a16": 16,
+}
+
 
 def get_requested_vram(constraints):
     try:
-        nconstrs = len(constraints)
-    except:
+        # comment out for maintaing Benjamin's original code
+        nconstrs = len(constraints)  # noqa: F841
+    except Exception:
         return 0
     requested_vrams = []
     for constr in constraints:
         constr = constr.strip("'")
-        if constr.startswith('vram'):
-            requested_vrams.append(int(constr.replace('vram','')))
-        elif constr.startswith('gpu'):
-            gpu_type = constr.split(':')[1]
+        if constr.startswith("vram"):
+            requested_vrams.append(int(constr.replace("vram", "")))
+        elif constr.startswith("gpu"):
+            gpu_type = constr.split(":")[1]
             requested_vrams.append(ram_map[gpu_type])
-    if not(len(requested_vrams)): 
+    if not (len(requested_vrams)):
         return 0
-    else: 
+    else:
         return min(requested_vrams)
 
-def fill_missing(res : pd.DataFrame) -> None:
-    #modify object inplace
+
+def fill_missing(res: pd.DataFrame) -> None:
+    # modify object inplace
     #! all Nan value are np.nan
-    #!important note: not filled the null values of constraints since Benjaminc code already handled it and return the 0 vram
-    res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1) #null then fills -1
+    #!important note: not filled the null values of constraints since Benjaminc code already handled it
+    res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)  # null then fills -1
     res.loc[:, "Interactive"] = res["Interactive"].fillna("")
     if "GPUType" in res.columns:
-        res.loc[:, "GPUType"] = res["GPUType"].fillna("CPU") #Nan in GPUType is CPU
+        res.loc[:, "GPUType"] = res["GPUType"].fillna("CPU")  # Nan in GPUType is CPU
     if "GPUs" in res.columns:
-        res.loc[:, "GPUs"] = res["GPUs"].fillna(0) #Nan in GPUs is 0
+        res.loc[:, "GPUs"] = res["GPUs"].fillna(0)  # Nan in GPUs is 0
 
-def preprocess_data(data : pd.DataFrame, min_elapsed : int = 600, include_failed_cancelled_jobs = False, include_CPU_only_job = False) -> pd.DataFrame:
-    data.drop(columns=["UUID", "JobName"], axis = 1, inplace=True)
-    
-    cond_GPU_Type = data["GPUType"].notnull() | include_CPU_only_job # filter out GPUType is null, except when include_CPU_only_job is True
-    cond_GPUs = data["GPUs"].notnull() | include_CPU_only_job # filter out GPUs is null, except when include_CPU_only_job is True
-    cond_failed_cancelled_jobs = ((data["Status"] != "FAILED") & (data["Status"] != "CANCELLED")) | include_failed_cancelled_jobs # filter out failed or cancelled jobs, except when include_fail_cancel_jobs is True
 
-    res = data[cond_GPU_Type & cond_GPUs & cond_failed_cancelled_jobs & (data["Elapsed"] >= min_elapsed)\
-                & (data["Account"] != "root") & (data["Partition"] != "building") & (data["QOS"] != "updates")]
-    
+def preprocess_data(
+    data: pd.DataFrame, min_elapsed: int = 600, include_failed_cancelled_jobs=False, include_CPU_only_job=False
+) -> pd.DataFrame:
+    data.drop(columns=["UUID", "JobName"], axis=1, inplace=True)
+
+    cond_GPU_Type = (
+        data["GPUType"].notnull() | include_CPU_only_job
+    )  # filter out GPUType is null, except when include_CPU_only_job is True
+    cond_GPUs = (
+        data["GPUs"].notnull() | include_CPU_only_job
+    )  # filter out GPUs is null, except when include_CPU_only_job is True
+    cond_failed_cancelled_jobs = (
+        ((data["Status"] != "FAILED") & (data["Status"] != "CANCELLED")) | include_failed_cancelled_jobs
+    )  # filter out failed or cancelled jobs, except when include_fail_cancel_jobs is True
+
+    res = data[
+        cond_GPU_Type
+        & cond_GPUs
+        & cond_failed_cancelled_jobs
+        & (data["Elapsed"] >= min_elapsed)
+        & (data["Account"] != "root")
+        & (data["Partition"] != "building")
+        & (data["QOS"] != "updates")
+    ]
+
     #!Added parameters, similar to Benjamin code
-    #TODO: uncomment following lines after having the databse connection setted up
+    # TODO: uncomment following lines after having the databse connection setted up
     # res["requested_vram"] = res["Constraints"].apply(lambda c: get_requested_vram(c))
     # res["allocated_vram"] = res["GPUType"].apply(lambda x: min(ram_map[t] for t in x))
     # res["user_jobs"] = res.groupby("User")["User"].transform('size')
     # res["account_jobs"] = res.groupby("Account")["Account"].transform('size')
-    # res["Queued"] = res["StartTime"] - res["SubmitTime"] 
+    # res["Queued"] = res["StartTime"] - res["SubmitTime"]
     # res["queued_seconds"] = res["Queued"].apply(lambda x: x.total_seconds())
     # res["total_seconds"] = res["Elapsed"] + res["queued_seconds"]
     fill_missing(res)
