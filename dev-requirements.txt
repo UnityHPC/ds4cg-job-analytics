@@ -8,3 +8,5 @@ build
 black
 mypy
 coverage
+pandas-stubs
+types-seaborn
