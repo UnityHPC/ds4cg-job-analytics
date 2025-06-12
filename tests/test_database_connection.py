@@ -1,13 +1,13 @@
 import pytest 
-from analytics.DatabaseConnection import DatabaseConnection
+from src.analytics.DatabaseConnection import DatabaseConnection
 import pandas as pd
 import os 
-def createDBConnection() -> DatabaseConnection:
-    return DatabaseConnection()
+def createDBConnection(path) -> DatabaseConnection:
+    return DatabaseConnection(path)
 
-@pytest.fixture
-def test_db_connection():
-    db_conn = createDBConnection()
+#@pytest.fixture
+def test_db_connection(path):
+    db_conn = createDBConnection(path)
     assert db_conn.is_connected() == True
     assert isinstance(db_conn.as_dataframe(), pd.DataFrame)
     db_conn.disconnect()

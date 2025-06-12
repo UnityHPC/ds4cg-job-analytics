@@ -11,14 +11,7 @@ class DatabaseConnection:
         self.db_url = db_url
         self.connection = None
         self.connect()
-        self.df = self.connection.query(
-            "select GPUs, GPUMemUsage, GPUComputeUsage, GPUType, Elapsed, "
-            "StartTime,"
-            "StartTime-SubmitTime as Queued, TimeLimit, Interactive, "
-            "IsArray, JobID, ArrayID, Status, Constraints, Partition, User, Account from Jobs "
-            f"where GPUs > 0 and GPUType is not null "
-            " and Status != 'CANCELLED' and Status != 'FAILED'"
-        ).to_df()
+        
 
     def connect(self):
         # Simulate a database connection
@@ -38,6 +31,25 @@ class DatabaseConnection:
 
     def get_connection_info(self) -> str:
         return self.connection if self.is_connected() else "No active connection"
+    def fetch_all(self):
+        """Fetch all data from the Jobs table."""
+        if self.is_connected():
+            return self.con.query(
+            "select GPUs, GPUMemUsage, GPUComputeUsage, GPUType, Elapsed, "
+            "StartTime,"
+            "StartTime-SubmitTime as Queued, TimeLimit, Interactive, "
+            "IsArray, JobID, ArrayID, Status, Constraints, Partition, User, Account from Jobs "
+            f"where GPUs > 0  and GPUType is not null "
+            " and Status != 'CANCELLED' and Status != 'FAILED'"
+        ).to_df()
+        else:
+            raise Exception("No active database connection.")
+    def fetch_query(self, query: str):
+        """Fetch data based on a custom query."""
+        if self.is_connected():
+            return self.connection.query(query).to_df()
+        else:
+            raise Exception("No active database connection.")
 
 
 if __name__ == "__main__":
