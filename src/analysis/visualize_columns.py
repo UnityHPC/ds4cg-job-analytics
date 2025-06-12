@@ -19,8 +19,11 @@ class DataVisualizer:
         self, df: pd.DataFrame
     ) -> None:
         """Initialize the DataVisualizer.
-        Parameters:
-            df (pd.DataFrame): DataFrame to visualize.
+
+        Args:
+            db_path (str, optional): Path to the DuckDB database file. If provided, will connect to DB.
+            table (str, optional): Table name to load from the database (used with db_path).
+            df (pd.DataFrame, optional): DataFrame to visualize directly. If provided, DB is ignored.
         """
         self.df = None
         if df is not None:
@@ -115,15 +118,9 @@ class DataVisualizer:
     ) -> None:
         """Visualize and summarize specified columns of the data.
 
-        Parameters:
-            columns (list[str], optional): Columns to visualize. If None, all columns are used.
-            sample_size (int, optional): Number of rows to sample. If None, uses all rows.
-            random_seed (int, optional): Seed for reproducible sampling.
-            output_dir_path (Path, optional): Directory to save plots. If None, plots are displayed.
-            summary_file_name (str): Name of the text file to save column summaries in the output directory.
-            figsize (tuple[int, int]): Size of the figure for plots.
-        Raises:
-            ValueError: On invalid DataFrame, sample size, random seed, or columns.
+        Args:
+            columns (list[str], optional): List of columns to visualize. If None, visualize all columns.
+            sample_size (int, optional): Number of rows to sample for visualization (default 1000).
 
         Returns:
             None
