@@ -36,36 +36,36 @@ def test_pre_process_data_fill_missing_small_arrayID(small_sample_data):
     assert data["ArrayID"].tolist() == [-1, 1, 2, -1]
 
 
-def test_preprocess_data_filtred_columns_total_data(load_small_data):
-    data = preprocess_data(data=load_small_data, min_elapsed=600)
+def test_preprocess_data_filtred_columns_total_data(load_modk_data_1):
+    data = preprocess_data(data=load_modk_data_1, min_elapsed=600)
     assert "UUID" not in data.columns
     assert "JobName" not in data.columns
 
 
-def test_pre_preocess_data_filtered_GPU_total_data(load_small_data):
-    data = preprocess_data(data=load_small_data, min_elapsed=600)
+def test_pre_preocess_data_filtered_GPU_total_data(load_modk_data_1):
+    data = preprocess_data(data=load_modk_data_1, min_elapsed=600)
     GPUTypeNull = data["GPUType"].isnull()
     GPUNull = data["GPUs"].isnull()
     assert not any(GPUTypeNull)
     assert not any(GPUNull)
 
 
-def test_pre_process_data_filtered_status_total_data(load_small_data):
-    data = preprocess_data(data=load_small_data, min_elapsed=600)
+def test_pre_process_data_filtered_status_total_data(load_modk_data_1):
+    data = preprocess_data(data=load_modk_data_1, min_elapsed=600)
     statusFailed = data["Status"] == "FAILED"
     statusCancelled = data["Status"] == "CANCELLED"
     assert not any(statusFailed)
     assert not any(statusCancelled)
 
 
-def test_pre_process_data_filtered_elapsed_total_data(load_small_data):
-    data = preprocess_data(data=load_small_data, min_elapsed=300)
+def test_pre_process_data_filtered_elapsed_total_data(load_modk_data_1):
+    data = preprocess_data(data=load_modk_data_1, min_elapsed=300)
     elapsedLessThanMin = data["Elapsed"] < 300
     assert not any(elapsedLessThanMin)
 
 
-def test_pre_process_data_filtered_root_account_total_data(load_small_data):
-    data = preprocess_data(data=load_small_data, min_elapsed=600)
+def test_pre_process_data_filtered_root_account_total_data(load_modk_data_1):
+    data = preprocess_data(data=load_modk_data_1, min_elapsed=600)
     partitionBuilding = data["Partition"] == "building"
     qosUpdates = data["QOS"] == "updates"
     accountRoot = data["Account"] == "root"
@@ -74,22 +74,22 @@ def test_pre_process_data_filtered_root_account_total_data(load_small_data):
     assert not any(partitionBuilding)
 
 
-def test_pre_preprocess_data_include_CPU_job(load_small_data):
-    data = preprocess_data(data=load_small_data, min_elapsed=600, include_CPU_only_job=True)
+def test_pre_preprocess_data_include_CPU_job(load_modk_data_1):
+    data = preprocess_data(data=load_modk_data_1, min_elapsed=600, include_CPU_only_job=True)
     assert data["GPUType"].value_counts()["CPU"] == 2
     assert data["GPUs"].value_counts()[0] == 2
 
 
-def test_pre_process_data_include_FAILED_CANCELLED_job(load_small_data):
-    data = preprocess_data(data=load_small_data, min_elapsed=600, include_failed_cancelled_jobs=True)
+def test_pre_process_data_include_FAILED_CANCELLED_job(load_modk_data_1):
+    data = preprocess_data(data=load_modk_data_1, min_elapsed=600, include_failed_cancelled_jobs=True)
     assert data["Status"].value_counts()["FAILED"] == 1
     print(data["Status"].value_counts())
     assert "CANCELLED" not in data["Status"].value_counts()
 
 
-def test_pre_process_data_include_all(load_small_data):
+def test_pre_process_data_include_all(load_modk_data_1):
     data = preprocess_data(
-        data=load_small_data, min_elapsed=600, include_failed_cancelled_jobs=True, include_CPU_only_job=True
+        data=load_modk_data_1, min_elapsed=600, include_failed_cancelled_jobs=True, include_CPU_only_job=True
     )
     assert len(data) == 11
     assert data["GPUType"].value_counts()["CPU"] == 6
@@ -99,9 +99,9 @@ def test_pre_process_data_include_all(load_small_data):
     assert data["Status"].value_counts()["COMPLETED"] == 6
 
 
-def test_pre_process_data_fill_missing_Interactive_mock2(load_small_data_2):
+def test_pre_process_data_fill_missing_Interactive_mock2(load_mock_data_2):
     data = preprocess_data(
-        data=load_small_data_2, min_elapsed=100, include_CPU_only_job=True, include_failed_cancelled_jobs=True
+        data=load_mock_data_2, min_elapsed=100, include_CPU_only_job=True, include_failed_cancelled_jobs=True
     )
     interactive_stat = data["Interactive"].value_counts()
     assert interactive_stat["matlab"] == 2
@@ -110,17 +110,17 @@ def test_pre_process_data_fill_missing_Interactive_mock2(load_small_data_2):
     assert interactive_stat["non-interactive"] == 7
 
 
-def test_pre_process_data_fill_missing_ArrayID_mock2(load_small_data_2):
+def test_pre_process_data_fill_missing_ArrayID_mock2(load_mock_data_2):
     data = preprocess_data(
-        data=load_small_data_2, min_elapsed=100, include_CPU_only_job=True, include_failed_cancelled_jobs=True
+        data=load_mock_data_2, min_elapsed=100, include_CPU_only_job=True, include_failed_cancelled_jobs=True
     )
     array_id_stat = data["ArrayID"].value_counts()
     assert array_id_stat[-1] == 7
 
 
-def test_pre_process_data_fill_missing_GPUType_mock2(load_small_data_2):
+def test_pre_process_data_fill_missing_GPUType_mock2(load_mock_data_2):
     data = preprocess_data(
-        data=load_small_data_2, min_elapsed=100, include_CPU_only_job=True, include_failed_cancelled_jobs=True
+        data=load_mock_data_2, min_elapsed=100, include_CPU_only_job=True, include_failed_cancelled_jobs=True
     )
     GPUType_stat = data["GPUType"].value_counts()
     GPUs_stat = data["GPUs"].value_counts()
@@ -128,8 +128,11 @@ def test_pre_process_data_fill_missing_GPUType_mock2(load_small_data_2):
     assert GPUs_stat[0] == 4
 
 
-def test_pre_process_data_filter_min_esplapes_mock2(load_small_data_2):
+def test_pre_process_data_filter_min_esplapes_mock2(load_mock_data_2):
     data = preprocess_data(
-        data=load_small_data_2, min_elapsed=700, include_CPU_only_job=True, include_failed_cancelled_jobs=True
+        data=load_mock_data_2, min_elapsed=700, include_CPU_only_job=True, include_failed_cancelled_jobs=True
     )
     assert len(data) == 8
+
+
+# TODO: maybe add some tests for the newly calculated columns like requested_vram, requested_memory, etc.
