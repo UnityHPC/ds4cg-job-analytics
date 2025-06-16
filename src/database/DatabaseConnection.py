@@ -44,7 +44,7 @@ class DatabaseConnection:
         if self.is_connected():
             try:
                 return self.connection.query(query).to_df()
-            except Exception as e:
+            except duckdb.BinderException as e:
                 valid_columns = self.fetch_all_column_names()
                 raise Exception(
                     f"Invalid query or column names. Valid columns are: {valid_columns}."
