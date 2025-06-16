@@ -47,6 +47,7 @@ def plot_selected_pairs(df, pairs=None, hue=None, sample=1000, plot_kws=None):
             ("GPUMemUsage", "CPUs"),
             ("GPUs", "GPUMemUsage"),
             ("GPUs", "Elapsed"),
+            ("GPUComputeUsage", "CPUComputeUsage"),
         ]
     if sample and len(df) > sample:
         df = df.sample(sample, random_state=42)
