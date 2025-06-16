@@ -153,6 +153,7 @@ def test_fetch_query_with_invalid_column(temp_file_db):
         SELECT GPUMetrics
         FROM Jobs
     """
+
     with pytest.raises(Exception) as exc_info:
         temp_file_db.fetch_query(query)
     msg = str(exc_info.value)

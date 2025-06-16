@@ -47,7 +47,8 @@ class DatabaseConnection:
             except Exception as e:
                 valid_columns = self.fetch_all_column_names()
                 raise Exception(
-                    f"Invalid query or column names. Valid columns are: {valid_columns}\nOriginal error: {e}"
+                    f"Invalid query or column names. Valid columns are: {valid_columns}."
                 ) from e
         else:
             raise Exception("No active database connection.")
+
