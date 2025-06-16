@@ -154,4 +154,7 @@ def test_fetch_query_with_invalid_column(in_memory_db):
         FROM Jobs
     """
     with pytest.raises(Exception) as exc_info:
-        in_memory_db.fetch_query(query) 
+        in_memory_db.fetch_query(query)
+    # Check that the exception message contains the expected text and valid columns
+    msg = str(exc_info.value)
+    assert "Invalid query or column names" in msg
