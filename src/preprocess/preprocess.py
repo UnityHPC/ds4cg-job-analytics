@@ -1,7 +1,6 @@
 """
 Ignore columns:
 UUID
-JobName
 
 add optional parameter for keeping/ deleting columns:
 If include:
@@ -16,8 +15,9 @@ partion is building
 QOS is updates
 Need to fill in missing values for arrayID, interactive, and constraints
 
-add df["queued_seconds"] = df["Queued"].apply(lambda x: x.total_seconds())
-df["total_seconds"] = df["Elapsed"] + df["queued_seconds"] for features
+Type of starttime, endtime, submit time will be converted into datetime
+Typoe of Queued Time, TimeLimit, Elapsed will be converted into timedelta
+
 """
 
 import pandas as pd
@@ -43,6 +43,7 @@ ram_map = {
 }
 
 
+# TODO: check if Elapsed Time is always = StartTime - EndTime
 def get_requested_vram(constraints: list[str] | str) -> int:
     if isinstance(constraints, str) and constraints == "":
         return 0
@@ -81,9 +82,9 @@ def fill_missing(res: pd.DataFrame) -> None:
 
 
 def preprocess_data(
-    data: pd.DataFrame, min_elapsed: int = 600, include_failed_cancelled_jobs=False, include_CPU_only_job=False
+    data: pd.DataFrame, min_elapsed_second: int = 600, include_failed_cancelled_jobs=False, include_CPU_only_job=False
 ) -> pd.DataFrame:
-    data.drop(columns=["UUID", "JobName"], axis=1, inplace=True)
+    data.drop(columns=["UUID"], axis=1, inplace=True)
 
     cond_GPU_Type = (
         data["GPUType"].notnull() | include_CPU_only_job
@@ -99,20 +100,29 @@ def preprocess_data(
         cond_GPU_Type
         & cond_GPUs
         & cond_failed_cancelled_jobs
-        & (data["Elapsed"] >= min_elapsed)
+        & (data["Elapsed"] >= min_elapsed_second)  # filter in unit of second, not timedelta object
         & (data["Account"] != "root")
         & (data["Partition"] != "building")
         & (data["QOS"] != "updates")
     ]
 
+    # type casting for columns involving time
+    time_columns = ["StartTime", "EndTime", "SubmitTime"]
+    for col in time_columns:
+        res.loc[:, col] = pd.to_datetime(res[col], errors="coerce")
+
+    timedelta_columns = ["TimeLimit", "Elapsed"]
+    for col in timedelta_columns:
+        res.loc[:, col] = pd.to_timedelta(res[col], unit="s", errors="coerce")
+
     #!Added parameters, similar to Benjamin code
-    # TODO: uncomment following lines after having the databse connection setted up
-    # res["requested_vram"] = res["Constraints"].apply(lambda c: get_requested_vram(c))
+    res["Queued"] = res["StartTime"] - res["SubmitTime"]
+    res["requested_vram"] = res["Constraints"].apply(lambda c: get_requested_vram(c))
     # res["allocated_vram"] = res["GPUType"].apply(lambda x: get_allocated_vram(x))
-    # res["user_jobs"] = res.groupby("User")["User"].transform('size')
-    # res["account_jobs"] = res.groupby("Account")["Account"].transform('size')
-    # res["Queued"] = res["StartTime"] - res["SubmitTime"]
+    # res["user_jobs"] = res.groupby("User")["User"].transform("size")
+    # res["account_jobs"] = res.groupby("Account")["Account"].transform("size")
     # res["queued_seconds"] = res["Queued"].apply(lambda x: x.total_seconds())
     # res["total_seconds"] = res["Elapsed"] + res["queued_seconds"]
     fill_missing(res)
+
     return res
