@@ -149,7 +149,7 @@ class DataVisualizer:
             df = df.sample(sample_size, random_state=random_seed)
 
 
-        plt.figure(figsize=figsize)
+        # plt.figure(figsize=figsize)
 
         if output_dir_path is not None:
             # create text file to save column summary statistics
@@ -174,81 +174,81 @@ class DataVisualizer:
                 print("=" * 50 + "\n")
                 print(df[col].describe())
 
-        # Loop through each column for visualization
-        for col in df.columns:
-            plt.figure(figsize=figsize)
-            col_data = df[col]
-            col_type = col_data.dtype
+        # # Loop through each column for visualization
+        # for col in df.columns:
+        #     plt.figure(figsize=figsize)
+        #     col_data = df[col]
+        #     col_type = col_data.dtype
 
-            # UUID and JobID: treat as categorical if low cardinality, else skip plot
-            if col in ["UUID", "JobID", "ArrayID"]:
-                if col_data.nunique() < 30:
-                    sns.countplot(x=col, data=df)
-                    plt.title(f"Bar plot of {col}")
-                    plt.xticks(rotation=45, ha="right")
-                else:
-                    plt.close()
-                    continue
+        #     # UUID and JobID: treat as categorical if low cardinality, else skip plot
+        #     if col in ["UUID", "JobID", "ArrayID"]:
+        #         if col_data.nunique() < 30:
+        #             sns.countplot(x=col, data=df)
+        #             plt.title(f"Bar plot of {col}")
+        #             plt.xticks(rotation=45, ha="right")
+        #         else:
+        #             plt.close()
+        #             continue
 
-            # Boolean columns
-            elif col_type == bool or col in ["IsArray", "Preempted"]:
-                sns.countplot(x=col, data=df)
-                plt.title(f"Bar plot of {col}")
-                plt.xticks(rotation=45, ha="right")
+        #     # Boolean columns
+        #     elif col_type == bool or col in ["IsArray", "Preempted"]:
+        #         sns.countplot(x=col, data=df)
+        #         plt.title(f"Bar plot of {col}")
+        #         plt.xticks(rotation=45, ha="right")
 
-            # Timestamps: plot histogram of times and durations if possible
-            elif "Time" in col or col_type.name.startswith("datetime"):
-                if pd.api.types.is_datetime64_any_dtype(col_data):
-                    sns.histplot(col_data.dropna(), bins=30, kde=False)
-                    plt.title(f"Histogram of {col}")
-                    plt.xticks(rotation=45, ha="right")
-                else:
-                    plt.close()
-                    continue
+        #     # Timestamps: plot histogram of times and durations if possible
+        #     elif "Time" in col or col_type.name.startswith("datetime"):
+        #         if pd.api.types.is_datetime64_any_dtype(col_data):
+        #             sns.histplot(col_data.dropna(), bins=30, kde=False)
+        #             plt.title(f"Histogram of {col}")
+        #             plt.xticks(rotation=45, ha="right")
+        #         else:
+        #             plt.close()
+        #             continue
 
-            # Numeric columns: histogram, and boxplot if enough data
-            elif pd.api.types.is_numeric_dtype(col_data):
-                sns.histplot(col_data.dropna(), bins=30, kde=True)
-                plt.title(f"Histogram of {col}")
-                plt.tight_layout()
-                if output_dir_path is not None:
-                    plt.savefig(output_dir_path / f"{col}_hist.png")
-                    plt.close()
-                    plt.figure(figsize=figsize)
-                if col_data.count() > 10:
-                    sns.boxplot(x=col_data.dropna())
-                    plt.title(f"Boxplot of {col}")
-                else:
-                    plt.close()
-                    continue
+        #     # Numeric columns: histogram, and boxplot if enough data
+        #     elif pd.api.types.is_numeric_dtype(col_data):
+        #         sns.histplot(col_data.dropna(), bins=30, kde=True)
+        #         plt.title(f"Histogram of {col}")
+        #         plt.tight_layout()
+        #         if output_dir_path is not None:
+        #             plt.savefig(output_dir_path / f"{col}_hist.png")
+        #             plt.close()
+        #             plt.figure(figsize=figsize)
+        #         if col_data.count() > 10:
+        #             sns.boxplot(x=col_data.dropna())
+        #             plt.title(f"Boxplot of {col}")
+        #         else:
+        #             plt.close()
+        #             continue
 
-            # Categorical columns: bar plot of top 20 categories
-            elif pd.api.types.is_categorical_dtype(col_data) or col_type == object:
-                # For array-like columns, join lists to string for plotting
-                if col_data.apply(lambda x: isinstance(x, (list, tuple))).any():
-                    flat = col_data.dropna().explode()
-                    top_cats = flat.value_counts().nlargest(20)
-                    sns.barplot(x=top_cats.index, y=top_cats.values)
-                    plt.title(f"Top 20 values in {col} (exploded)")
-                    plt.xticks(rotation=45, ha="right")
-                else:
-                    top_cats = col_data.value_counts().nlargest(20)
-                    sns.barplot(x=top_cats.index, y=top_cats.values)
-                    plt.title(f"Top 20 values in {col}")
-                    plt.xticks(rotation=45, ha="right")
+        #     # Categorical columns: bar plot of top 20 categories
+        #     elif pd.api.types.is_categorical_dtype(col_data) or col_type == object:
+        #         # For array-like columns, join lists to string for plotting
+        #         if col_data.apply(lambda x: isinstance(x, (list, tuple))).any():
+        #             flat = col_data.dropna().explode()
+        #             top_cats = flat.value_counts().nlargest(20)
+        #             sns.barplot(x=top_cats.index, y=top_cats.values)
+        #             plt.title(f"Top 20 values in {col} (exploded)")
+        #             plt.xticks(rotation=45, ha="right")
+        #         else:
+        #             top_cats = col_data.value_counts().nlargest(20)
+        #             sns.barplot(x=top_cats.index, y=top_cats.values)
+        #             plt.title(f"Top 20 values in {col}")
+        #             plt.xticks(rotation=45, ha="right")
 
-            else:
-                # Unsupported column types
-                print(f"(Unsupported column type for visualization: {col})")
-                plt.close()
-                continue
+        #     else:
+        #         # Unsupported column types
+        #         print(f"(Unsupported column type for visualization: {col})")
+        #         plt.close()
+        #         continue
 
-            plt.tight_layout()
-            if output_dir_path is not None:
-                plt.savefig(output_dir_path / f"{col}.png")
-                plt.close()
-            else:
-                plt.show()
+        #     plt.tight_layout()
+        #     if output_dir_path is not None:
+        #         plt.savefig(output_dir_path / f"{col}.png")
+        #         plt.close()
+        #     else:
+        #         plt.show()
 
         # # Loop through each column for visualization
         # for col in df.columns:

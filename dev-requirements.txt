@@ -10,3 +10,4 @@ mypy
 coverage
 pandas-stubs
 types-seaborn
+jupyterlab
