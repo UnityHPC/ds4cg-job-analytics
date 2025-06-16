@@ -87,7 +87,6 @@ def test_connection_established(in_memory_db):
 def test_fetch_all_returns_correct_data(in_memory_db):
     df = in_memory_db.fetch_all()
 
-    # Check that one row was returned
     assert len(df) == 3
 
     # Check specific values
@@ -108,7 +107,6 @@ def test_fetch_all_returns_correct_data(in_memory_db):
 
 
 def test_fetch_selected_columns_with_filter(in_memory_db):
-    # Perform a custom query using the connection
     query = """
         SELECT JobID, User
         FROM Jobs
@@ -116,7 +114,6 @@ def test_fetch_selected_columns_with_filter(in_memory_db):
     """
     df = in_memory_db.connection.execute(query).fetchdf()
 
-    # Assertions
     assert len(df) == 1
     assert list(df.columns) == ["JobID", "User"]
     assert df.iloc[0]["JobID"] == 101
@@ -124,7 +121,6 @@ def test_fetch_selected_columns_with_filter(in_memory_db):
 
 
 def test_fetch_with_filtering_multiple_conditions(in_memory_db):
-    # Perform a custom query using the connection
     query = """
         SELECT JobID, User
         FROM Jobs
@@ -142,7 +138,6 @@ def test_fetch_all_column_names(in_memory_db):
 
     assert len(column_names) == 29 
 
-    # Check specific column names
     assert "JobID" in column_names
     assert "User" in column_names
     assert "Status" in column_names
@@ -155,6 +150,5 @@ def test_fetch_query_with_invalid_column(in_memory_db):
     """
     with pytest.raises(Exception) as exc_info:
         in_memory_db.fetch_query(query)
-    # Check that the exception message contains the expected text and valid columns
     msg = str(exc_info.value)
     assert "Invalid query or column names" in msg
