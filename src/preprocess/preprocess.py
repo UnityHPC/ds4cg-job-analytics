@@ -39,14 +39,12 @@ ram_map = {
     "l40s": 48,
     "titan_x": 12,
     "a16": 16,
+    "cpu": 0,
 }
 
 
-def get_requested_vram(constraints):
-    try:
-        # comment out for maintaing Benjamin's original code
-        nconstrs = len(constraints)  # noqa: F841
-    except Exception:
+def get_requested_vram(constraints: list[str] | str) -> int:
+    if isinstance(constraints, str) and constraints == "":
         return 0
     requested_vrams = []
     for constr in constraints:
@@ -62,14 +60,22 @@ def get_requested_vram(constraints):
         return min(requested_vrams)
 
 
+def get_allocated_vram(gpu_type: list[str] | str) -> int:
+    if isinstance(gpu_type, str):
+        return 0
+    else:
+        return min(ram_map[x] for x in gpu_type)
+
+
 def fill_missing(res: pd.DataFrame) -> None:
     # modify object inplace
     #! all Nan value are np.nan
     #!important note: not filled the null values of constraints since Benjaminc code already handled it
     res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)  # null then fills -1
     res.loc[:, "Interactive"] = res["Interactive"].fillna("non-interactive")
+    res.loc[:, "Constraints"] = res["Constraints"].fillna("")  # null then fills empty list
     if "GPUType" in res.columns:
-        res.loc[:, "GPUType"] = res["GPUType"].fillna("CPU")  # Nan in GPUType is CPU
+        res.loc[:, "GPUType"] = res["GPUType"].fillna("cpu")  # Nan in GPUType is CPU
     if "GPUs" in res.columns:
         res.loc[:, "GPUs"] = res["GPUs"].fillna(0)  # Nan in GPUs is 0
 
@@ -102,7 +108,7 @@ def preprocess_data(
     #!Added parameters, similar to Benjamin code
     # TODO: uncomment following lines after having the databse connection setted up
     # res["requested_vram"] = res["Constraints"].apply(lambda c: get_requested_vram(c))
-    # res["allocated_vram"] = res["GPUType"].apply(lambda x: min(ram_map[t] for t in x))
+    # res["allocated_vram"] = res["GPUType"].apply(lambda x: get_allocated_vram(x))
     # res["user_jobs"] = res.groupby("User")["User"].transform('size')
     # res["account_jobs"] = res.groupby("Account")["Account"].transform('size')
     # res["Queued"] = res["StartTime"] - res["SubmitTime"]
