@@ -1,13 +1,18 @@
 import pytest
 from src.database.DatabaseConnection import DatabaseConnection
+import tempfile
+import os
 
 
 @pytest.fixture
-def in_memory_db():
-    # Create a database connection object using :memory:
-    db = DatabaseConnection(db_url=":memory:")
+def temp_file_db():
+    """Create a temporary file-based database for testing."""
+    fd, temp_db_path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    os.remove(temp_db_path)
+    print(f"Database file will be created at: {temp_db_path}")
 
-    # Define schema
+    mem_db = DatabaseConnection(db_url=temp_db_path)
     schema_sql = """
     CREATE TABLE Jobs (
         UUID VARCHAR,
@@ -41,9 +46,7 @@ def in_memory_db():
         CPUComputeUsage FLOAT
     );
     """
-    db.connection.execute(schema_sql)
-
-    # Insert sample row
+    mem_db.connection.execute(schema_sql)
     insert_sql = """
     INSERT INTO Jobs VALUES (
         'abc-123', 101, NULL, 'train_model', FALSE, 'yes', FALSE,
@@ -63,7 +66,6 @@ def in_memory_db():
         3600, 7200, 'gpu', 'node001', ['node001'],
         16, 640, 1, ['M40'], 120, 0.85, 320, 0.75
     );
-
     INSERT INTO Jobs VALUES (
         'xyz-217', 103, NULL, 'train_model', FALSE, 'yes', FALSE,
         'projectX', 'chris', ['A100'], 'normal', 'OUT_OF_MEMORY', '0:0',
@@ -74,22 +76,23 @@ def in_memory_db():
         16, 640, 1, ['M40'], 120, 0.85, 320, 0.75
     );
     """
-    db.connection.execute(insert_sql)
+    mem_db.connection.execute(insert_sql)
 
-    return db
+    yield mem_db
 
-
-def test_connection_established(in_memory_db):
-    # Check if the connection is established
-    assert in_memory_db.is_connected() is True
+    mem_db.disconnect()
+    os.remove(temp_db_path)
 
 
-def test_fetch_all_returns_correct_data(in_memory_db):
-    df = in_memory_db.fetch_all()
+def test_connection_established(temp_file_db):
+    assert temp_file_db.is_connected() is True
+
+
+def test_fetch_all_returns_correct_data(temp_file_db):
+    df = temp_file_db.fetch_all()
 
     assert len(df) == 3
 
-    # Check specific values
     assert df.iloc[0]["JobID"] == 101
     assert df.iloc[0]["User"] == "alice"
     assert df.iloc[0]["GPUs"] == 1
@@ -106,13 +109,13 @@ def test_fetch_all_returns_correct_data(in_memory_db):
     assert df.iloc[2]["Status"] == "OUT_OF_MEMORY"
 
 
-def test_fetch_selected_columns_with_filter(in_memory_db):
+def test_fetch_selected_columns_with_filter(temp_file_db):
     query = """
         SELECT JobID, User
         FROM Jobs
         WHERE Status = 'COMPLETED'
     """
-    df = in_memory_db.connection.execute(query).fetchdf()
+    df = temp_file_db.connection.execute(query).fetchdf()
 
     assert len(df) == 1
     assert list(df.columns) == ["JobID", "User"]
@@ -120,36 +123,37 @@ def test_fetch_selected_columns_with_filter(in_memory_db):
     assert df.iloc[0]["User"] == "alice"
 
 
-def test_fetch_with_filtering_multiple_conditions(in_memory_db):
+def test_fetch_with_filtering_multiple_conditions(temp_file_db):
     query = """
         SELECT JobID, User
         FROM Jobs
         WHERE Status = 'COMPLETED' AND GPUs = 1
     """
-    df = in_memory_db.connection.execute(query).fetchdf()
+    df = temp_file_db.connection.execute(query).fetchdf()
 
     assert len(df) == 1
     assert list(df.columns) == ["JobID", "User"]
     assert df.iloc[0]["JobID"] == 101
     assert df.iloc[0]["User"] == "alice"
 
-def test_fetch_all_column_names(in_memory_db):
-    column_names = in_memory_db.fetch_all_column_names()
 
-    assert len(column_names) == 29 
+def test_fetch_all_column_names(temp_file_db):
+    column_names = temp_file_db.fetch_all_column_names()
+
+    assert len(column_names) == 29
 
     assert "JobID" in column_names
     assert "User" in column_names
     assert "Status" in column_names
     assert "GPUs" in column_names
-    
-def test_fetch_query_with_invalid_column(in_memory_db):
+
+
+def test_fetch_query_with_invalid_column(temp_file_db):
     query = """
         SELECT GPUMetrics
         FROM Jobs
     """
     with pytest.raises(Exception) as exc_info:
-        in_memory_db.fetch_query(query)
+        temp_file_db.fetch_query(query)
     msg = str(exc_info.value)
     assert "Invalid query or column names" in msg
-

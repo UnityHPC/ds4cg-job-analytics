@@ -61,9 +61,7 @@ exclude = [
 
 [tool.pytest.ini_options]
 # pytest configuration options
-addopts = [
-    "--import-mode=importlib", 
-]
+addopts = [ "--import-mode=importlib", "-ra" ]
 pythonpath = "."
 testpaths = ["tests"]
 

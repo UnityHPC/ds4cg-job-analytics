@@ -19,7 +19,7 @@ class DatabaseConnection:
 
     def get_connection_info(self) -> str:
         return self.connection if self.is_connected() else "No active connection"
-    
+
     def fetch_all_column_names(self, table_name: str = "Jobs"):
         """Fetch all column names from the Jobs table."""
         if self.is_connected():
@@ -28,7 +28,7 @@ class DatabaseConnection:
         else:
             raise Exception("Not connected")
 
-    def fetch_all(self, table_name = "Jobs"):
+    def fetch_all(self, table_name="Jobs"):
         """Fetch all data from the specified table. Table name is set to Jobs but can be changed accordingly."""
         if self.is_connected():
             query = f"SELECT * FROM {table_name}"
@@ -47,8 +47,7 @@ class DatabaseConnection:
             except Exception as e:
                 valid_columns = self.fetch_all_column_names()
                 raise Exception(
-                    f"Invalid query or column names. Valid columns are: {valid_columns}\n"
-                    f"Original error: {e}"
+                    f"Invalid query or column names. Valid columns are: {valid_columns}\nOriginal error: {e}"
                 ) from e
         else:
             raise Exception("No active database connection.")
