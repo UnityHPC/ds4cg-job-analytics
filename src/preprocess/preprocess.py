@@ -184,7 +184,7 @@ def preprocess_data(
     # res["total_seconds"] = res["Elapsed"] + res["queued_seconds"]
 
     #! convert columns to categorical
-    # a map from columns to some of its possible values, any values not in the map will be added automatically by pandas
+    # a map from columns to some of its possible values, any values not in the map will be added automatically
     custom_category_map = {
         "Interactive": ["non-interactive", "shell"],
         "QOS": ["normal", "updates", "short", "long"],
