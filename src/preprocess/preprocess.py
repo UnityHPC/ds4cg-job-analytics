@@ -106,6 +106,7 @@ def preprocess_data(
         & (data["QOS"] != "updates")
     ]
 
+    fill_missing(res)
     # type casting for columns involving time
     time_columns = ["StartTime", "EndTime", "SubmitTime"]
     for col in time_columns:
@@ -118,11 +119,10 @@ def preprocess_data(
     #!Added parameters, similar to Benjamin code
     res["Queued"] = res["StartTime"] - res["SubmitTime"]
     res["requested_vram"] = res["Constraints"].apply(lambda c: get_requested_vram(c))
-    # res["allocated_vram"] = res["GPUType"].apply(lambda x: get_allocated_vram(x))
-    # res["user_jobs"] = res.groupby("User")["User"].transform("size")
-    # res["account_jobs"] = res.groupby("Account")["Account"].transform("size")
+    res["allocated_vram"] = res["GPUType"].apply(lambda x: get_allocated_vram(x))
+    res["user_jobs"] = res.groupby("User")["User"].transform("size")
+    res["account_jobs"] = res.groupby("Account")["Account"].transform("size")
     # res["queued_seconds"] = res["Queued"].apply(lambda x: x.total_seconds())
     # res["total_seconds"] = res["Elapsed"] + res["queued_seconds"]
-    fill_missing(res)
 
     return res
