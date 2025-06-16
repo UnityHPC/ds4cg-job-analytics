@@ -136,3 +136,15 @@ def test_fetch_with_filtering_multiple_conditions(in_memory_db):
     assert list(df.columns) == ["JobID", "User"]
     assert df.iloc[0]["JobID"] == 101
     assert df.iloc[0]["User"] == "alice"
+
+def test_fetch_all_column_names(in_memory_db):
+    column_names = in_memory_db.fetch_all_column_names()
+
+    assert len(column_names) == 29 
+
+    # Check specific column names
+    assert "JobID" in column_names
+    assert "User" in column_names
+    assert "Status" in column_names
+    assert "GPUs" in column_names
+    

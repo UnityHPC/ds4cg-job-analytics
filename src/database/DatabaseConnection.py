@@ -19,6 +19,14 @@ class DatabaseConnection:
 
     def get_connection_info(self) -> str:
         return self.connection if self.is_connected() else "No active connection"
+    
+    def fetch_all_column_names(self):
+        """Fetch all column names from the Jobs table."""
+        if self.is_connected():
+            query = "SELECT * FROM Jobs LIMIT 0"
+            return self.connection.execute(query).df().columns.tolist()
+        else:
+            raise Exception("Not connected")
 
     def fetch_all(self, table_name = "Jobs"):
         """Fetch all data from the specified table. Table name is set to Jobs but can be changed accordingly."""
