@@ -22,7 +22,7 @@ Need to fill in missing values for arrayID, interactive, and constraints
 
 
 - Convert the following to categorical:
-Interactive, Status, ExitCode, QOS, partition, Constraints??, NodeList??, Account??, GPUType??
+Interactive, Status, ExitCode, QOS, partition,Account, Constraints??, NodeList??,  GPUType??
 """
 
 import pandas as pd
@@ -162,7 +162,7 @@ def preprocess_data(
         & (data["Account"] != "root")
         & (data["Partition"] != "building")
         & (data["QOS"] != "updates")
-    ]
+    ].copy()
 
     fill_missing(res)
     #! type casting for columns involving time
@@ -175,11 +175,11 @@ def preprocess_data(
         res.loc[:, col] = pd.to_timedelta(res[col], unit="s", errors="coerce")
 
     #!Added parameters, similar to Benjamin code
-    res["Queued"] = res["StartTime"] - res["SubmitTime"]
-    res["requested_vram"] = res["Constraints"].apply(lambda c: get_requested_vram(c))
-    res["allocated_vram"] = res["GPUType"].apply(lambda x: get_allocated_vram(x))
-    res["user_jobs"] = res.groupby("User")["User"].transform("size")
-    res["account_jobs"] = res.groupby("Account")["Account"].transform("size")
+    res.loc[:, "Queued"] = res["StartTime"] - res["SubmitTime"]
+    res.loc[:, "requested_vram"] = res["Constraints"].apply(lambda c: get_requested_vram(c))
+    res.loc[:, "allocated_vram"] = res["GPUType"].apply(lambda x: get_allocated_vram(x))
+    res.loc[:, "user_jobs"] = res.groupby("User")["User"].transform("size")
+    res.loc[:, "account_jobs"] = res.groupby("Account")["Account"].transform("size")
     # res["queued_seconds"] = res["Queued"].apply(lambda x: x.total_seconds())
     # res["total_seconds"] = res["Elapsed"] + res["queued_seconds"]
 
@@ -199,6 +199,7 @@ def preprocess_data(
             "NODE_FAIL",
         ],
         "ExitCode": ["SUCCESS", "ERROR", "SIGNALED"],
+        "Account": ["root"],
     }
     for col in custom_category_map:
         all_categories = list(set(custom_category_map[col] + list(res[col].unique())))

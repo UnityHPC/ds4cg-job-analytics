@@ -9,11 +9,11 @@ def test_pre_process_data_fill_missing_small_interactive(small_sample_data):
     assert data["Interactive"].tolist() == ["non-interactive", "Matlab", "non-interactive", "Matlab"]
 
 
-# def test_pre_process_data_fill_missing_small_constraints(small_sample_data):
-#     data = small_sample_data
-#     fill_missing(data)
-#     assert data["Constraints"].isnull().sum() == 0
-#     assert data["Constraints"].tolist() == ["", ['some constraints'], "", ['some constraints']]
+def test_pre_process_data_fill_missing_small_constraints(small_sample_data):
+    data = small_sample_data
+    fill_missing(data)
+    assert data["Constraints"].isnull().sum() == 0
+    assert data["Constraints"].tolist() == ["", ["some constraints"], "", ["some constraints"]]
 
 
 def test_pre_process_data_fill_missing_small_GPUType(small_sample_data):
@@ -41,6 +41,7 @@ def test_preprocess_data_filtred_columns_total_data(load_modk_data_1):
     data = preprocess_data(data=load_modk_data_1, min_elapsed_second=600)
     assert "UUID" not in data.columns
     assert "EndTime" not in data.columns
+    assert "Nodes" not in data.columns
 
 
 def test_pre_preocess_data_filtered_GPU_total_data(load_modk_data_1):
@@ -162,4 +163,6 @@ def test_category_partition(load_modk_data_1):
     assert expected.issubset(set(data["Partition"].cat.categories))
 
 
-# TODO: maybe add some tests for the newly calculated columns like requested_vram, requested_memory, etc.
+def test_category_account(load_modk_data_1):
+    data = preprocess_data(data=load_modk_data_1, min_elapsed_second=600)
+    assert data["Account"].dtype == "category"
