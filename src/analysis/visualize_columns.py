@@ -17,6 +17,7 @@ class DataVisualizer:
         self, df: pd.DataFrame
     ) -> None:
         """Initialize the DataVisualizer.
+
         Args:
             df (pd.DataFrame): DataFrame to visualize.
         """
@@ -31,6 +32,7 @@ class DataVisualizer:
 
         Returns:
             pd.DataFrame: The validated DataFrame.
+
         Raises:
             ValueError: If the DataFrame is empty or has no columns.
         """
@@ -43,10 +45,12 @@ class DataVisualizer:
     def validate_sample_size(self, sample_size: int | None) -> int | None:
         """Validate the sample size for visualization.
 
-        Parameters:
+        Args:
             sample_size (int): The number of rows to sample for visualization.
+
         Returns:
             int or None: Validated sample size.
+
         Raises:
             ValueError: If sample_size is provided but is not a positive integer.
         """
@@ -57,10 +61,12 @@ class DataVisualizer:
     def validate_random_seed(self, random_seed: int | None) -> int | None:
         """Validate the random seed for reproducibility.
 
-        Parameters:
+        Args:
             random_seed (int): The random seed to use for sampling.
+
         Returns:
             int or None: Validated random seed.
+
         Raises:
             ValueError: If random_seed is provided but is not an integer.
         """
@@ -71,7 +77,7 @@ class DataVisualizer:
     def validate_columns(self, columns: list[str]) -> list[str]:
         """Validate the provided columns against the DataFrame.
 
-        Parameters:
+        Args:
             columns (list[str]): List of column names to validate.
 
         Raises:
@@ -86,10 +92,12 @@ class DataVisualizer:
     def validate_output_dir(self, output_dir_path: Path | None) -> Path | None:
         """Validate the output directory for saving plots.
 
-        Parameters:
+        Args:
             output_dir_path (Path): Directory to save plots.
+
         Returns:
             Path or None: Validated output directory path.
+
         Raises:
             ValueError: If output_dir_path is provided but is not a valid directory.
         """
@@ -120,6 +128,7 @@ class DataVisualizer:
             output_dir_path (Path, optional): Directory to save plots. If None, plots are displayed.
             summary_file_name (str): Name of the text file to save column summaries in the output directory.
             figsize (tuple[int, int]): Size of the figure for plots.
+
         Raises:
             ValueError: On invalid DataFrame, sample size, random seed, or columns.
 
