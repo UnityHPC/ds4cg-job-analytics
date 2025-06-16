@@ -2,9 +2,13 @@ name: Unity Job Analytics
 
 on:
   push:
-    branches: [$default-branch new-project-structure]
+    branches-ignore:
+      - gh-pages
+      - 'release/**'
   pull_request:
-    branches: [$default-branch new-project-structure]
+    branches-ignore:
+      - gh-pages
+      - 'release/**'
   workflow_dispatch:
     
 jobs:
