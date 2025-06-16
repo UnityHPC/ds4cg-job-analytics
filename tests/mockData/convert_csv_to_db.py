@@ -3,8 +3,7 @@ import pandas as pd
 
 
 # Use this script to convert csv into a duckdb database
-#! 1 potntial issue, really big number like what we are having in the csv in gpumemusage columns when converteed \
-# !to float (in duckdb) will have rounding errors
+# TODO: convert GPUMemUsage and CPUMemUsage to BIGINT
 def connect(path_to_csv: str, path_to_db: str):
     # Connect to DuckDB (creates file if it doesn't exist)
     conn = duckdb.connect(path_to_db)

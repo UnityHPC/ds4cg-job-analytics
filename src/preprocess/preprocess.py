@@ -1,23 +1,28 @@
 """
-Ignore columns:
+- Ignore columns:
 UUID
+Nodes(NodesList have more specific information)
+EndTime (can be calculated from StartTime and Elapsed)
 
-add optional parameter for keeping/ deleting columns:
+- Add optional parameter for keeping/ deleting columns:
 If include:
 GPUType is null, keep this and replace as CPU
 GPUs is null or is 0, keep this replace as 0
 status os Failed or Cancelled, don't drop this
 
-ignore record which has:
+- Ignore record which has:
 Elapsed < min_elapsed
 account is root
 partion is building
 QOS is updates
 Need to fill in missing values for arrayID, interactive, and constraints
 
-Type of starttime, endtime, submit time will be converted into datetime
-Typoe of Queued Time, TimeLimit, Elapsed will be converted into timedelta
+- Type of starttime, endtime, submit time will be converted into datetime
+- Type of Queued Time, TimeLimit, Elapsed will be converted into timedelta
 
+
+- Convert the following to categorical:
+Interactive, Status, ExitCode, QOS, partition, Constraints??, NodeList??, Account??, GPUType??
 """
 
 import pandas as pd
@@ -42,8 +47,63 @@ ram_map = {
     "cpu": 0,
 }
 
+CATEGORY_PARTITION = [
+    "building",
+    "arm-gpu",
+    "arm-preempt",
+    "cpu",
+    "cpu-preempt",
+    "gpu",
+    "gpu-preempt",
+    "power9",
+    "power9-gpu",
+    "power9-gpu-preempt",
+    "astroth-cpu",
+    "astroth-gpu",
+    "cbio-cpu",
+    "cbio-gpu",
+    "ceewater_casey-cpu",
+    "ceewater_cjgleason-cpu",
+    "ceewater_kandread-cpu",
+    "ece-gpu",
+    "fsi-lab",
+    "gaoseismolab-cpu",
+    "superpod-a100",
+    "gpupod-l40s",
+    "ials-gpu",
+    "jdelhommelle",
+    "lan",
+    "mpi",
+    "power9-gpu-osg",
+    "toltec-cpu",
+    "umd-cscdr-arm",
+    "umd-cscdr-cpu",
+    "umd-cscdr-gpu",
+    "uri-cpu",
+    "uri-gpu",
+    "uri-richamp",
+    "visterra",
+    "zhoulin-cpu",
+]
 
-# TODO: check if Elapsed Time is always = StartTime - EndTime
+CATEGORY_GPUTYPE = [
+    "titanx",
+    "m40",
+    "1080ti",
+    "v100",
+    "2080",
+    "2080ti",
+    "rtx8000",
+    "a100-40g",
+    "a100-80g",
+    "a16",
+    "a40",
+    "gh200",
+    "l40s",
+    "l4",
+]
+
+
 def get_requested_vram(constraints: list[str] | str) -> int:
     if isinstance(constraints, str) and constraints == "":
         return 0
@@ -74,17 +134,15 @@ def fill_missing(res: pd.DataFrame) -> None:
     #!important note: not filled the null values of constraints since Benjaminc code already handled it
     res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)  # null then fills -1
     res.loc[:, "Interactive"] = res["Interactive"].fillna("non-interactive")
-    res.loc[:, "Constraints"] = res["Constraints"].fillna("")  # null then fills empty list
-    if "GPUType" in res.columns:
-        res.loc[:, "GPUType"] = res["GPUType"].fillna("cpu")  # Nan in GPUType is CPU
-    if "GPUs" in res.columns:
-        res.loc[:, "GPUs"] = res["GPUs"].fillna(0)  # Nan in GPUs is 0
+    res.loc[:, "Constraints"] = res["Constraints"].fillna("")  # null then fills empty string
+    res.loc[:, "GPUType"] = res["GPUType"].fillna("cpu")  # Nan in GPUType is CPU
+    res.loc[:, "GPUs"] = res["GPUs"].fillna(0)  # Nan in GPUs is 0
 
 
 def preprocess_data(
     data: pd.DataFrame, min_elapsed_second: int = 600, include_failed_cancelled_jobs=False, include_CPU_only_job=False
 ) -> pd.DataFrame:
-    data.drop(columns=["UUID"], axis=1, inplace=True)
+    data.drop(columns=["UUID", "EndTime", "Nodes"], axis=1, inplace=True)
 
     cond_GPU_Type = (
         data["GPUType"].notnull() | include_CPU_only_job
@@ -107,8 +165,8 @@ def preprocess_data(
     ]
 
     fill_missing(res)
-    # type casting for columns involving time
-    time_columns = ["StartTime", "EndTime", "SubmitTime"]
+    #! type casting for columns involving time
+    time_columns = ["StartTime", "SubmitTime"]
     for col in time_columns:
         res.loc[:, col] = pd.to_datetime(res[col], errors="coerce")
 
@@ -124,5 +182,29 @@ def preprocess_data(
     res["account_jobs"] = res.groupby("Account")["Account"].transform("size")
     # res["queued_seconds"] = res["Queued"].apply(lambda x: x.total_seconds())
     # res["total_seconds"] = res["Elapsed"] + res["queued_seconds"]
+
+    #! convert columns to categorical
+    # a map from columns to some of its possible values, any values not in the map will be added automatically by pandas
+    custom_category_map = {
+        "Interactive": ["non-interactive", "shell"],
+        "QOS": ["normal", "updates", "short", "long"],
+        "Status": [
+            "COMPLETED",
+            "FAILED",
+            "CANCELLED",
+            "TIMEOUT",
+            "PREEMPTED",
+            "OUT_OF_MEMORY",
+            "PENDING",
+            "NODE_FAIL",
+        ],
+        "ExitCode": ["SUCCESS", "ERROR", "SIGNALED"],
+    }
+    for col in custom_category_map:
+        all_categories = list(set(custom_category_map[col] + list(res[col].unique())))
+        res[col] = pd.Categorical(res[col], categories=all_categories, ordered=False)
+
+    #! some category that we have access to all possible values:
+    res["Partition"] = pd.Categorical(res["Partition"], categories=CATEGORY_PARTITION, ordered=False)
 
     return res

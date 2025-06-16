@@ -40,7 +40,7 @@ def test_pre_process_data_fill_missing_small_arrayID(small_sample_data):
 def test_preprocess_data_filtred_columns_total_data(load_modk_data_1):
     data = preprocess_data(data=load_modk_data_1, min_elapsed_second=600)
     assert "UUID" not in data.columns
-    assert "JobName" in data.columns
+    assert "EndTime" not in data.columns
 
 
 def test_pre_preocess_data_filtered_GPU_total_data(load_modk_data_1):
@@ -86,8 +86,7 @@ def test_pre_preprocess_data_include_CPU_job(load_modk_data_1):
 def test_pre_process_data_include_FAILED_CANCELLED_job(load_modk_data_1):
     data = preprocess_data(data=load_modk_data_1, min_elapsed_second=600, include_failed_cancelled_jobs=True)
     assert data["Status"].value_counts()["FAILED"] == 1
-    print(data["Status"].value_counts())
-    assert "CANCELLED" not in data["Status"].value_counts()
+    assert data["Status"].value_counts()["CANCELLED"] == 0
 
 
 def test_pre_process_data_include_all(load_modk_data_1):
@@ -137,9 +136,30 @@ def test_pre_process_data_filter_min_esplapes_mock2(load_mock_data_2):
     assert len(data) == 8
 
 
-# def check_eslaped_time(load_big_data):
-#     data = load_big_data
-#     assert all(data["Elapsed"] == (data["EndTime"] - data["StartTime"]))
+def test_category_interactive(load_modk_data_1):
+    data = preprocess_data(data=load_modk_data_1, min_elapsed_second=600)
+    assert data["Interactive"].dtype == "category"
+
+
+def test_category_QOS(load_modk_data_1):
+    data = preprocess_data(data=load_modk_data_1, min_elapsed_second=600)
+    assert data["QOS"].dtype == "category"
+    expected = {"short", "long", "normal"}
+    assert expected.issubset(set(data["QOS"].cat.categories))
+
+
+def test_category_exit_code(load_modk_data_1):
+    data = preprocess_data(data=load_modk_data_1, min_elapsed_second=600)
+    assert data["ExitCode"].dtype == "category"
+    expected = {"SUCCESS", "ERROR", "SIGNALED"}
+    assert expected.issubset(set(data["ExitCode"].cat.categories))
+
+
+def test_category_partition(load_modk_data_1):
+    data = preprocess_data(data=load_modk_data_1, min_elapsed_second=600)
+    assert data["Partition"].dtype == "category"
+    expected = {"building", "gpu", "cpu"}
+    assert expected.issubset(set(data["Partition"].cat.categories))
 
 
 # TODO: maybe add some tests for the newly calculated columns like requested_vram, requested_memory, etc.
