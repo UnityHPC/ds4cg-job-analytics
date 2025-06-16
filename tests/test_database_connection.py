@@ -6,7 +6,7 @@ from src.database.DatabaseConnection import DatabaseConnection
 def in_memory_db():
     # Create a database connection object using :memory:
     db = DatabaseConnection(db_url=":memory:")
-    
+
     # Define schema
     schema_sql = """
     CREATE TABLE Jobs (
@@ -78,10 +78,10 @@ def in_memory_db():
 
     return db
 
+
 def test_connection_established(in_memory_db):
     # Check if the connection is established
     assert in_memory_db.is_connected() is True
-    
 
 
 def test_fetch_all_returns_correct_data(in_memory_db):
@@ -106,7 +106,6 @@ def test_fetch_all_returns_correct_data(in_memory_db):
     assert df.iloc[2]["GPUs"] == 1
     assert df.iloc[2]["Status"] == "OUT_OF_MEMORY"
 
-    
 
 def test_fetch_selected_columns_with_filter(in_memory_db):
     # Perform a custom query using the connection
@@ -123,6 +122,7 @@ def test_fetch_selected_columns_with_filter(in_memory_db):
     assert df.iloc[0]["JobID"] == 101
     assert df.iloc[0]["User"] == "alice"
 
+
 def test_fetch_with_filtering_multiple_conditions(in_memory_db):
     # Perform a custom query using the connection
     query = """
@@ -136,4 +136,3 @@ def test_fetch_with_filtering_multiple_conditions(in_memory_db):
     assert list(df.columns) == ["JobID", "User"]
     assert df.iloc[0]["JobID"] == 101
     assert df.iloc[0]["User"] == "alice"
-
