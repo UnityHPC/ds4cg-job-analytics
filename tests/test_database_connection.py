@@ -148,3 +148,10 @@ def test_fetch_all_column_names(in_memory_db):
     assert "Status" in column_names
     assert "GPUs" in column_names
     
+def test_fetch_query_with_invalid_column(in_memory_db):
+    query = """
+        SELECT GPUMetrics
+        FROM Jobs
+    """
+    with pytest.raises(Exception) as exc_info:
+        in_memory_db.fetch_query(query) 

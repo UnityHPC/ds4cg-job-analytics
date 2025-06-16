@@ -37,8 +37,18 @@ class DatabaseConnection:
             raise Exception("Not connected")
 
     def fetch_query(self, query: str):
-        """Fetch data based on a custom query."""
+        """
+        Fetch data based on a custom query. If the query is invalid due to column names,
+        raise an exception with valid column names.
+        """
         if self.is_connected():
-            return self.connection.query(query).to_df()
+            try:
+                return self.connection.query(query).to_df()
+            except Exception as e:
+                valid_columns = self.fetch_all_column_names()
+                raise Exception(
+                    f"Invalid query or column names. Valid columns are: {valid_columns}\n"
+                    f"Original error: {e}"
+                ) from e
         else:
             raise Exception("No active database connection.")
