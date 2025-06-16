@@ -6,7 +6,8 @@ from pathlib import Path
 
 def get_db_dataframe(db_path=None, table_name="Jobs"):
     """
-    Connect to the DuckDB database and return the jobs table as a pandas DataFrame.
+    Connect to the DuckDB database and return the jobs table as a pandas
+    DataFrame.
 
     Args:
         db_path (str or Path, optional): Path to the DuckDB database. Defaults to 'data/slurm_data_small.db'.
@@ -25,7 +26,8 @@ def get_db_dataframe(db_path=None, table_name="Jobs"):
 
 def plot_selected_pairs(df, pairs=None, hue=None, sample=1000, plot_kws=None):
     """
-    Plot selected pairs of columns from a DataFrame using seaborn scatterplots.
+    Plot selected pairs of columns from a DataFrame using seaborn
+    scatterplots.
 
     Args:
         df (pd.DataFrame): The DataFrame to plot from.
