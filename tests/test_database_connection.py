@@ -1,6 +1,4 @@
 import pytest
-import duckdb
-import pandas as pd
 from src.database.DatabaseConnection import DatabaseConnection
 
 
@@ -34,12 +32,12 @@ def in_memory_db():
         Nodes VARCHAR,
         NodeList VARCHAR[],
         CPUs SMALLINT,
-        Memory BIGINT,
+        Memory INTEGER,
         GPUs SMALLINT,
         GPUType VARCHAR[],
-        GPUMemUsage BIGINT,
+        GPUMemUsage FLOAT,
         GPUComputeUsage FLOAT,
-        CPUMemUsage BIGINT,
+        CPUMemUsage FLOAT,
         CPUComputeUsage FLOAT
     );
     """
@@ -54,25 +52,61 @@ def in_memory_db():
         CURRENT_TIMESTAMP - INTERVAL 2 HOUR,
         CURRENT_TIMESTAMP - INTERVAL 1 HOUR,
         3600, 7200, 'gpu', 'node001', ['node001'],
-        16, 64000000000, 1, ['A100'], 12000000000, 0.85, 32000000000, 0.75
+        16, 640, 1, ['A100'], 120, 0.85, 320, 0.75
+    );
+    INSERT INTO Jobs VALUES (
+        'xyz-215', 102, NULL, 'train_model', FALSE, 'yes', FALSE,
+        'projectX', 'bob', ['A100'], 'normal', 'FAILED', '0:0',
+        CURRENT_TIMESTAMP - INTERVAL 3 HOUR,
+        CURRENT_TIMESTAMP - INTERVAL 2 HOUR,
+        CURRENT_TIMESTAMP - INTERVAL 1 HOUR,
+        3600, 7200, 'gpu', 'node001', ['node001'],
+        16, 640, 1, ['M40'], 120, 0.85, 320, 0.75
+    );
+
+    INSERT INTO Jobs VALUES (
+        'xyz-217', 103, NULL, 'train_model', FALSE, 'yes', FALSE,
+        'projectX', 'chris', ['A100'], 'normal', 'OUT_OF_MEMORY', '0:0',
+        CURRENT_TIMESTAMP - INTERVAL 3 HOUR,
+        CURRENT_TIMESTAMP - INTERVAL 2 HOUR,
+        CURRENT_TIMESTAMP - INTERVAL 1 HOUR,
+        3600, 7200, 'gpu', 'node001', ['node001'],
+        16, 640, 1, ['M40'], 120, 0.85, 320, 0.75
     );
     """
     db.connection.execute(insert_sql)
 
     return db
 
+def test_connection_established(in_memory_db):
+    # Check if the connection is established
+    assert in_memory_db.is_connected() is True
+    
+
 
 def test_fetch_all_returns_correct_data(in_memory_db):
     df = in_memory_db.fetch_all()
 
     # Check that one row was returned
-    assert len(df) == 1
+    assert len(df) == 3
 
     # Check specific values
     assert df.iloc[0]["JobID"] == 101
     assert df.iloc[0]["User"] == "alice"
     assert df.iloc[0]["GPUs"] == 1
     assert df.iloc[0]["Status"] == "COMPLETED"
+
+    assert df.iloc[1]["JobID"] == 102
+    assert df.iloc[1]["User"] == "bob"
+    assert df.iloc[1]["GPUs"] == 1
+    assert df.iloc[1]["Status"] == "FAILED"
+
+    assert df.iloc[2]["JobID"] == 103
+    assert df.iloc[2]["User"] == "chris"
+    assert df.iloc[2]["GPUs"] == 1
+    assert df.iloc[2]["Status"] == "OUT_OF_MEMORY"
+
+    
 
 def test_fetch_selected_columns_with_filter(in_memory_db):
     # Perform a custom query using the connection
@@ -88,3 +122,18 @@ def test_fetch_selected_columns_with_filter(in_memory_db):
     assert list(df.columns) == ["JobID", "User"]
     assert df.iloc[0]["JobID"] == 101
     assert df.iloc[0]["User"] == "alice"
+
+def test_fetch_with_filtering_multiple_conditions(in_memory_db):
+    # Perform a custom query using the connection
+    query = """
+        SELECT JobID, User
+        FROM Jobs
+        WHERE Status = 'COMPLETED' AND GPUs = 1
+    """
+    df = in_memory_db.connection.execute(query).fetchdf()
+
+    assert len(df) == 1
+    assert list(df.columns) == ["JobID", "User"]
+    assert df.iloc[0]["JobID"] == 101
+    assert df.iloc[0]["User"] == "alice"
+
