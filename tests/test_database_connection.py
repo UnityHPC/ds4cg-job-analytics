@@ -152,3 +152,4 @@ def test_fetch_query_with_invalid_column(in_memory_db):
         in_memory_db.fetch_query(query)
     msg = str(exc_info.value)
     assert "Invalid query or column names" in msg
+
