@@ -18,9 +18,7 @@ plots and statistics for numeric and categorical columns.
 class DataVisualizer:
     """A class for visualizing and summarizing columns of pre-processed data in a DataFrame."""
 
-    def __init__(
-        self, df: pd.DataFrame
-    ) -> None:
+    def __init__(self, df: pd.DataFrame) -> None:
         """Initialize the DataVisualizer.
 
         Args:
@@ -31,7 +29,7 @@ class DataVisualizer:
             self.df = df.copy()
         else:
             raise ValueError("Must provide a DataFrame.")
-        
+
     def validate_dataframe(self) -> pd.DataFrame:
         """Validate that the DataFrame is not empty and has columns.
 
@@ -46,7 +44,7 @@ class DataVisualizer:
         if self.df.columns.empty:
             raise ValueError("DataFrame has no columns.")
         return self.df
-        
+
     def validate_sample_size(self, sample_size: int | None) -> int | None:
         """Validate the sample size for visualization.
 
@@ -62,7 +60,7 @@ class DataVisualizer:
         if sample_size is not None and (not isinstance(sample_size, int) or sample_size <= 0):
             raise ValueError("Sample size must be a positive integer.")
         return sample_size
-    
+
     def validate_random_seed(self, random_seed: int | None) -> int | None:
         """Validate the random seed for reproducibility.
 
@@ -78,7 +76,7 @@ class DataVisualizer:
         if not isinstance(random_seed, int):
             raise ValueError("Random seed must be an integer.")
         return random_seed
-        
+
     def validate_columns(self, columns: list[str]) -> list[str]:
         """Validate the provided columns against the DataFrame.
 
@@ -145,7 +143,7 @@ class DataVisualizer:
         self.validate_random_seed(random_seed)
         self.validate_columns(columns if columns is not None else df.columns.tolist())
         self.validate_output_dir(output_dir_path)
-        
+
         df = df.copy()
 
         # If specific columns are provided, select them
@@ -155,9 +153,7 @@ class DataVisualizer:
         # Sample the data if sample_size is specified
         if sample_size is not None:
             if len(df) < sample_size:
-                raise ValueError(
-                    f"Sample size {sample_size} is larger than the DataFrame size {len(df)}."
-                )
+                raise ValueError(f"Sample size {sample_size} is larger than the DataFrame size {len(df)}.")
             df = df.sample(sample_size, random_state=random_seed)
 
         # Generate summary statistics for each column
@@ -166,12 +162,12 @@ class DataVisualizer:
             summary_file = output_dir_path / summary_file_name
             if summary_file.exists():
                 print(f"Summary file already exists. Overwriting {summary_file.name}")
-            
+
             summary_lines = ["Column Summary Statistics\n", "=" * 30 + "\n"]
             for col in df.columns:
                 summary_lines.append(f"\nColumn: {col}\n")
                 summary_lines.append(str(df[col].describe(include="all")) + "\n")
-            
+
             with open(summary_file, "w", encoding="utf-8") as f:
                 f.writelines(summary_lines)
         else:
@@ -185,7 +181,6 @@ class DataVisualizer:
 
         # Generate visualizations for each column
         for col in df.columns:
-            plt.figure(figsize=figsize)
             col_data = df[col]
             col_type = col_data.dtype
 
@@ -193,7 +188,7 @@ class DataVisualizer:
                 # Skip UUID column as it is not useful for visualization
                 plt.close()
                 continue
-            
+
             # JobID: treat as categorical if low cardinality, else skip plot
             if col in ["JobID", "ArrayID"]:
                 if col_data.nunique() < 30:
@@ -206,7 +201,7 @@ class DataVisualizer:
 
             # Boolean columns
             elif col_type is bool or col in ["IsArray", "Preempted"]:
-                plt.figure(figsize=(3,7))
+                plt.figure(figsize=(3, 7))
                 ax = sns.countplot(x=col, stat="percent", data=df)
                 if isinstance(ax.containers[0], BarContainer):
                     # The heights are already in percent (0-100) due to stat="percent"
@@ -237,16 +232,11 @@ class DataVisualizer:
                 # If jobs span more than 2 days, plot jobs per day
                 if total_days > 2:
                     # Group by date, count jobs per day
-                    jobs_per_day = col_data.dt.floor('D').value_counts().sort_index()
+                    jobs_per_day = col_data.dt.floor("D").value_counts().sort_index()
                     # Trim days at start/end with zero jobs
                     jobs_per_day = jobs_per_day[jobs_per_day > 0]
                     # A line plot is often better for time series to show trends over days
-                    plt.plot(
-                        jobs_per_day.index,
-                        np.asarray(jobs_per_day.values, dtype=int),
-                        marker='o',
-                        linestyle='-'
-                    )
+                    plt.plot(jobs_per_day.index, np.asarray(jobs_per_day.values, dtype=int), marker="o", linestyle="-")
                     ax = plt.gca()
                     ax.xaxis.set_major_locator(plt.MaxNLocator(10))
                     plt.xlabel("Date")
@@ -267,9 +257,11 @@ class DataVisualizer:
                                 xy=(x, label_y),
                                 xytext=(0, 0),
                                 textcoords="offset points",
-                                ha='center', va='bottom', fontsize=10,
+                                ha="center",
+                                va="bottom",
+                                fontsize=10,
                                 bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7),
-                                clip_on=True
+                                clip_on=True,
                             )
                             # Adjust annotation if it goes out of bounds
                             bbox = ann.get_window_extent(renderer=None)
@@ -284,20 +276,17 @@ class DataVisualizer:
                         plt.savefig(output_dir_path / f"{col}_days_lineplot.png")
                 else:
                     # All jobs within a couple of days: plot by hour
-                    jobs_per_hour = col_data.dt.floor('H').value_counts().sort_index()
+                    jobs_per_hour = col_data.dt.floor("H").value_counts().sort_index()
                     jobs_per_hour = jobs_per_hour[jobs_per_hour > 0]
                     # Use line plot for time series to better show trends over hours
                     plt.plot(
-                        jobs_per_hour.index,
-                        np.asarray(jobs_per_hour.values, dtype=int),
-                        marker='o',
-                        linestyle='-'
+                        jobs_per_hour.index, np.asarray(jobs_per_hour.values, dtype=int), marker="o", linestyle="-"
                     )
                     plt.gca().xaxis.set_major_locator(plt.MaxNLocator(12))
                     plt.xlabel("Hour")
                     plt.ylabel("Number of jobs")
                     plt.title(f"Jobs per hour for {col}")
-                    plt.grid(True, which='both', axis='both', linestyle='--', alpha=0.5)
+                    plt.grid(True, which="both", axis="both", linestyle="--", alpha=0.5)
 
                     # Set x-axis labels: show date at midnight, hour otherwise
                     ax = plt.gca()
@@ -311,15 +300,100 @@ class DataVisualizer:
                     # Show at most 12 labels to avoid crowding
                     step = max(1, len(tick_labels) // 12)
                     ax.set_xticks(tick_locs[::step])
-                    ax.set_xticklabels([tick_labels[i] for i in range(0, len(tick_labels), step)], rotation=45, ha="right")
+                    ax.set_xticklabels(
+                        [tick_labels[i] for i in range(0, len(tick_labels), step)], rotation=45, ha="right"
+                    )
 
                     plt.tight_layout()
                     if output_dir_path is not None:
                         plt.savefig(output_dir_path / f"{col}_hourly_lineplot.png")
                 plt.show()
 
+            # Elapsed time: histogram of durations in minutes, hours, days
+            elif col in ["Elapsed"]:
+                # Convert to timedelta if not already
+                if not pd.api.types.is_timedelta64_dtype(col_data):
+                    col_data = pd.to_timedelta(col_data, unit="seconds", errors="coerce")
+                # Convert to minutes for plotting
+                elapsed_minutes = col_data.dropna().dt.total_seconds() / 60
 
-             # Interactive    
+                # Define breakpoints for minutes, hours, days
+                min_break = 60  # 1 hour in minutes
+                hour_break = 1440  # 1 day in minutes
+                max_val = elapsed_minutes.max()
+                total_count = len(elapsed_minutes)
+
+                # Prepare data for each section
+                minutes_data = elapsed_minutes[(elapsed_minutes <= min_break)]
+                hours_data = elapsed_minutes[(elapsed_minutes > min_break) & (elapsed_minutes <= hour_break)]
+                days_data = elapsed_minutes[(elapsed_minutes > hour_break)]
+
+                # Proportional widths: minutes (up to 1hr), hours (1hr-1d), days (>1d)
+                width_minutes = min(0.4, len(minutes_data) / total_count + 0.1)
+                width_hours = min(0.4, len(hours_data) / total_count + 0.1)
+                width_days = 1.0 - width_minutes - width_hours
+
+                def pct(n, total_count=total_count):
+                    return f"{(n / total_count * 100):.1f}%" if total_count > 0 else "0.0%"
+
+                fig = plt.figure(figsize=(7, 5))
+                gs = GridSpec(1, 3, width_ratios=[width_minutes, width_hours, width_days], wspace=0.12)
+
+                # Minutes axis
+                ax0 = fig.add_subplot(gs[0])
+                if not minutes_data.empty:
+                    ax0.hist(minutes_data, bins=20, color="tab:blue", alpha=0.7, log=True)
+                ax0.set_xlim(0, min_break)
+                ax0.set_xticks([0, 15, 30, 45, 60])
+                ax0.set_xticklabels(["0", "15m", "30m", "45m", "1h"], rotation=0)
+                ax0.set_ylabel("Count (log scale)")
+                ax0.set_title(f"Minutes (≤1h)\nN={len(minutes_data)} ({pct(len(minutes_data))})")
+                ax0.spines["right"].set_visible(False)
+                ax0.spines["top"].set_visible(False)
+
+                # Hours axis
+                ax1 = fig.add_subplot(gs[1], sharey=ax0)
+                if not hours_data.empty:
+                    ax1.hist(hours_data, bins=20, color="tab:orange", alpha=0.7, log=True)
+                ax1.set_xlim(min_break, hour_break)
+                ax1.set_xticks([60, 180, 360, 720, 1440])
+                ax1.set_xticklabels(["1h", "3h", "6h", "12h", "1d"], rotation=0)
+                ax1.set_title(f"Hours (1h–1d)\nN={len(hours_data)} ({pct(len(hours_data))})")
+                ax1.spines["left"].set_visible(False)
+                ax1.spines["right"].set_visible(False)
+                ax1.spines["top"].set_visible(False)
+                plt.setp(ax1.get_yticklabels(), visible=False)
+
+                # Days axis
+                ax2 = fig.add_subplot(gs[2], sharey=ax0)
+                if not days_data.empty:
+                    ax2.hist(days_data, bins=20, color="tab:green", alpha=0.7, log=True)
+                ax2.set_xlim(hour_break, max_val)
+                # Choose ticks for days
+                if max_val > hour_break:
+                    day_ticks = [
+                        hour_break,
+                        hour_break + (max_val - hour_break) / 3,
+                        hour_break + 2 * (max_val - hour_break) / 3,
+                        max_val,
+                    ]
+                    day_labels = ["1d"] + [f"{int(t / 1440)}d" for t in day_ticks[1:]]
+                    ax2.set_xticks([hour_break] + day_ticks[1:])
+                    ax2.set_xticklabels(day_labels, rotation=0)
+                ax2.set_title(f"Days (>1d)\nN={len(days_data)} ({pct(len(days_data))})")
+                ax2.spines["left"].set_visible(False)
+                ax2.spines["top"].set_visible(False)
+                plt.setp(ax2.get_yticklabels(), visible=False)
+
+                # Remove space between subplots
+                plt.subplots_adjust(wspace=0.12)
+                fig.suptitle(f"Histogram of {col} (minutes, hours, days)", y=1.04)
+
+                if output_dir_path is not None:
+                    plt.savefig(output_dir_path / f"{col}_hist.png", bbox_inches="tight")
+                plt.show()
+
+            # Interactive
 
             # # Numeric columns: histogram, and boxplot if enough data
             # elif pd.api.types.is_numeric_dtype(col_data):
@@ -364,30 +438,3 @@ class DataVisualizer:
             #     plt.close()
             # else:
             #     plt.show()
-
-        # # Loop through each column for visualization
-        # for col in df.columns:
-        #     print(f"\nColumn: {col}")
-        #     print(df[col].describe(include="all"))  # Print summary statistics
-        #     plt.figure(figsize=(7, 4))
-        #     # Numeric columns: bar plot for low cardinality, histogram otherwise
-        #     if pd.api.types.is_numeric_dtype(df[col]):
-        #         if df[col].nunique() < 20:
-        #             sns.countplot(x=col, data=df)
-        #             plt.title(f"Bar plot of {col}")
-        #         else:
-        #             sns.histplot(df[col].dropna(), kde=True, bins=30)
-        #             plt.title(f"Histogram of {col}")
-        #     # Categorical columns: bar plot of top 20 categories
-        #     elif pd.api.types.is_categorical_dtype(df[col]) or df[col].dtype == object:
-        #         top_cats = df[col].value_counts().nlargest(20)
-        #         sns.barplot(x=top_cats.index, y=top_cats.values)
-        #         plt.title(f"Top categories in {col}")
-        #         plt.xticks(rotation=45, ha="right")
-        #     else:
-        #         # Unsupported column types
-        #         print("(Unsupported column type for visualization)")
-        #         plt.close()
-        #         continue
-        #     plt.tight_layout()
-        #     plt.show()
