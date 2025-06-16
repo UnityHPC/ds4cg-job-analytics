@@ -1,7 +1,7 @@
 import pytest
 import duckdb
 import pandas as pd
-from src.analytics.DatabaseConnection import DatabaseConnection
+from src.database.DatabaseConnection import DatabaseConnection
 
 
 @pytest.fixture
