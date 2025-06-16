@@ -19,7 +19,7 @@ def test_pre_process_data_fill_missing_small_GPUType(small_sample_data):
     data = small_sample_data
     fill_missing(data)
     assert data["GPUType"].isnull().sum() == 0
-    assert data["GPUType"].tolist() == ["CPU", "v100", "CPU", "v100"]
+    assert data["GPUType"].tolist() == ["cpu", "v100", "cpu", "v100"]
 
 
 def test_pre_process_data_fill_missing_small_GPUs(small_sample_data):
@@ -76,7 +76,7 @@ def test_pre_process_data_filtered_root_account_total_data(load_modk_data_1):
 
 def test_pre_preprocess_data_include_CPU_job(load_modk_data_1):
     data = preprocess_data(data=load_modk_data_1, min_elapsed=600, include_CPU_only_job=True)
-    assert data["GPUType"].value_counts()["CPU"] == 2
+    assert data["GPUType"].value_counts()["cpu"] == 2
     assert data["GPUs"].value_counts()[0] == 2
 
 
@@ -92,7 +92,7 @@ def test_pre_process_data_include_all(load_modk_data_1):
         data=load_modk_data_1, min_elapsed=600, include_failed_cancelled_jobs=True, include_CPU_only_job=True
     )
     assert len(data) == 11
-    assert data["GPUType"].value_counts()["CPU"] == 6
+    assert data["GPUType"].value_counts()["cpu"] == 6
     assert data["GPUs"].value_counts()[0] == 6
     assert data["Status"].value_counts()["FAILED"] == 3
     assert data["Status"].value_counts()["CANCELLED"] == 2
@@ -124,7 +124,7 @@ def test_pre_process_data_fill_missing_GPUType_mock2(load_mock_data_2):
     )
     GPUType_stat = data["GPUType"].value_counts()
     GPUs_stat = data["GPUs"].value_counts()
-    assert GPUType_stat["CPU"] == 4
+    assert GPUType_stat["cpu"] == 4
     assert GPUs_stat[0] == 4
 
 
