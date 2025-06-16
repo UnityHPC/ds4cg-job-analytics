@@ -157,4 +157,4 @@ def test_fetch_query_with_invalid_column(temp_file_db):
     with pytest.raises(Exception) as exc_info:
         temp_file_db.fetch_query(query)
     msg = str(exc_info.value)
-    assert "Invalid query or column names" in msg
+    assert "This query does not match the database schema." in msg

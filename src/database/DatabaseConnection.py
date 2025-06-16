@@ -47,7 +47,7 @@ class DatabaseConnection:
             except duckdb.BinderException as e:
                 valid_columns = self.fetch_all_column_names()
                 raise Exception(
-                    f"This query does not match the Database Schema. Valid columns are: {valid_columns}."
+                    f"This query does not match the database schema. Valid columns are: {valid_columns}."
                 ) from e
         else:
             raise Exception("No active database connection.")
