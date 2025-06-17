@@ -22,7 +22,7 @@ Need to fill in missing values for arrayID, interactive, and constraints
 
 
 - Convert the following to categorical:
-Interactive, Status, ExitCode, QOS, partition,Account, Constraints??, NodeList??,  GPUType??
+Interactive, Status, ExitCode, QOS, partition,Account
 """
 
 import pandas as pd

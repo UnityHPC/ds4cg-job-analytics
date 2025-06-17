@@ -3,7 +3,6 @@ import pandas as pd
 
 
 # Use this script to convert csv into a duckdb database
-# TODO: convert GPUMemUsage and CPUMemUsage to BIGINT
 def connect(path_to_csv: str, path_to_db: str):
     # Connect to DuckDB (creates file if it doesn't exist)
     conn = duckdb.connect(path_to_db)
@@ -49,9 +48,9 @@ def connect(path_to_csv: str, path_to_db: str):
             Memory INTEGER,
             GPUs SMALLINT,
             GPUType VARCHAR[],
-            GPUMemUsage FLOAT,
+            GPUMemUsage BIGINT,
             GPUComputeUsage FLOAT,
-            CPUMemUsage FLOAT,
+            CPUMemUsage BIGINT,
             CPUComputeUsage FLOAT
         );"""
     )
@@ -61,6 +60,11 @@ def connect(path_to_csv: str, path_to_db: str):
 
 
 # if __name__ == "__main__":
+# connect("tests/mockData/mock2.csv", "tests/mockData/mock2.db")
+# obj = duckdb.connect("tests/mockData/mock2.db")
+# df = obj.query("SELECT * FROM Jobs").to_df()
+# print(df["CPUMemUsage"][4])
+# obj.close()
 #     connect()
 #     obj = duckdb.connect("mock2.db")
 #     df = obj.query("select * from Jobs").to_df()
