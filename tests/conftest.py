@@ -30,8 +30,8 @@ def small_sample_data():
         "UUID": ["123456789", "123456789", "123456789", "123456789"],
         "ArrayID": [np.nan, 1, 2, np.nan],
         "Interactive": [np.nan, "Matlab", np.nan, "Matlab"],
-        "Constraints": [np.nan, ["some constraints"], np.nan, ["some constraints"]],
-        "GPUType": [np.nan, "v100", np.nan, "v100"],
+        "Constraints": [np.nan, np.array(["some constraints"]), np.nan, np.array(["some constraints"])],
+        "GPUType": [np.nan, np.array(["v100"]), np.nan, np.array(["v100"])],
         "GPUs": [np.nan, 1, np.nan, 4],
     }
     df = pd.DataFrame(data)

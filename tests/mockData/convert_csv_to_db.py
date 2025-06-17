@@ -59,8 +59,8 @@ def connect(path_to_csv: str, path_to_db: str):
     conn.close()
 
 
-# if __name__ == "__main__":
-# connect("tests/mockData/mock2.csv", "tests/mockData/mock2.db")
+if __name__ == "__main__":
+    connect("tests/mockData/mock2.csv", "tests/mockData/mock2.db")
 # obj = duckdb.connect("tests/mockData/mock2.db")
 # df = obj.query("SELECT * FROM Jobs").to_df()
 # print(df["CPUMemUsage"][4])

@@ -28,6 +28,7 @@ Interactive, Status, ExitCode, QOS, partition,Account
 """
 
 import pandas as pd
+import numpy as np
 
 #! add requested_vram, allocated_vram, user_jobs, account_jobs
 
@@ -145,8 +146,10 @@ def fill_missing(res: pd.DataFrame) -> None:
     # fill default values for specific columns
     res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)
     res.loc[:, "Interactive"] = res["Interactive"].fillna("non-interactive")
-    res.loc[:, "Constraints"] = res["Constraints"].fillna("")
-    res.loc[:, "GPUType"] = res["GPUType"].fillna("cpu")
+    res.loc[:, "Constraints"] = res["Constraints"].fillna("").apply(lambda x: np.array(list(x)))
+    res.loc[:, "GPUType"] = (
+        res["GPUType"].fillna("").apply(lambda x: np.array(["cpu"]) if isinstance(x, str) else np.array(x))
+    )
     res.loc[:, "GPUs"] = res["GPUs"].fillna(0)
 
 

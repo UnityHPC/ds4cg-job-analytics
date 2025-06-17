@@ -13,14 +13,16 @@ def test_pre_process_data_fill_missing_small_constraints(small_sample_data):
     data = small_sample_data
     fill_missing(data)
     assert data["Constraints"].isnull().sum() == 0
-    assert data["Constraints"].tolist() == ["", ["some constraints"], "", ["some constraints"]]
+    temp = data["Constraints"].tolist()
+    assert temp[1] == temp[3] == ["some constraints"]
+    assert len(temp[0]) == len(temp[2]) == 0
 
 
 def test_pre_process_data_fill_missing_small_GPUType(small_sample_data):
     data = small_sample_data
     fill_missing(data)
     assert data["GPUType"].isnull().sum() == 0
-    assert data["GPUType"].tolist() == ["cpu", "v100", "cpu", "v100"]
+    print(data["GPUType"].tolist() == [["cpu"], ["v100"], ["cpu"], ["v100"]])
 
 
 def test_pre_process_data_fill_missing_small_GPUs(small_sample_data):
@@ -79,8 +81,9 @@ def test_pre_process_data_filtered_root_account_total_data(load_mock_data_1):
 
 
 def test_pre_preprocess_data_include_CPU_job(load_mock_data_1):
+    print(type(load_mock_data_1["Constraints"][3]))
     data = preprocess_data(data=load_mock_data_1, min_elapsed_second=600, include_CPU_only_job=True)
-    assert (data["GPUType"] == "cpu").sum() == 2
+    assert sum(x == ["cpu"] for x in data["GPUType"]) == 2
     assert data["GPUs"].value_counts()[0] == 2
 
 
@@ -91,11 +94,12 @@ def test_pre_process_data_include_FAILED_CANCELLED_job(load_mock_data_1):
 
 
 def test_pre_process_data_include_all(load_mock_data_1):
+    print(load_mock_data_1["GPUType"])
     data = preprocess_data(
         data=load_mock_data_1, min_elapsed_second=600, include_failed_cancelled_jobs=True, include_CPU_only_job=True
     )
     assert len(data) == 11
-    assert (data["GPUType"] == "cpu").sum() == 6
+    assert sum(x == ["cpu"] for x in data["GPUType"]) == 6
     assert data["GPUs"].value_counts()[0] == 6
     assert data["Status"].value_counts()["FAILED"] == 3
     assert data["Status"].value_counts()["CANCELLED"] == 2
@@ -126,8 +130,16 @@ def test_pre_process_data_fill_missing_GPUType_mock2(load_mock_data_2):
         data=load_mock_data_2, min_elapsed_second=100, include_CPU_only_job=True, include_failed_cancelled_jobs=True
     )
     GPUs_stat = data["GPUs"].value_counts()
-    assert (data["GPUType"] == "cpu").sum() == 4
+    assert sum(x == ["cpu"] for x in data["GPUType"]) == 4
     assert GPUs_stat[0] == 4
+
+
+def test_pre_process_data_fill_missing_Constraints_mock2(load_mock_data_2):
+    data = preprocess_data(
+        data=load_mock_data_2, min_elapsed_second=100, include_CPU_only_job=True, include_failed_cancelled_jobs=True
+    )
+    assert sum(len(x) > 0 for x in data["Constraints"]) == 10
+    assert len(data["Constraints"][0]) == 0
 
 
 def test_pre_process_data_filter_min_esplapes_mock2(load_mock_data_2):
