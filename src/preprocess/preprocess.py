@@ -131,9 +131,9 @@ def get_allocated_vram(gpu_type: list[str] | str) -> int:
         return min(ram_map[x] for x in gpu_type)
 
 
-def fill_missing(res: pd.DataFrame) -> None:
+def _fill_missing(res: pd.DataFrame) -> None:
     """
-    Fill missing values in the DataFrame with default values.
+    Intended for internal use inside preprocess_data() only. Fill missing values in the DataFrame with default values.
 
     Args:
         res (pd.DataFrame): The DataFrame to fill missing values in.
@@ -191,7 +191,7 @@ def preprocess_data(
         & (data["QOS"] != "updates")
     ].copy()
 
-    fill_missing(res)
+    _fill_missing(res)
     #! type casting for columns involving time
     time_columns = ["StartTime", "SubmitTime"]
     for col in time_columns:

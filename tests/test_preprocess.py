@@ -1,17 +1,17 @@
-from src import preprocess_data, fill_missing
+from src import preprocess_data, _fill_missing
 import pandas as pd
 
 
 def test_pre_process_data_fill_missing_small_interactive(small_sample_data):
     data = small_sample_data
-    fill_missing(data)
+    _fill_missing(data)
     assert data["Interactive"].isnull().sum() == 0
     assert data["Interactive"].tolist() == ["non-interactive", "Matlab", "non-interactive", "Matlab"]
 
 
 def test_pre_process_data_fill_missing_small_constraints(small_sample_data):
     data = small_sample_data
-    fill_missing(data)
+    _fill_missing(data)
     assert data["Constraints"].isnull().sum() == 0
     temp = data["Constraints"].tolist()
     assert temp[1] == temp[3] == ["some constraints"]
@@ -20,21 +20,21 @@ def test_pre_process_data_fill_missing_small_constraints(small_sample_data):
 
 def test_pre_process_data_fill_missing_small_GPUType(small_sample_data):
     data = small_sample_data
-    fill_missing(data)
+    _fill_missing(data)
     assert data["GPUType"].isnull().sum() == 0
     print(data["GPUType"].tolist() == [["cpu"], ["v100"], ["cpu"], ["v100"]])
 
 
 def test_pre_process_data_fill_missing_small_GPUs(small_sample_data):
     data = small_sample_data
-    fill_missing(data)
+    _fill_missing(data)
     assert data["GPUs"].isnull().sum() == 0
     assert data["GPUs"].tolist() == [0, 1, 0, 4]
 
 
 def test_pre_process_data_fill_missing_small_arrayID(small_sample_data):
     data = small_sample_data
-    fill_missing(data)
+    _fill_missing(data)
     assert data["ArrayID"].isnull().sum() == 0
     assert data["ArrayID"].tolist() == [-1, 1, 2, -1]
 
