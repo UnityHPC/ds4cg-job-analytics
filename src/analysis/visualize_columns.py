@@ -315,18 +315,18 @@ class DataVisualizer:
                 if not pd.api.types.is_timedelta64_dtype(col_data):
                     col_data = pd.to_timedelta(col_data, unit="seconds", errors="coerce")
                 # Convert to minutes for plotting
-                elapsed_minutes = col_data.dropna().dt.total_seconds() / 60
+                timelimit_minutes = col_data.dropna().dt.total_seconds() / 60
 
                 # Define breakpoints for minutes, hours, days
                 min_break = 60  # 1 hour in minutes
                 hour_break = 1440  # 1 day in minutes
-                max_val = elapsed_minutes.max()
-                total_count = len(elapsed_minutes)
+                max_val = timelimit_minutes.max()
+                total_count = len(timelimit_minutes)
 
                 # Prepare data for each section
-                minutes_data = elapsed_minutes[(elapsed_minutes <= min_break)]
-                hours_data = elapsed_minutes[(elapsed_minutes > min_break) & (elapsed_minutes <= hour_break)]
-                days_data = elapsed_minutes[(elapsed_minutes > hour_break)]
+                minutes_data = timelimit_minutes[(timelimit_minutes <= min_break)]
+                hours_data = timelimit_minutes[(timelimit_minutes > min_break) & (timelimit_minutes <= hour_break)]
+                days_data = timelimit_minutes[(timelimit_minutes > hour_break)]
 
                 # Proportional widths: minutes (up to 1hr), hours (1hr-1d), days (>1d)
                 width_minutes = min(0.4, len(minutes_data) / total_count + 0.1)
@@ -393,7 +393,161 @@ class DataVisualizer:
                     plt.savefig(output_dir_path / f"{col}_hist.png", bbox_inches="tight")
                 plt.show()
 
+            # TimeLimit: histogram of time limits in minutes, hours, days
+            elif col in ["TimeLimit"]:
+                # Convert to timedelta if not already
+                if not pd.api.types.is_timedelta64_dtype(col_data):
+                    col_data = pd.to_timedelta(col_data, unit="minutes", errors="coerce")
+                # Convert timelimits to minutes for plotting
+                timelimit_minutes = col_data.dropna().dt.total_seconds() / 60
+
+                # Define breakpoints for minutes, hours, days
+                min_break = 60  # 1 hour in minutes
+                hour_break = 1440  # 1 day in minutes
+                max_val = timelimit_minutes.max()
+                total_count = len(timelimit_minutes)
+
+                # Prepare data for each section
+                minutes_data = timelimit_minutes[(timelimit_minutes <= min_break)]
+                hours_data = timelimit_minutes[(timelimit_minutes > min_break) & (timelimit_minutes <= hour_break)]
+                days_data = timelimit_minutes[(timelimit_minutes > hour_break)]
+
+                # Ensure each section gets a reasonable width for readability
+                min_width = 0.3  # Minimum width for any section
+                # Compute proportional widths
+                width_minutes = len(minutes_data) / total_count if total_count > 0 else 0
+                width_hours = len(hours_data) / total_count if total_count > 0 else 0
+                width_days = len(days_data) / total_count if total_count > 0 else 0
+
+                # Enforce minimum width for non-empty sections
+                widths = []
+                for w, d in zip(
+                    [width_minutes, width_hours, width_days],
+                    [minutes_data, hours_data, days_data],
+                    strict=True
+                ):
+                    if not d.empty:
+                        widths.append(max(w, min_width))
+                    else:
+                        widths.append(0)
+                # If all are empty (shouldn't happen), fallback to equal widths
+                if sum(widths) == 0:
+                    widths = [1, 1, 1]
+                # Normalize so total is 1.0
+                total_width = sum(widths)
+                widths = [w / total_width for w in widths]
+                width_minutes, width_hours, width_days = widths
+
+                def pct(n, total_count=total_count):
+                    return f"{(n / total_count * 100):.1f}%" if total_count > 0 else "0.0%"
+
+                # Add space between sections to avoid overlapping xticks
+                section_gap = 0.1  # width of gap between sections (in axis units)
+                fig = plt.figure(figsize=(8, 5))
+                # Add a small gap between sections by adding blank axes
+                # We'll use 5 sections: [minutes, gap, hours, gap, days]
+                width_gap = section_gap
+                gs = GridSpec(
+                    1, 5,
+                    width_ratios=[width_minutes, width_gap, width_hours, width_gap, width_days],
+                    wspace=0.0
+                )
+
+                # Helper to reduce xticks and rotate if width is small
+                def choose_ticks_and_rotation(ticks, width, max_labels=3):
+                    # If width is small, reduce number of ticks and rotate
+                    if width < 0.38:
+                        step = max(1, int(np.ceil(len(ticks) / max_labels)))
+                        return ticks[::step], 45
+                    return ticks, 0
+
+                # Minutes axis
+                ax0 = fig.add_subplot(gs[0])
+                if not minutes_data.empty:
+                    ax0.hist(minutes_data, bins=20, color="tab:blue", alpha=0.7, log=True)
+                ax0.set_xlim(0, min_break)
+                min_ticks = [0, 15, 30, 45, 60]
+                min_ticklabels = ["0", "15m", "30m", "45m", "1h"]
+                min_ticks_sel, min_rot = choose_ticks_and_rotation(min_ticks, width_minutes)
+                min_ticklabels_sel = [min_ticklabels[i] for i, t in enumerate(min_ticks) if t in min_ticks_sel]
+                ax0.set_xticks(min_ticks_sel)
+                ax0.set_xticklabels(min_ticklabels_sel, rotation=min_rot, ha="right" if min_rot else "center")
+                ax0.set_ylabel("Count (log scale)")
+                ax0.set_title(f"Minutes (≤1h)\nN={len(minutes_data)} ({pct(len(minutes_data))})")
+                ax0.spines["right"].set_visible(False)
+                ax0.spines["top"].set_visible(False)
+
+                # Blank axis for gap between minutes and hours
+                ax_gap1 = fig.add_subplot(gs[1], frame_on=False)
+                ax_gap1.set_xticks([])
+                ax_gap1.set_yticks([])
+                ax_gap1.axis("off")
+
+                # Hours axis
+                ax1 = fig.add_subplot(gs[2], sharey=ax0)
+                if not hours_data.empty:
+                    ax1.hist(hours_data, bins=20, color="tab:orange", alpha=0.7, log=True)
+                ax1.set_xlim(min_break, hour_break)
+                hour_ticks = [60, 180, 360, 720, 1440]
+                hour_ticklabels = ["1h", "3h", "6h", "12h", "1d"]
+                hour_ticks_sel, hour_rot = choose_ticks_and_rotation(hour_ticks, width_hours)
+                hour_ticklabels_sel = [hour_ticklabels[i] for i, t in enumerate(hour_ticks) if t in hour_ticks_sel]
+                ax1.set_xticks(hour_ticks_sel)
+                ax1.set_xticklabels(hour_ticklabels_sel, rotation=hour_rot, ha="right" if hour_rot else "center")
+                ax1.set_title(f"Hours (1h–1d)\nN={len(hours_data)} ({pct(len(hours_data))})")
+                ax1.spines["left"].set_visible(False)
+                ax1.spines["right"].set_visible(False)
+                ax1.spines["top"].set_visible(False)
+                plt.setp(ax1.get_yticklabels(), visible=False)
+
+                # Blank axis for gap between hours and days
+                ax_gap2 = fig.add_subplot(gs[3], frame_on=False)
+                ax_gap2.set_xticks([])
+                ax_gap2.set_yticks([])
+                ax_gap2.axis("off")
+
+                # Days axis
+                ax2 = fig.add_subplot(gs[4], sharey=ax0)
+                if not days_data.empty:
+                    ax2.hist(days_data, bins=20, color="tab:green", alpha=0.7, log=True)
+                ax2.set_xlim(hour_break, max_val)
+                # Choose ticks for days
+                if max_val > hour_break:
+                    day_ticks = [
+                        hour_break,
+                        hour_break + (max_val - hour_break) / 3,
+                        hour_break + 2 * (max_val - hour_break) / 3,
+                        max_val,
+                    ]
+                    day_labels = ["1d"] + [f"{int(t / 1440)}d" for t in day_ticks[1:]]
+                    day_ticks_sel, day_rot = choose_ticks_and_rotation(day_ticks, width_days)
+                    day_labels_sel = [day_labels[i] for i, t in enumerate(day_ticks) if t in day_ticks_sel]
+                    ax2.set_xticks(day_ticks_sel)
+                    ax2.set_xticklabels(day_labels_sel, rotation=day_rot, ha="right" if day_rot else "center")
+                ax2.set_title(f"Days (>1d)\nN={len(days_data)} ({pct(len(days_data))})")
+                ax2.spines["left"].set_visible(False)
+                ax2.spines["top"].set_visible(False)
+                plt.setp(ax2.get_yticklabels(), visible=False)
+
+                # Remove space between subplots (handled by blank axes)
+                plt.subplots_adjust(wspace=0.0)
+                fig.suptitle(f"Histogram of {col} (minutes, hours, days)", y=1.04)
+
+                if output_dir_path is not None:
+                    plt.savefig(output_dir_path / f"{col}_hist.png", bbox_inches="tight")
+                plt.show()
+
             # Interactive
+
+            # GPUMemUsage: histogram of GPU memory usage
+            
+            # GPUs and GPU Count
+
+            # Memory vs GPUMemUsage: scatter plot
+
+            # Partition, node, GPU, and GPU Count, constraints
+
+            # Status, ExitCode, QoS
 
             # # Numeric columns: histogram, and boxplot if enough data
             # elif pd.api.types.is_numeric_dtype(col_data):
