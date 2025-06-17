@@ -12,7 +12,7 @@ from src import DatabaseConnection
 
 # loading small local data before every test modules run
 @pytest.fixture
-def load_modk_data_1():
+def load_mock_data_1():
     db = DatabaseConnection("tests/mockData/mock1.db")
     return db.fetch_all()
 

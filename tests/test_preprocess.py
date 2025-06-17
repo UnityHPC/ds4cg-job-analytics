@@ -37,39 +37,39 @@ def test_pre_process_data_fill_missing_small_arrayID(small_sample_data):
     assert data["ArrayID"].tolist() == [-1, 1, 2, -1]
 
 
-def test_preprocess_data_filtred_columns_total_data(load_modk_data_1):
-    data = preprocess_data(data=load_modk_data_1, min_elapsed_second=600)
+def test_preprocess_data_filtred_columns_total_data(load_mock_data_1):
+    data = preprocess_data(data=load_mock_data_1, min_elapsed_second=600)
     assert "UUID" not in data.columns
     assert "EndTime" not in data.columns
     assert "Nodes" not in data.columns
 
 
-def test_pre_preocess_data_filtered_GPU_total_data(load_modk_data_1):
-    data = preprocess_data(data=load_modk_data_1, min_elapsed_second=600)
+def test_pre_preocess_data_filtered_GPU_total_data(load_mock_data_1):
+    data = preprocess_data(data=load_mock_data_1, min_elapsed_second=600)
     GPUTypeNull = data["GPUType"].isnull()
     GPUNull = data["GPUs"].isnull()
     assert not any(GPUTypeNull)
     assert not any(GPUNull)
 
 
-def test_pre_process_data_filtered_status_total_data(load_modk_data_1):
-    data = preprocess_data(data=load_modk_data_1, min_elapsed_second=600)
+def test_pre_process_data_filtered_status_total_data(load_mock_data_1):
+    data = preprocess_data(data=load_mock_data_1, min_elapsed_second=600)
     statusFailed = data["Status"] == "FAILED"
     statusCancelled = data["Status"] == "CANCELLED"
     assert not any(statusFailed)
     assert not any(statusCancelled)
 
 
-def test_pre_process_data_filtered_elapsed_total_data(load_modk_data_1):
-    data = preprocess_data(data=load_modk_data_1, min_elapsed_second=300)
+def test_pre_process_data_filtered_elapsed_total_data(load_mock_data_1):
+    data = preprocess_data(data=load_mock_data_1, min_elapsed_second=300)
     elapsedLessThanMin = data["Elapsed"] < pd.to_timedelta(
         300, unit="s"
     )  # final version of Elapsed column is timedelta so convert for comparison
     assert not any(elapsedLessThanMin)
 
 
-def test_pre_process_data_filtered_root_account_total_data(load_modk_data_1):
-    data = preprocess_data(data=load_modk_data_1, min_elapsed_second=600)
+def test_pre_process_data_filtered_root_account_total_data(load_mock_data_1):
+    data = preprocess_data(data=load_mock_data_1, min_elapsed_second=600)
     partitionBuilding = data["Partition"] == "building"
     qosUpdates = data["QOS"] == "updates"
     accountRoot = data["Account"] == "root"
@@ -78,21 +78,21 @@ def test_pre_process_data_filtered_root_account_total_data(load_modk_data_1):
     assert not any(partitionBuilding)
 
 
-def test_pre_preprocess_data_include_CPU_job(load_modk_data_1):
-    data = preprocess_data(data=load_modk_data_1, min_elapsed_second=600, include_CPU_only_job=True)
+def test_pre_preprocess_data_include_CPU_job(load_mock_data_1):
+    data = preprocess_data(data=load_mock_data_1, min_elapsed_second=600, include_CPU_only_job=True)
     assert (data["GPUType"] == "cpu").sum() == 2
     assert data["GPUs"].value_counts()[0] == 2
 
 
-def test_pre_process_data_include_FAILED_CANCELLED_job(load_modk_data_1):
-    data = preprocess_data(data=load_modk_data_1, min_elapsed_second=600, include_failed_cancelled_jobs=True)
+def test_pre_process_data_include_FAILED_CANCELLED_job(load_mock_data_1):
+    data = preprocess_data(data=load_mock_data_1, min_elapsed_second=600, include_failed_cancelled_jobs=True)
     assert data["Status"].value_counts()["FAILED"] == 1
     assert data["Status"].value_counts()["CANCELLED"] == 0
 
 
-def test_pre_process_data_include_all(load_modk_data_1):
+def test_pre_process_data_include_all(load_mock_data_1):
     data = preprocess_data(
-        data=load_modk_data_1, min_elapsed_second=600, include_failed_cancelled_jobs=True, include_CPU_only_job=True
+        data=load_mock_data_1, min_elapsed_second=600, include_failed_cancelled_jobs=True, include_CPU_only_job=True
     )
     assert len(data) == 11
     assert (data["GPUType"] == "cpu").sum() == 6
@@ -137,32 +137,42 @@ def test_pre_process_data_filter_min_esplapes_mock2(load_mock_data_2):
     assert len(data) == 8
 
 
-def test_category_interactive(load_modk_data_1):
-    data = preprocess_data(data=load_modk_data_1, min_elapsed_second=600)
+def test_category_interactive(load_mock_data_1):
+    data = preprocess_data(data=load_mock_data_1, min_elapsed_second=600)
     assert data["Interactive"].dtype == "category"
 
 
-def test_category_QOS(load_modk_data_1):
-    data = preprocess_data(data=load_modk_data_1, min_elapsed_second=600)
+def test_category_QOS(load_mock_data_1):
+    data = preprocess_data(data=load_mock_data_1, min_elapsed_second=600)
     assert data["QOS"].dtype == "category"
     expected = {"short", "long", "normal"}
     assert expected.issubset(set(data["QOS"].cat.categories))
 
 
-def test_category_exit_code(load_modk_data_1):
-    data = preprocess_data(data=load_modk_data_1, min_elapsed_second=600)
+def test_category_exit_code(load_mock_data_1):
+    data = preprocess_data(data=load_mock_data_1, min_elapsed_second=600)
     assert data["ExitCode"].dtype == "category"
     expected = {"SUCCESS", "ERROR", "SIGNALED"}
     assert expected.issubset(set(data["ExitCode"].cat.categories))
 
 
-def test_category_partition(load_modk_data_1):
-    data = preprocess_data(data=load_modk_data_1, min_elapsed_second=600)
+def test_category_partition(load_mock_data_1):
+    data = preprocess_data(data=load_mock_data_1, min_elapsed_second=600)
     assert data["Partition"].dtype == "category"
     expected = {"building", "gpu", "cpu"}
     assert expected.issubset(set(data["Partition"].cat.categories))
 
 
-def test_category_account(load_modk_data_1):
-    data = preprocess_data(data=load_modk_data_1, min_elapsed_second=600)
+def test_category_account(load_mock_data_1):
+    data = preprocess_data(data=load_mock_data_1, min_elapsed_second=600)
     assert data["Account"].dtype == "category"
+
+
+def test_pre_proess_timedelta_conversion(load_mock_data_1):
+    data = preprocess_data(
+        data=load_mock_data_1, min_elapsed_second=600, include_CPU_only_job=True, include_failed_cancelled_jobs=True
+    )
+    time_limit = data["TimeLimit"]
+    assert time_limit.dtype == "timedelta64[ns]"
+    assert time_limit[0].total_seconds() == 24000
+    assert time_limit[10].total_seconds() == 480

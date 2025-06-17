@@ -168,11 +168,11 @@ def preprocess_data(
     #! type casting for columns involving time
     time_columns = ["StartTime", "SubmitTime"]
     for col in time_columns:
-        res.loc[:, col] = pd.to_datetime(res[col], errors="coerce")
+        res[col] = pd.to_datetime(res[col], errors="coerce")
 
     timedelta_columns = ["TimeLimit", "Elapsed"]
     for col in timedelta_columns:
-        res.loc[:, col] = pd.to_timedelta(res[col], unit="s", errors="coerce")
+        res[col] = pd.to_timedelta(res[col], unit="s", errors="coerce")
 
     #!Added parameters, similar to Benjamin code
     res.loc[:, "Queued"] = res["StartTime"] - res["SubmitTime"]
