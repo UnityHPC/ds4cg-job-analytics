@@ -6,6 +6,8 @@ from pathlib import Path
 import os
 import numpy as np
 from matplotlib.gridspec import GridSpec
+from matplotlib.patches import Patch
+from ..config.constants import VRAM_CATEGORIES
 
 """
 Visualization utilities for pre-processed Unity job data.
@@ -615,10 +617,146 @@ class DataVisualizer:
                     plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
                 plt.show()
 
+            # GPUMemUsage: histogram of GPU memory usage (categorical bins)
+            elif col in ["GPUMemUsage"]:
+                # Convert to numeric if not already
+                if not pd.api.types.is_numeric_dtype(col_data):
+                    col_data = pd.to_numeric(col_data, errors="coerce")
+                col_data = col_data.dropna().div(2 ** 30)  # Convert to GB
 
-            # GPUMemUsage: histogram of GPU memory usage
-            
-            # GPUs and GPU Count
+                # Define the categorical VRAM bins (as categories, not intervals)
+                vram_labels = [str(v) for v in VRAM_CATEGORIES]
+
+                # Bin the data by closest category (floor to the largest category <= value)
+                bins = [-0.1] + VRAM_CATEGORIES  # -0.1 to include 0 exactly
+                binned = pd.cut(col_data, bins=bins, labels=vram_labels, right=True, include_lowest=True)
+                binned[col_data == 0] = "0"
+
+                bin_counts = binned.value_counts(sort=False, dropna=False)
+                bin_percents = bin_counts / bin_counts.sum() * 100
+
+                plt.figure(figsize=figsize)
+                ax = plt.gca()
+                x_ticks = np.arange(len(vram_labels))
+                bar_positions = [0] + [i + 0.5 for i in range(1, len(vram_labels))]
+                bar_width = 0.8
+
+                # Use a distinct color for 0 (e.g., red) and a colorblind-friendly palette for others
+                zero_color = "#E15759"  # red, colorblind-friendly
+                other_color = "#4E79A7"  # blue, colorblind-friendly
+
+                bars = []
+                # 0 GB bar with cross-hatch
+                bar0 = ax.bar(
+                    bar_positions[0],
+                    bin_percents.values[0],
+                    width=bar_width,
+                    align="center",
+                    color=zero_color,
+                    hatch="///"
+                )
+                bars.append(bar0)
+                # Other bars
+                for i in range(1, len(vram_labels)):
+                    bars.append(ax.bar(
+                        bar_positions[i],
+                        bin_percents.values[i],
+                        width=bar_width,
+                        align="center",
+                        color=other_color
+                    ))
+
+                ax.set_xticks(x_ticks)
+                ax.set_xticklabels(vram_labels)
+                ax.set_xlabel("GPU Memory (GB)")
+                ax.set_ylabel("Percent of Jobs")
+                ax.set_title(f"Histogram of GPU VRAM Usage ({col})")
+                plt.grid(axis="y", linestyle="--", alpha=0.5)
+
+                # --- Bar labels with gap above tallest label ---
+                # Find the tallest bar
+                tallest = bin_percents.max()
+                # Set y-limit a bit higher to leave a gap above the tallest bar label
+                gap = max(2.5, tallest * 0.08)
+                ax.set_ylim(0, tallest + gap)
+
+                # Draw bar labels with bbox, always above the bar
+                for i, v in enumerate(bin_percents.values):
+                    label_y = v + 0.7  # offset above bar
+                    ax.text(
+                        bar_positions[i], label_y, f"{v:.1f}%",
+                        ha="center", va="bottom", fontsize=9,
+                        bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7)
+                    )
+
+                legend_handles = [
+                    Patch(facecolor=zero_color, hatch="///", label="0 GB (no GPU used)"),
+                    Patch(facecolor=other_color, label=">0 GB"),
+                ]
+                ax.legend(handles=legend_handles, loc="upper right")
+
+                if output_dir_path is not None:
+                    plt.savefig(output_dir_path / f"{col}_hist.png")
+                plt.show()
+
+            # GPUType: bar plot of GPU types arrays
+            elif col in ["GPUType"]:
+                # GPUType should be a numpy array or list-like per row
+                # Check if all non-null entries are numpy arrays
+                non_null = col_data.dropna()
+                if not all(isinstance(x, np.ndarray) for x in non_null):
+                    print(f"Error: Not all entries in column '{col}' are numpy arrays. Example values:")
+                    print(non_null.head())
+                    plt.close()
+                    continue
+
+                # Drop NaN and flatten all GPU types (each entry is a numpy array)
+                flat_gpu_types = pd.Series(np.concatenate(non_null.values))
+
+                # Count single and multi-GPU-type jobs
+                is_multi = non_null.apply(lambda x: len(x) > 1)
+                multi_count = is_multi.sum()
+                single_count = (~is_multi).sum()
+
+                # Count occurrences of each GPU type (across all jobs)
+                gpu_counts = flat_gpu_types.value_counts()
+
+                plt.figure(figsize=figsize)
+                ax = sns.barplot(
+                    x=gpu_counts.index,
+                    y=gpu_counts.values,
+                    hue=gpu_counts.index,
+                    palette="viridis",
+                    legend=False
+                )
+                plt.title(f"GPU Types ({col})")
+                plt.xlabel("GPU Type")
+                plt.ylabel("Count (across all jobs)")
+                plt.xticks(rotation=45, ha="right")
+
+                # Annotate bars with counts, ensuring a gap above the tallest bar label
+                tallest = np.asarray(gpu_counts.values).max()
+                gap = max(2.5, tallest * 0.08)
+                ax.set_ylim(0, tallest + gap)
+                for i, v in enumerate(gpu_counts.values):
+                    label_y = v + gap * 0.2  # offset above bar, proportional to gap
+                    ax.text(i, label_y, str(v), ha="center", va="bottom", fontsize=9,
+                            bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7))
+
+                # Add a text box showing number of jobs with multiple GPU types
+                info_text = f"Jobs with 1 GPU type: {single_count}\nJobs with >1 GPU type: {multi_count}"
+                # Place the text box inside the axes, top right, with a small offset
+                ax.text(
+                    0.98, 0.98, info_text,
+                    ha="right", va="top", fontsize=10,
+                    bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.7),
+                    transform=ax.transAxes,
+                    zorder=10
+                )
+
+                if output_dir_path is not None:
+                    plt.savefig(output_dir_path / f"{col}_barplot.png")
+                plt.show()
 
             # Memory vs GPUMemUsage: scatter plot
 
