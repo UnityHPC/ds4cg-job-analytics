@@ -131,9 +131,12 @@ def get_allocated_vram(gpu_type: list[str] | str) -> int:
 
 
 def fill_missing(res: pd.DataFrame) -> None:
-    """Fill missing values in the DataFrame with default values.
+    """
+    Fill missing values in the DataFrame with default values.
+
     Args:
         res (pd.DataFrame): The DataFrame to fill missing values in.
+
     Returns:
         None: The function modifies the DataFrame in place.
     """
@@ -150,7 +153,8 @@ def fill_missing(res: pd.DataFrame) -> None:
 def preprocess_data(
     data: pd.DataFrame, min_elapsed_second: int = 600, include_failed_cancelled_jobs=False, include_CPU_only_job=False
 ) -> pd.DataFrame:
-    """ "Preprocess dataframe, filtering out unwanted rows and columns, filling missing values and converting types.
+    """
+    Preprocess dataframe, filtering out unwanted rows and columns, filling missing values and converting types.
 
     Args:
         data (pd.DataFrame): The input dataframe containing job data.
