@@ -1,4 +1,7 @@
 """
+
+The following describes some preprocessing criteria for the job data:
+
 - Ignore columns:
 UUID
 Nodes(NodesList have more specific information)
@@ -19,7 +22,6 @@ Need to fill in missing values for arrayID, interactive, and constraints
 
 - Type of starttime, endtime, submit time will be converted into datetime
 - Type of Queued Time, TimeLimit, Elapsed will be converted into timedelta
-
 
 - Convert the following to categorical:
 Interactive, Status, ExitCode, QOS, partition,Account
@@ -129,19 +131,37 @@ def get_allocated_vram(gpu_type: list[str] | str) -> int:
 
 
 def fill_missing(res: pd.DataFrame) -> None:
-    # modify object inplace
+    """Fill missing values in the DataFrame with default values.
+    Args:
+        res (pd.DataFrame): The DataFrame to fill missing values in.
+    Returns:
+        None: The function modifies the DataFrame in place.
+    """
+
     #! all Nan value are np.nan
-    #!important note: not filled the null values of constraints since Benjaminc code already handled it
-    res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)  # null then fills -1
+    # fill default values for specific columns
+    res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)
     res.loc[:, "Interactive"] = res["Interactive"].fillna("non-interactive")
-    res.loc[:, "Constraints"] = res["Constraints"].fillna("")  # null then fills empty string
-    res.loc[:, "GPUType"] = res["GPUType"].fillna("cpu")  # Nan in GPUType is CPU
-    res.loc[:, "GPUs"] = res["GPUs"].fillna(0)  # Nan in GPUs is 0
+    res.loc[:, "Constraints"] = res["Constraints"].fillna("")
+    res.loc[:, "GPUType"] = res["GPUType"].fillna("cpu")
+    res.loc[:, "GPUs"] = res["GPUs"].fillna(0)
 
 
 def preprocess_data(
     data: pd.DataFrame, min_elapsed_second: int = 600, include_failed_cancelled_jobs=False, include_CPU_only_job=False
 ) -> pd.DataFrame:
+    """ "Preprocess dataframe, filtering out unwanted rows and columns, filling missing values and converting types.
+
+    Args:
+        data (pd.DataFrame): The input dataframe containing job data.
+        min_elapsed_second (int, optional): Minimum elapsed time in seconds to keep a job record. Defaults to 600.
+        include_failed_cancelled_jobs (bool, optional): Whether to include jobs with status FAILED or CANCELLED.
+        include_CPU_only_job (bool, optional): Whether to include jobs that do not use GPUs (CPU-only jobs).
+
+    Returns:
+        pd.DataFrame: The preprocessed dataframe
+    """
+
     data.drop(columns=["UUID", "EndTime", "Nodes"], axis=1, inplace=True)
 
     cond_GPU_Type = (
@@ -205,7 +225,7 @@ def preprocess_data(
         all_categories = list(set(custom_category_map[col] + list(res[col].unique())))
         res[col] = pd.Categorical(res[col], categories=all_categories, ordered=False)
 
-    #! some category that we have access to all possible values:
+    #! some category that we have access to all possible values on Unity documentation
     res["Partition"] = pd.Categorical(res["Partition"], categories=CATEGORY_PARTITION, ordered=False)
 
     return res
