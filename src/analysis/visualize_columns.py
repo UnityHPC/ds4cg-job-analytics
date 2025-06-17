@@ -537,7 +537,7 @@ class DataVisualizer:
                     plt.savefig(output_dir_path / f"{col}_hist.png", bbox_inches="tight")
                 plt.show()
 
-            # Interactive
+            # Interactive: pie chart of interactive vs non-interactive jobs
             elif col in ["Interactive"]:
                 # Replace empty/NaN with 'non interactive', others as their type
                 interactive_col = df[col].fillna('non interactive').astype(str)
@@ -547,16 +547,22 @@ class DataVisualizer:
                 # Define threshold for small slices
                 threshold_pct = 5
                 total = counts.sum()
-                pct = counts / total * 100
+                pct_values = counts.div(total).multiply(100)
 
                 # Explode small slices to separate them visually
-                explode = [max(0.15 - p / 100 * 4, 0.1) if p < threshold_pct else 0 for p in pct]
+                explode = [max(0.15 - p / 100 * 4, 0.1) if p < threshold_pct else 0 for p in pct_values]
 
                 # Prepare labels: only show label on pie if above threshold
-                labels = [str(label) if p >= threshold_pct else '' for label, p in zip(counts.index, pct)]
+                labels = [
+                    str(label) if p >= threshold_pct else ''
+                    for label, p in zip(counts.index, pct_values, strict=True)
+                ]
 
                 # Prepare legend labels for all slices
-                legend_labels = [f"{label}: {count} ({p:.1f}%)" for label, count, p in zip(counts.index, counts, pct)]
+                legend_labels = [
+                    f"{label}: {count} ({p:.1f}%)"
+                    for label, count, p in zip(counts.index, counts, pct_values, strict=True)
+                ]
 
                 # Create a gridspec to reserve space for the legend above the pie
                 fig = plt.gcf()
