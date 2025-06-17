@@ -107,9 +107,7 @@ CATEGORY_GPUTYPE = [
 ]
 
 
-def get_requested_vram(constraints: list[str] | str) -> int:
-    if isinstance(constraints, str) and constraints == "":
-        return 0
+def get_requested_vram(constraints: list[str]) -> int:
     requested_vrams = []
     for constr in constraints:
         constr = constr.strip("'")
@@ -120,15 +118,11 @@ def get_requested_vram(constraints: list[str] | str) -> int:
             requested_vrams.append(ram_map[gpu_type])
     if not (len(requested_vrams)):
         return 0
-    else:
-        return min(requested_vrams)
+    return min(requested_vrams)
 
 
-def get_allocated_vram(gpu_type: list[str] | str) -> int:
-    if isinstance(gpu_type, str):
-        return 0
-    else:
-        return min(ram_map[x] for x in gpu_type)
+def get_allocated_vram(gpu_type: list[str]) -> int:
+    return min(ram_map[x] for x in gpu_type)
 
 
 def _fill_missing(res: pd.DataFrame) -> None:
