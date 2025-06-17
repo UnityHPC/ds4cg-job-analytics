@@ -189,7 +189,7 @@ class DataVisualizer:
                 plt.close()
                 continue
 
-            # JobID: treat as categorical if low cardinality, else skip plot
+            # JobID and ArrayID: treat as categorical if low cardinality, else skip plot
             if col in ["JobID", "ArrayID"]:
                 if col_data.nunique() < 30:
                     sns.countplot(x=col, data=df)
@@ -201,12 +201,12 @@ class DataVisualizer:
 
             # Boolean columns
             elif col_type is bool or col in ["IsArray", "Preempted"]:
-                plt.figure(figsize=(3, 7))
+                plt.figure(figsize=(5, 7))
                 ax = sns.countplot(x=col, stat="percent", data=df)
                 if isinstance(ax.containers[0], BarContainer):
                     # The heights are already in percent (0-100) due to stat="percent"
                     ax.bar_label(ax.containers[0], labels=[f"{h.get_height():.1f}%" for h in ax.containers[0]])
-                plt.title(f"Bar plot of {col}")
+                plt.title("Whether a job is submitted in an array")
                 plt.xticks(rotation=45, ha="right")
                 if output_dir_path is not None:
                     plt.savefig(output_dir_path / f"{col}_barplot.png")
@@ -538,6 +538,77 @@ class DataVisualizer:
                 plt.show()
 
             # Interactive
+            elif col in ["Interactive"]:
+                # Replace empty/NaN with 'non interactive', others as their type
+                interactive_col = df[col].fillna('non interactive').astype(str)
+                counts = interactive_col.value_counts()
+                plt.figure(figsize=(5, 7))
+
+                # Define threshold for small slices
+                threshold_pct = 5
+                total = counts.sum()
+                pct = counts / total * 100
+
+                # Explode small slices to separate them visually
+                explode = [max(0.15 - p / 100 * 4, 0.1) if p < threshold_pct else 0 for p in pct]
+
+                # Prepare labels: only show label on pie if above threshold
+                labels = [str(label) if p >= threshold_pct else '' for label, p in zip(counts.index, pct)]
+
+                # Prepare legend labels for all slices
+                legend_labels = [f"{label}: {count} ({p:.1f}%)" for label, count, p in zip(counts.index, counts, pct)]
+
+                # Create a gridspec to reserve space for the legend above the pie
+                fig = plt.gcf()
+                fig.clf()
+
+                # Use 3 rows: title, legend, pie
+                gs = GridSpec(3, 1, height_ratios=[0.05, 0.75, 0.25], hspace=0.0)
+                ax_title = fig.add_subplot(gs[0])
+                ax_pie = fig.add_subplot(gs[1])
+                ax_legend = fig.add_subplot(gs[2])
+
+                def autopct_func(p, threshold_pct=threshold_pct):
+                    return f"{p:.1f}%" if p >= threshold_pct else ''
+                
+                wedges, *_ = ax_pie.pie(
+                    counts,
+                    labels=labels,
+                    autopct=autopct_func,
+                    startangle=0,
+                    colors=sns.color_palette("pastel")[0:len(counts)],
+                    explode=explode,
+                )
+
+                ax_pie.axis('equal')
+
+                # Hide the legend and title axes
+                ax_legend.axis('off')
+                ax_title.axis('off')
+
+                # Place the title in its own axis, centered
+                ax_title.text(
+                    0.5, 0.5,
+                    "Job Type Distribution (Interactive vs Non Interactive)",
+                    ha='center', va='center', fontsize=14,
+                )
+
+                # Place the legend below the title and above the pie chart
+                ax_legend.legend(
+                    wedges,
+                    legend_labels,
+                    title="Job Type",
+                    loc="center",
+                    bbox_to_anchor=(0.5, 0.5),
+                    ncol=1,
+                    fontsize=10,
+                    title_fontsize=11
+                )
+
+                if output_dir_path is not None:
+                    plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
+                plt.show()
+
 
             # GPUMemUsage: histogram of GPU memory usage
             
