@@ -6,8 +6,8 @@ in GPU usage and notify users or PIs about these issues.
 
 import pandas as pd
 from pathlib import Path
-from preprocess.preprocess import preprocess_data
-from database.DatabaseConnection import DatabaseConnection
+from src.preprocess.preprocess import preprocess_data
+from src.database.DatabaseConnection import DatabaseConnection
 
 
 def load_jobs_dataframe_from_duckdb(db_path=None, table_name="Jobs"):
