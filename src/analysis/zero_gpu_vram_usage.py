@@ -33,7 +33,14 @@ def load_jobs_dataframe_from_duckdb(db_path=None, table_name="Jobs"):
 
 
 def analyze_hybrid_workload_efficiency(
-    df, requested_vram_filter=0, allocated_vram_min=0, gpu_mem_usage_min=0, gpus_min=1, elapsed_seconds_min=600
+    df,
+    requested_vram_filter=0,
+    allocated_vram_greater_than=0,
+    gpu_mem_usage_min=None,
+    gpu_mem_usage_max=None,
+    gpu_mem_usage_exact=None,
+    gpus_min=1,
+    elapsed_seconds_min=600, #TODO: make it a parameter
 ):
     """
     Analyze jobs requesting a specific VRAM, GPU allocation, and usage criteria.
@@ -41,8 +48,10 @@ def analyze_hybrid_workload_efficiency(
     Args:
         df (DataFrame): Main job dataframe from GPUMetrics
         requested_vram_filter (int, float, or callable): Value or function to filter requested_vram
-        allocated_vram_min (int, float): Minimum allocated_vram
-        gpu_mem_usage_min (int, float): Minimum GPUMemUsage
+        allocated_vram_greater_than (int, float): allocated_vram greater than this value
+        gpu_mem_usage_min (int, float, optional): Minimum GPUMemUsage (inclusive)
+        gpu_mem_usage_max (int, float, optional): Maximum GPUMemUsage (inclusive)
+        gpu_mem_usage_exact (int, float, optional): If set, select only rows where GPUMemUsage == this value
         gpus_min (int): Minimum GPUs allocated
         elapsed_seconds_min (int): Minimum elapsed time in seconds
 
@@ -55,10 +64,21 @@ def analyze_hybrid_workload_efficiency(
         mask = df["requested_vram"].apply(requested_vram_filter)
     else:
         mask = df["requested_vram"] == requested_vram_filter
+
+    # GPU memory usage filter
+    gpu_mem_mask = pd.Series([True] * len(df), index=df.index)
+    if gpu_mem_usage_exact is not None:
+        gpu_mem_mask &= df["GPUMemUsage"] == gpu_mem_usage_exact
+    else:
+        if gpu_mem_usage_min is not None:
+            gpu_mem_mask &= df["GPUMemUsage"] >= gpu_mem_usage_min
+        if gpu_mem_usage_max is not None:
+            gpu_mem_mask &= df["GPUMemUsage"] <= gpu_mem_usage_max
+
     hybrid_jobs = df[
         mask
-        & (df["allocated_vram"] > allocated_vram_min)
-        & (df["GPUMemUsage"] > gpu_mem_usage_min)
+        & (df["allocated_vram"] > allocated_vram_greater_than)
+        & gpu_mem_mask
         & (df["GPUs"] >= gpus_min)
         & (df["Elapsed_seconds"] >= elapsed_seconds_min)
     ].copy()
@@ -85,8 +105,8 @@ def analyze_hybrid_workload_efficiency(
     hybrid_jobs["duration_hours"] = hybrid_jobs["Elapsed_seconds"] / 3600
     hybrid_jobs["duration_category"] = pd.cut(
         hybrid_jobs["duration_hours"],
-        bins=[0, 1, 6, 24, float("inf")],
-        labels=["Short (<1h)", "Medium (1-6h)", "Long (6-24h)", "Very Long (>24h)"],
+        bins=[0, 1, 6, 24, 48, float("inf")],
+        labels=["Short (<1h)", "Medium (1-6h)", "Long (6-24h)", "Under two days (24-48h)", "Over two days (>48h)"],
     )
 
     return hybrid_jobs
