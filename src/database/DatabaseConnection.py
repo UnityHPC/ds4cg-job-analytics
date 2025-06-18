@@ -51,4 +51,3 @@ class DatabaseConnection:
                 ) from e
         else:
             raise Exception("No active database connection.")
-

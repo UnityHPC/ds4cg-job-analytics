@@ -13,9 +13,7 @@ plots and statistics for numeric and categorical columns.
 class DataVisualizer:
     """A class for visualizing and summarizing columns of pre-processed data in a DataFrame."""
 
-    def __init__(
-        self, df: pd.DataFrame
-    ) -> None:
+    def __init__(self, df: pd.DataFrame) -> None:
         """Initialize the DataVisualizer.
 
 
@@ -29,7 +27,7 @@ class DataVisualizer:
             self.df = df.copy()
         else:
             raise ValueError("Must provide a DataFrame.")
-        
+
     def validate_dataframe(self) -> pd.DataFrame:
         """Validate that the DataFrame is not empty and has columns.
 
@@ -44,7 +42,7 @@ class DataVisualizer:
         if self.df.columns.empty:
             raise ValueError("DataFrame has no columns.")
         return self.df
-        
+
     def validate_sample_size(self, sample_size: int | None) -> int | None:
         """Validate the sample size for visualization.
 
@@ -60,7 +58,7 @@ class DataVisualizer:
         if sample_size is not None and (not isinstance(sample_size, int) or sample_size <= 0):
             raise ValueError("Sample size must be a positive integer.")
         return sample_size
-    
+
     def validate_random_seed(self, random_seed: int | None) -> int | None:
         """Validate the random seed for reproducibility.
 
@@ -76,7 +74,7 @@ class DataVisualizer:
         if not isinstance(random_seed, int):
             raise ValueError("Random seed must be an integer.")
         return random_seed
-        
+
     def validate_columns(self, columns: list[str]) -> list[str]:
         """Validate the provided columns against the DataFrame.
 
@@ -143,7 +141,7 @@ class DataVisualizer:
         self.validate_random_seed(random_seed)
         self.validate_columns(columns if columns is not None else df.columns.tolist())
         self.validate_output_dir(output_dir_path)
-        
+
         df = df.copy()
 
         # If specific columns are provided, select them
@@ -153,11 +151,8 @@ class DataVisualizer:
         # Sample the data if sample_size is specified
         if sample_size is not None:
             if len(df) < sample_size:
-                raise ValueError(
-                    f"Sample size {sample_size} is larger than the DataFrame size {len(df)}."
-                )
+                raise ValueError(f"Sample size {sample_size} is larger than the DataFrame size {len(df)}.")
             df = df.sample(sample_size, random_state=random_seed)
-
 
         # plt.figure(figsize=figsize)
 
@@ -167,12 +162,12 @@ class DataVisualizer:
             if summary_file.exists():
                 summary_file = summary_file.with_name(summary_file.stem + "_new.txt")
                 print(f"Summary file already exists. Saving as {summary_file.name}")
-            
+
             summary_lines = ["Column Summary Statistics\n", "=" * 30 + "\n"]
             for col in df.columns:
                 summary_lines.append(f"\nColumn: {col}\n")
                 summary_lines.append(str(df[col].describe(include="all")) + "\n")
-            
+
             with open(summary_file, "w", encoding="utf-8") as f:
                 f.writelines(summary_lines)
         else:

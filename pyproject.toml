@@ -60,14 +60,9 @@ exclude = [
 
 [tool.pytest.ini_options]
 # pytest configuration options
-<<<<<<< HEAD
-addopts = [ "--import-mode=importlib", "-ra" ]
-pythonpath = "."
-=======
 addopts = [
     "--import-mode=importlib", "-ra"
 ]
->>>>>>> edc15e8 (Fix pytest config in .toml)
 testpaths = ["tests"]
 
 [tool.mkdocs]
