@@ -11,3 +11,4 @@ coverage
 pandas-stubs
 types-seaborn
 jupyterlab
+nbconvert

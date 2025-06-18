@@ -218,12 +218,12 @@ def evaluate_cpu_gpu_balance(hybrid_jobs_df):
 def filter_zero_vram_requested_with_gpu_allocated(df, requested_vram=0, gpus_min=1):
     """
     Return jobs where requested_vram is greater than or equal to a value (default 0) and GPUs >= gpus_min (default 1).
-    
+
     Args:
         df (pd.DataFrame): The jobs DataFrame.
         requested_vram (int, float): Value to filter requested_vram
         gpus_min (int): Minimum GPUs allocated
-    
+
     Returns:
         pd.DataFrame: Filtered DataFrame with jobs matching the criteria.
     """
