@@ -1274,53 +1274,51 @@ class DataVisualizer:
                     plt.savefig(output_dir_path / f"{col}_barplot.png")
                 plt.show()
 
-            
-            # Memory vs GPUMemUsage: scatter plot
+            # CPUMemUsage: plot histogram of CPU memory usage
+            elif col in ["CPUMemUsage"]:
+                # Convert to numeric (int) if not already
+                if not pd.api.types.is_numeric_dtype(col_data):
+                    col_data = pd.to_numeric(col_data, errors="coerce")
+                col_data = col_data.dropna().div(2 ** 30)  # Convert B to GiB
 
-            # Partition, node, GPUType, and GPU Count, constraints
+                # Filter out non-positive values for log scale
+                col_data = col_data[col_data > 0]
 
-            # Status, ExitCode, QoS
+                plt.figure(figsize=figsize)
+                ax = sns.histplot(col_data.tolist(), bins=60, kde=True, log_scale=(True, False), stat="percent")
+                plt.title(f"Histogram of {col} (in GiB, log scale)")
+                plt.xlabel("CPU Memory (GiB, log scale)")
+                plt.ylabel("Percent of Jobs")
 
-            # # Numeric columns: histogram, and boxplot if enough data
-            # elif pd.api.types.is_numeric_dtype(col_data):
-            #     sns.histplot(col_data.dropna(), bins=30, kde=True)
-            #     plt.title(f"Histogram of {col}")
-            #     plt.tight_layout()
-            #     if output_dir_path is not None:
-            #         plt.savefig(output_dir_path / f"{col}_hist.png")
-            #         plt.close()
-            #         plt.figure(figsize=figsize)
-            #     if col_data.count() > 10:
-            #         sns.boxplot(x=col_data.dropna())
-            #         plt.title(f"Boxplot of {col}")
-            #     else:
-            #         plt.close()
-            #         continue
+                # Prepare stat summary with units
+                stats = col_data.describe(percentiles=[.25, .5, .75])
+                stat_text = (
+                    f"Count: {int(stats['count'])} jobs\n"
+                    f"Mean: {stats['mean']:.2f} GiB\n"
+                    f"Std: {stats['std']:.2f} GiB\n"
+                    f"Min: {stats['min']:.2f} GiB\n"
+                    f"25%: {stats['25%']:.2f} GiB\n"
+                    f"50%: {stats['50%']:.2f} GiB\n"
+                    f"75%: {stats['75%']:.2f} GiB\n"
+                    f"Max: {stats['max']:.2f} GiB"
+                )
+                # Place the box in the top right, inside the axes, with a small offset
+                ax.text(
+                    0.98, 0.98, stat_text,
+                    ha="right", va="top", fontsize=10,
+                    bbox=dict(boxstyle="round,pad=0.4", fc="white", ec="gray", alpha=0.8),
+                    transform=ax.transAxes,
+                    zorder=10
+                )
+                plt.grid(axis="y", linestyle="--", alpha=0.5)
 
-            # # Categorical columns: bar plot of top 20 categories
-            # elif pd.api.types.is_categorical_dtype(col_data) or col_type == object:
-            #     # For array-like columns, join lists to string for plotting
-            #     if col_data.apply(lambda x: isinstance(x, (list, tuple))).any():
-            #         flat = col_data.dropna().explode()
-            #         top_cats = flat.value_counts().nlargest(20)
-            #         sns.barplot(x=top_cats.index, y=top_cats.values)
-            #         plt.title(f"Top 20 values in {col} (exploded)")
-            #         plt.xticks(rotation=45, ha="right")
-            #     else:
-            #         top_cats = col_data.value_counts().nlargest(20)
-            #         sns.barplot(x=top_cats.index, y=top_cats.values)
-            #         plt.title(f"Top 20 values in {col}")
-            #         plt.xticks(rotation=45, ha="right")
+                if output_dir_path is not None:
+                    plt.savefig(output_dir_path / f"{col}_hist.png")
+                plt.show()
 
-            # else:
-            #     # Unsupported column types
-            #     print(f"(Unsupported column type for visualization: {col})")
-            #     plt.close()
-            #     continue
 
-            # plt.tight_layout()
-            # if output_dir_path is not None:
-            #     plt.savefig(output_dir_path / f"{col}.png")
-            #     plt.close()
-            # else:
-            #     plt.show()
+            # Unrecognized column type
+            else:
+                print(f"Unrecognized column type '{col}' in DataFrame. Skipping visualization.")
+                plt.close()
+                continue
