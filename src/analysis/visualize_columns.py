@@ -8,6 +8,7 @@ import numpy as np
 from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Patch
 from ..config.constants import VRAM_CATEGORIES
+import textwrap
 
 """
 Visualization utilities for pre-processed Unity job data.
@@ -140,23 +141,23 @@ class DataVisualizer:
         Returns:
             None
         """
-        df = self.validate_dataframe()
+        jobs_df = self.validate_dataframe()
         self.validate_sample_size(sample_size)
         self.validate_random_seed(random_seed)
-        self.validate_columns(columns if columns is not None else df.columns.tolist())
+        self.validate_columns(columns if columns is not None else jobs_df.columns.tolist())
         self.validate_output_dir(output_dir_path)
 
-        df = df.copy()
+        jobs_df = jobs_df.copy()
 
         # If specific columns are provided, select them
         if columns is not None:
-            df = df[columns]
+            jobs_df = jobs_df[columns]
 
         # Sample the data if sample_size is specified
         if sample_size is not None:
-            if len(df) < sample_size:
-                raise ValueError(f"Sample size {sample_size} is larger than the DataFrame size {len(df)}.")
-            df = df.sample(sample_size, random_state=random_seed)
+            if len(jobs_df) < sample_size:
+                raise ValueError(f"Sample size {sample_size} is larger than the DataFrame size {len(jobs_df)}.")
+            jobs_df = jobs_df.sample(sample_size, random_state=random_seed)
 
         # Generate summary statistics for each column
         if output_dir_path is not None:
@@ -166,25 +167,24 @@ class DataVisualizer:
                 print(f"Summary file already exists. Overwriting {summary_file.name}")
 
             summary_lines = ["Column Summary Statistics\n", "=" * 30 + "\n"]
-            for col in df.columns:
+            for col in jobs_df.columns:
                 summary_lines.append(f"\nColumn: {col}\n")
-                summary_lines.append(str(df[col].describe(include="all")) + "\n")
+                summary_lines.append(str(jobs_df[col].describe(include="all")) + "\n")
 
             with open(summary_file, "w", encoding="utf-8") as f:
                 f.writelines(summary_lines)
         else:
-            for col in df.columns:
+            for col in jobs_df.columns:
                 print("\n" + "=" * 50)
                 print(f"Column: {col}")
                 print("-" * 50)
-                print(df[col].describe(include="all"))
+                print(jobs_df[col].describe(include="all"))
                 print("=" * 50 + "\n")
-                print(df[col].describe())
+                print(jobs_df[col].describe())
 
         # Generate visualizations for each column
-        for col in df.columns:
-            col_data = df[col]
-            col_type = col_data.dtype
+        for col in jobs_df.columns:
+            col_data = jobs_df[col]
 
             if col in ["UUID"]:
                 # Skip UUID column as it is not useful for visualization
@@ -194,21 +194,40 @@ class DataVisualizer:
             # JobID and ArrayID: treat as categorical if low cardinality, else skip plot
             if col in ["JobID", "ArrayID"]:
                 if col_data.nunique() < 30:
-                    sns.countplot(x=col, data=df)
+                    sns.countplot(x=col, data=jobs_df)
                     plt.title(f"Bar plot of {col}")
                     plt.xticks(rotation=45, ha="right")
                 else:
                     plt.close()
                     continue
 
-            # Boolean columns
-            elif col_type is bool or col in ["IsArray", "Preempted"]:
+            # IsArray: bar plot of whether a job is submitted in an array
+            elif col in ["IsArray"]:
+                # all nans should be False, so convert to bool
+                if not pd.api.types.is_bool_dtype(col_data):
+                    col_data = col_data.astype(bool)
                 plt.figure(figsize=(5, 7))
-                ax = sns.countplot(x=col, stat="percent", data=df)
+                ax = sns.countplot(x=col, stat="percent", data=jobs_df)
                 if isinstance(ax.containers[0], BarContainer):
                     # The heights are already in percent (0-100) due to stat="percent"
                     ax.bar_label(ax.containers[0], labels=[f"{h.get_height():.1f}%" for h in ax.containers[0]])
                 plt.title("Whether a job is submitted in an array")
+                plt.xticks(rotation=45, ha="right")
+                if output_dir_path is not None:
+                    plt.savefig(output_dir_path / f"{col}_barplot.png")
+                plt.show()
+
+            # Preempted: bar plot of whether a job was preempted
+            elif col in ["Preempted"]:
+                # all nans should be False, so convert to bool
+                if not pd.api.types.is_bool_dtype(col_data):
+                    col_data = col_data.astype(bool)
+                plt.figure(figsize=(5, 5))
+                ax = sns.countplot(x=col, stat="count", data=jobs_df)
+                if isinstance(ax.containers[0], BarContainer):
+                    # The heights are counts, so we can use them directly
+                    ax.bar_label(ax.containers[0], labels=[f"{h.get_height():.1f}" for h in ax.containers[0]])
+                plt.title("Whether a job is preempted")
                 plt.xticks(rotation=45, ha="right")
                 if output_dir_path is not None:
                     plt.savefig(output_dir_path / f"{col}_barplot.png")
@@ -542,7 +561,7 @@ class DataVisualizer:
             # Interactive: pie chart of interactive vs non-interactive jobs
             elif col in ["Interactive"]:
                 # Replace empty/NaN with 'non interactive', others as their type
-                interactive_col = df[col].fillna('non interactive').astype(str)
+                interactive_col = jobs_df[col].fillna('non interactive').astype(str)
                 counts = interactive_col.value_counts()
                 plt.figure(figsize=(5, 7))
 
@@ -622,7 +641,7 @@ class DataVisualizer:
                 # Convert to numeric if not already
                 if not pd.api.types.is_numeric_dtype(col_data):
                     col_data = pd.to_numeric(col_data, errors="coerce")
-                col_data = col_data.dropna().div(2 ** 30)  # Convert to GB
+                col_data = col_data.dropna().div(2 ** 30)  # Convert to GiB
 
                 # Define the categorical VRAM bins (as categories, not intervals)
                 vram_labels = [str(v) for v in VRAM_CATEGORIES]
@@ -646,10 +665,10 @@ class DataVisualizer:
                 other_color = "#4E79A7"  # blue, colorblind-friendly
 
                 bars = []
-                # 0 GB bar with cross-hatch
+                # 0 GiB bar with cross-hatch
                 bar0 = ax.bar(
                     bar_positions[0],
-                    bin_percents.values[0],
+                    bin_percents.to_numpy()[0],
                     width=bar_width,
                     align="center",
                     color=zero_color,
@@ -660,7 +679,7 @@ class DataVisualizer:
                 for i in range(1, len(vram_labels)):
                     bars.append(ax.bar(
                         bar_positions[i],
-                        bin_percents.values[i],
+                        bin_percents.to_numpy()[i],
                         width=bar_width,
                         align="center",
                         color=other_color
@@ -668,7 +687,7 @@ class DataVisualizer:
 
                 ax.set_xticks(x_ticks)
                 ax.set_xticklabels(vram_labels)
-                ax.set_xlabel("GPU Memory (GB)")
+                ax.set_xlabel("GPU Memory (GiB)")
                 ax.set_ylabel("Percent of Jobs")
                 ax.set_title(f"Histogram of GPU VRAM Usage ({col})")
                 plt.grid(axis="y", linestyle="--", alpha=0.5)
@@ -690,8 +709,8 @@ class DataVisualizer:
                     )
 
                 legend_handles = [
-                    Patch(facecolor=zero_color, hatch="///", label="0 GB (no GPU used)"),
-                    Patch(facecolor=other_color, label=">0 GB"),
+                    Patch(facecolor=zero_color, hatch="///", label="0 GiB (no GPU used)"),
+                    Patch(facecolor=other_color, label=">0 GiB"),
                 ]
                 ax.legend(handles=legend_handles, loc="upper right")
 
@@ -758,9 +777,507 @@ class DataVisualizer:
                     plt.savefig(output_dir_path / f"{col}_barplot.png")
                 plt.show()
 
+            # Partition: bar plot of job partitions
+            elif col in ["Partition"]:
+                # Partition should be a categorical column
+                # Count occurrences of each partition
+                partition_counts = col_data.value_counts()
+                partition_percents = partition_counts / partition_counts.sum() * 100
+                plt.figure(figsize=figsize)
+                ax = sns.barplot(
+                    x=partition_counts.index,
+                    y=partition_percents.values,
+                    hue=partition_counts.index,
+                    palette="viridis",
+                    legend=False
+                )
+                plt.title(f"{col}")
+                plt.xlabel("Partitions")
+                plt.ylabel("Percent of Jobs")
+                plt.xticks(rotation=45, ha="right")
+
+                # Annotate bars with counts, ensuring a gap above the tallest bar label
+                tallest = partition_percents.max()
+                gap = max(2.5, tallest * 0.08)
+                ax.set_ylim(0, tallest + gap)
+                for i, (pct, count) in enumerate(zip(partition_percents.values, partition_counts.values, strict=True)):
+                    label_y = pct + gap * 0.2  # offset above bar, proportional to gap
+                    ax.text(i, label_y, f"{count}", ha="center", va="bottom", fontsize=9,
+                            bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7))
+
+                if output_dir_path is not None:
+                    plt.savefig(output_dir_path / f"{col}_barplot.png")
+                plt.show()
+
+            # Memory: histogram of memory usage (logarithmic x-axis, percent)
+            elif col in ["Memory"]:
+                # Convert to numeric if not already
+                if not pd.api.types.is_numeric_dtype(col_data):
+                    col_data = pd.to_numeric(col_data, errors="coerce")
+                col_data = col_data.dropna().div(2 ** 10)  # Convert KiB to MiB
+
+                # Filter out non-positive values for log scale
+                col_data = col_data[col_data > 0]
+
+                plt.figure(figsize=figsize)
+                ax = sns.histplot(col_data.tolist(), bins=60, kde=True, log_scale=(True, False), stat="percent")
+                plt.title(f"Histogram of {col} (in MiB, log scale)")
+                plt.xlabel("Memory (MiB, log scale)")
+                plt.ylabel("Percent of Jobs")
+
+                # Prepare stat summary with units
+                stats = col_data.describe(percentiles=[.25, .5, .75])
+                stat_text = (
+                    f"Count: {int(stats['count'])} jobs\n"
+                    f"Mean: {stats['mean']:.1f} MiB\n"
+                    f"Std: {stats['std']:.1f} MiB\n"
+                    f"Min: {stats['min']:.1f} MiB\n"
+                    f"25%: {stats['25%']:.1f} MiB\n"
+                    f"50%: {stats['50%']:.1f} MiB\n"
+                    f"75%: {stats['75%']:.1f} MiB\n"
+                    f"Max: {stats['max']:.1f} MiB"
+                )
+                # Place the box in the top right, inside the axes, with a small offset
+                ax.text(
+                    0.98, 0.98, stat_text,
+                    ha="right", va="top", fontsize=10,
+                    bbox=dict(boxstyle="round,pad=0.4", fc="white", ec="gray", alpha=0.8),
+                    transform=ax.transAxes,
+                    zorder=10
+                )
+                plt.grid(axis="y", linestyle="--", alpha=0.5)
+
+                if output_dir_path is not None:
+                    plt.savefig(output_dir_path / f"{col}_hist.png")
+                plt.show()
+
+            # Status: pie chart of job statuses
+            elif col in ["Status"]:
+                # Count occurrences of each status
+                exit_code_counts = col_data.value_counts()
+                total_count = exit_code_counts.sum()
+                if total_count == 0:
+                    print(f"No valid statuses in {col}. Skipping visualization.")
+                    plt.close()
+                    continue
+
+                # Prepare labels and explode small slices
+                threshold_pct = 5
+                pct_values = exit_code_counts.div(total_count).multiply(100)
+                explode = [max(0.15 - p / 100 * 4, 0.1) if p < threshold_pct else 0 for p in pct_values]
+
+                # Prepare labels: only show label on pie if above threshold
+                labels = [
+                    str(label) if p >= threshold_pct else ''
+                    for label, p in zip(exit_code_counts.index, pct_values, strict=True)
+                ]
+
+                plt.figure(figsize=(5, 7))
+
+                # Prepare legend labels for all slices
+                legend_labels = [
+                    f"{label}: {count} ({p:.1f}%)"
+                    for label, count, p in zip(exit_code_counts.index, exit_code_counts, pct_values, strict=True)
+                ]
+
+                # Create a gridspec to reserve space for the legend above the pie
+                fig = plt.gcf()
+                fig.clf()
+
+                # Use 3 rows: title, legend, pie
+                gs = GridSpec(3, 1, height_ratios=[0.05, 0.75, 0.25], hspace=0.0)
+                ax_title = fig.add_subplot(gs[0])
+                ax_pie = fig.add_subplot(gs[1])
+                ax_legend = fig.add_subplot(gs[2])
+
+                def autopct_func(p, threshold_pct=threshold_pct):
+                    return f"{p:.1f}%" if p >= threshold_pct else ''
+
+                wedges, *_ = ax_pie.pie(
+                    exit_code_counts,
+                    labels=labels,
+                    autopct=autopct_func,
+                    startangle=0,
+                    colors=sns.color_palette("pastel")[0:len(exit_code_counts)],
+                    explode=explode,
+                )
+                
+                ax_pie.axis('equal')
+
+                # Hide the legend and title axes
+                ax_legend.axis('off')
+                ax_title.axis('off')
+
+                ax_title.text(
+                    0.5, 0.5,
+                    f"Job Status Distribution ({col})",
+                    ha='center', va='center', fontsize=14,
+                )
+                plt.grid(axis="y", linestyle="--", alpha=0.5)
+                # Add a legend below the pie chart
+                ax_legend.legend(
+                    wedges,
+                    legend_labels,
+                    title="Job Status",
+                    loc="center",
+                    bbox_to_anchor=(0.5, 0.5),
+                    fontsize=10,
+                    title_fontsize=11
+                )
+                if output_dir_path is not None:
+                    plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
+                plt.show()
+
+            # ExitCode: pie chart of job exit codes
+            elif col in ["ExitCode"]:
+                # Count occurrences of each exit code
+                exit_code_counts = col_data.value_counts()
+                total_count = exit_code_counts.sum()
+                if total_count == 0:
+                    print(f"No valid exit codes in {col}. Skipping visualization.")
+                    plt.close()
+                    continue
+
+                # Prepare labels and explode small slices
+                threshold_pct = 5
+                pct_values = exit_code_counts.div(total_count).multiply(100)
+                explode = [max(0.15 - p / 100 * 4, 0.2) if p < threshold_pct else 0 for p in pct_values]
+
+                # Prepare labels: only show label on pie if above threshold
+                labels = [
+                    str(label) if p >= threshold_pct else ''
+                    for label, p in zip(exit_code_counts.index, pct_values, strict=True)
+                ]
+
+                plt.figure(figsize=(5, 7))
+
+                # Prepare legend labels for all slices
+                legend_labels = [
+                    f"{label}: {count} ({p:.1f}%)"
+                    for label, count, p in zip(exit_code_counts.index, exit_code_counts, pct_values, strict=True)
+                ]
+
+                # Create a gridspec to reserve space for the legend above the pie
+                fig = plt.gcf()
+                fig.clf()
+
+                # Use 3 rows: title, legend, pie
+                gs = GridSpec(3, 1, height_ratios=[0.05, 0.75, 0.25], hspace=0.0)
+                ax_title = fig.add_subplot(gs[0])
+                ax_pie = fig.add_subplot(gs[1])
+                ax_legend = fig.add_subplot(gs[2])
+
+                def autopct_func(p, threshold_pct=threshold_pct):
+                    return f"{p:.1f}%" if p >= threshold_pct else ''
+
+                wedges, *_ = ax_pie.pie(
+                    exit_code_counts,
+                    labels=labels,
+                    autopct=autopct_func,
+                    startangle=0,
+                    colors=sns.color_palette("pastel")[0:len(exit_code_counts)],
+                    explode=explode,
+                )
+                
+                ax_pie.axis('equal')
+
+                # Hide the legend and title axes
+                ax_legend.axis('off')
+                ax_title.axis('off')
+
+                ax_title.text(
+                    0.5, 0.5,
+                    f"Job Exit Code Distribution ({col})",
+                    ha='center', va='center', fontsize=14,
+                )
+                plt.grid(axis="y", linestyle="--", alpha=0.5)
+                # Add a legend below the pie chart
+                ax_legend.legend(
+                    wedges,
+                    legend_labels,
+                    title="Job Exit Codes",
+                    loc="center",
+                    bbox_to_anchor=(0.5, 0.5),
+                    fontsize=10,
+                    title_fontsize=11
+                )
+                if output_dir_path is not None:
+                    plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
+                plt.show()
+
+                        # Status: pie chart of job statuses
+            
+            # QOS: pie chart of job QOS
+            elif col in ["QOS"]:
+                # Count occurrences of each QOS
+                qos_counts = col_data.value_counts()
+                total_count = qos_counts.sum()
+                if total_count == 0:
+                    print(f"No valid QOS in {col}. Skipping visualization.")
+                    plt.close()
+                    continue
+
+                # Prepare labels and explode small slices
+                threshold_pct = 5
+                pct_values = qos_counts.div(total_count).multiply(100)
+                explode = [max(0.15 - p / 100 * 4, 0.1) if p < threshold_pct else 0 for p in pct_values]
+
+                # Prepare labels: only show label on pie if above threshold
+                labels = [
+                    str(label) if p >= threshold_pct else ''
+                    for label, p in zip(qos_counts.index, pct_values, strict=True)
+                ]
+
+                plt.figure(figsize=(5, 8))
+
+                # Prepare legend labels for all slices
+                legend_labels = [
+                    f"{label}: {count} ({p:.1f}%)"
+                    for label, count, p in zip(qos_counts.index, qos_counts, pct_values, strict=True)
+                ]
+
+                # Create a gridspec to reserve space for the legend above the pie
+                fig = plt.gcf()
+                fig.clf()
+
+                # Use 3 rows: title, legend, pie
+                gs = GridSpec(3, 1, height_ratios=[0.05, 0.75, 0.25], hspace=0.0)
+                ax_title = fig.add_subplot(gs[0])
+                ax_pie = fig.add_subplot(gs[1])
+                ax_legend = fig.add_subplot(gs[2])
+
+                def autopct_func(p, threshold_pct=threshold_pct):
+                    return f"{p:.1f}%" if p >= threshold_pct else ''
+
+                wedges, *_ = ax_pie.pie(
+                    qos_counts,
+                    labels=labels,
+                    autopct=autopct_func,
+                    startangle=0,
+                    colors=sns.color_palette("pastel")[0:len(qos_counts)],
+                    explode=explode,
+                )
+                
+                ax_pie.axis('equal')
+
+                # Hide the legend and title axes
+                ax_legend.axis('off')
+                ax_title.axis('off')
+
+                ax_title.text(
+                    0.5, 0.5,
+                    f"Job QOS Distribution ({col})",
+                    ha='center', va='center', fontsize=14,
+                )
+                plt.grid(axis="y", linestyle="--", alpha=0.5)
+                # Add a legend below the pie chart
+                ax_legend.legend(
+                    wedges,
+                    legend_labels,
+                    title="Job QOS",
+                    loc="center",
+                    bbox_to_anchor=(0.5, 0.5),
+                    fontsize=10,
+                    title_fontsize=11
+                )
+                if output_dir_path is not None:
+                    plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
+                plt.show()
+            
+            # GPUs: pie chart of GPU counts in jobs
+            elif col in ["GPUs"]:
+                # Count occurrences of each GPU count
+                gpu_counts = col_data.value_counts().sort_index()
+
+                # Prepare labels and explode small slices
+                total_count = gpu_counts.sum()
+                if total_count == 0:
+                    print(f"No valid GPU counts in {col}. Skipping visualization.")
+                    plt.close()
+                    continue
+
+                threshold_pct = 5
+                pct_values = gpu_counts.div(total_count).multiply(100)
+                # Explode values increase with index: first group (0), second (small), ..., last (largest)
+                explode = [i * 0.04 for i in range(len(gpu_counts))]
+
+                # Prepare labels: only show label on pie if above threshold
+                labels = [
+                    str(label) if p >= threshold_pct else ''
+                    for label, p in zip(gpu_counts.index, pct_values, strict=True)
+                ]
+
+                plt.figure(figsize=(5, 7))
+
+                # Prepare legend labels for all slices
+                legend_labels = [
+                    f"{label} GPU{'s' if int(label) != 1 else ''}: {count} ({p:.1f}%)"
+                    for label, count, p in zip(gpu_counts.index, gpu_counts, pct_values, strict=True)
+                ]
+
+                # Create a gridspec to reserve space for the legend above the pie
+                fig = plt.gcf()
+                fig.clf()
+
+                # Use 3 rows: title, legend, pie
+                gs = GridSpec(3, 1, height_ratios=[0.05, 0.75, 0.25], hspace=0.0)
+                ax_title = fig.add_subplot(gs[0])
+                ax_pie = fig.add_subplot(gs[1])
+                ax_legend = fig.add_subplot(gs[2])
+
+                def autopct_func(p, threshold_pct=threshold_pct):
+                    return f"{p:.1f}%" if p >= threshold_pct else ''
+
+                # Format labels as "x GPU(s)" for each wedge
+                formatted_labels = [
+                    f"{label} GPU{'s' if int(label) != 1 else ''}" if label != '' else ''
+                    for label in labels
+                ]
+                wedges, *_ = ax_pie.pie(
+                    gpu_counts,
+                    labels=formatted_labels,
+                    autopct=autopct_func,
+                    startangle=0,
+                    colors=sns.color_palette("pastel")[0:len(gpu_counts)],
+                    explode=explode,
+                )
+                ax_pie.axis('equal')
+                # Hide the legend and title axes
+                ax_legend.axis('off')
+                ax_title.axis('off')
+                ax_title.text(
+                    0.5, 0.5,
+                    f"GPU Count Distribution ({col})",
+                    ha='center', va='center', fontsize=14,
+                )
+                plt.grid(axis="y", linestyle="--", alpha=0.5)
+                # Add a legend below the pie chart
+                ax_legend.legend(
+                    wedges,
+                    legend_labels,
+                    title="GPU Count",
+                    loc="center",
+                    bbox_to_anchor=(0.5, 0.5),
+                    fontsize=10,
+                    title_fontsize=11
+                )
+                if output_dir_path is not None:
+                    plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
+                plt.show()
+            
+            # Nodes: bar plot of job nodes
+            elif col in ["NodeList"]:
+                # NodeList should be a numpy array or list-like per row
+                # Convert all non-null entries to numpy arrays if not already
+                non_null = col_data.dropna()
+                if not all(isinstance(x, np.ndarray) for x in non_null):
+                    # Try to convert list-like to np.ndarray
+                    try:
+                        non_null = pd.Series([
+                            np.array(x) if isinstance(x, list | tuple | np.ndarray) else np.array([x])
+                            for x in non_null
+                        ], index=non_null.index)
+                    except Exception:
+                        print(f"Error: Not all entries in column '{col}' are arrays or list-like. Example values:")
+                        print(non_null.head())
+                        plt.close()
+                        continue
+                import re
+
+                # For each job, create a tuple of sorted prefixes (with multiplicity)
+                # Remove trailing digits from node names (combine nodes like gypsum-gpu010 and gypsumgpu053)
+                # This will combine nodes with the same prefix, regardless of dashes
+                nodes_clean = non_null.apply(
+                    lambda arr: tuple(sorted([re.sub(r'[-]?\d+$', '', str(x)) for x in arr]))
+                )
+
+                # --- Count prefix combinations (with multiplicity) for jobs with >1 node ---                
+                multi_node_jobs = nodes_clean[nodes_clean.apply(lambda arr: len(arr) > 1)]
+                prefix_combo_counts = multi_node_jobs.value_counts()
+                prefix_combo_df = prefix_combo_counts.reset_index()
+                prefix_combo_df.columns = ['prefix_combo', 'count']
+                # Ensure each prefix_combo is a tuple of strings
+                prefix_combo_df['prefix_combo'] = prefix_combo_df['prefix_combo'].apply(
+                    lambda x: tuple(x) if not isinstance(x, tuple) else x
+                )
+
+                # Build summary lines for each unique prefix combo
+                prefix_combo_text_lines = []
+                for combo, count in zip(prefix_combo_df['prefix_combo'], prefix_combo_df['count'], strict=True):
+                    # Count occurrences of each prefix in the combo
+                    prefix_counts: dict[str, int] = {}
+                    for prefix in combo:
+                        prefix_counts[prefix] = prefix_counts.get(prefix, 0) + 1
+                    # Format as "prefix (xN)"
+                    prefix_counts_str = ", ".join(f"{p} (x{c})" for p, c in sorted(prefix_counts.items()))
+                    prefix_combo_text_lines.append(
+                        f"Combo: [{prefix_counts_str}]  |  Jobs: {count}"
+                    )
+
+                # Limit to top 10 combos for readability, add a note if more
+                max_lines = 10
+                if len(prefix_combo_text_lines) > max_lines:
+                    prefix_combo_text = "\n".join(prefix_combo_text_lines[:max_lines]) + \
+                        f"\n... ({len(prefix_combo_text_lines) - max_lines} more combos)"
+                else:
+                    prefix_combo_text = "\n".join(prefix_combo_text_lines)
+
+                flat_nodes_clean = pd.Series(np.concatenate(nodes_clean.values))
+
+                # Count occurrences of each node prefix
+                node_counts = flat_nodes_clean.value_counts()
+                node_percents = node_counts / node_counts.sum() * 100
+                plt.figure(figsize=figsize)
+                ax = sns.barplot(
+                    x=node_counts.index,
+                    y=node_percents.values,
+                    hue=node_counts.index,
+                    palette="viridis",
+                    legend=False
+                )
+                plt.title(f"{col} (nodes combined by removing trailing numbers)")
+                # Set a long xlabel and wrap it to fit within the figure width
+                xlabel = "Nodes (trailing numbers removed, e.g., gpu10,gpu50 → gpu,gpu; counts are combined)"
+                plt.xlabel(xlabel)
+                plt.ylabel("Percent of Jobs")
+                plt.tight_layout()
+                # Now wrap the xlabel based on the actual axes width in pixels
+                ax = plt.gca()
+                fig = plt.gcf()
+                fig.canvas.draw()  # Needed to get correct bbox
+                bbox = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+                width_inch = bbox.width
+                # Estimate ~10-12 characters per inch for most fonts
+                wrap_width = max(30, int(width_inch * 11))
+                wrapped_xlabel = "\n".join(textwrap.wrap(xlabel, width=wrap_width))
+                ax.set_xlabel(wrapped_xlabel)
+                plt.xticks(rotation=45, ha="right")
+
+                ax.text(
+                    0.98, 0.98, prefix_combo_text,
+                    ha="right", va="top", fontsize=10,
+                    bbox=dict(boxstyle="round,pad=0.4", fc="white", ec="gray", alpha=0.8),
+                    transform=ax.transAxes,
+                    zorder=10
+                )
+
+                # Annotate bars with counts, ensuring a gap above the tallest bar label
+                tallest = node_percents.max()
+                gap = max(2.5, tallest * 0.08)
+                ax.set_ylim(0, tallest + gap)
+                for i, (pct, count) in enumerate(zip(node_percents.values, node_counts.values, strict=True)):
+                    label_y = pct + gap * 0.2  # offset above bar, proportional to gap
+                    ax.text(i, label_y, f"{count}", ha="center", va="bottom", fontsize=9,
+                            bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7))
+
+                if output_dir_path is not None:
+                    plt.savefig(output_dir_path / f"{col}_barplot.png")
+                plt.show()
+
+            
             # Memory vs GPUMemUsage: scatter plot
 
-            # Partition, node, GPU, and GPU Count, constraints
+            # Partition, node, GPUType, and GPU Count, constraints
 
             # Status, ExitCode, QoS
 
