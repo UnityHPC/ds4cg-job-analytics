@@ -29,6 +29,12 @@ select = [
 "B",
 # flake8-simplify
 "SIM",
+# PEP 8 naming conventions
+"N",
+# NumPy-specific rules
+"NPY",
+# pandas-vet
+"PD"
 ]
 ignore = [
 # Ignore use ternary operator in if statements
