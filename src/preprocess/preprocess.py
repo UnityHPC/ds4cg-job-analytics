@@ -148,7 +148,7 @@ def _fill_missing(res: pd.DataFrame) -> None:
 
 
 def preprocess_data(
-    data: pd.DataFrame, min_elapsed_second: int = 600, include_failed_cancelled_jobs=False, include_CPU_only_job=False
+    data: pd.DataFrame, min_elapsed_second: int = 600, include_failed_cancelled_jobs=False, include_cpu_only_job=False
 ) -> pd.DataFrame:
     """
     Preprocess dataframe, filtering out unwanted rows and columns, filling missing values and converting types.
@@ -163,21 +163,21 @@ def preprocess_data(
         pd.DataFrame: The preprocessed dataframe
     """
 
-    data.drop(columns=["UUID", "EndTime", "Nodes"], axis=1, inplace=True)
+    data = data.drop(columns=["UUID", "EndTime", "Nodes"], axis=1)
 
-    cond_GPU_Type = (
-        data["GPUType"].notnull() | include_CPU_only_job
+    cond_gpu_type = (
+        data["GPUType"].notna() | include_cpu_only_job
     )  # filter out GPUType is null, except when include_CPU_only_job is True
-    cond_GPUs = (
-        data["GPUs"].notnull() | include_CPU_only_job
+    cond_gpu_count = (
+        data["GPUs"].notna() | include_cpu_only_job
     )  # filter out GPUs is null, except when include_CPU_only_job is True
     cond_failed_cancelled_jobs = (
         ((data["Status"] != "FAILED") & (data["Status"] != "CANCELLED")) | include_failed_cancelled_jobs
     )  # filter out failed or cancelled jobs, except when include_fail_cancel_jobs is True
 
     res = data[
-        cond_GPU_Type
-        & cond_GPUs
+        cond_gpu_type
+        & cond_gpu_count
         & cond_failed_cancelled_jobs
         & (data["Elapsed"] >= min_elapsed_second)  # filter in unit of second, not timedelta object
         & (data["Account"] != "root")

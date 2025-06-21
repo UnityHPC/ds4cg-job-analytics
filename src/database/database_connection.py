@@ -29,12 +29,11 @@ class DatabaseConnection:
             raise Exception("Not connected")
 
     def fetch_all(self, table_name="Jobs"):
-        """Fetch all data from the specified table. Table name is set to Jobs but can be changed accordingly."""
-        if self.is_connected():
-            query = f"SELECT * FROM {table_name}"
-            return self.connection.execute(query).fetchdf()
-        else:
+        """Fetch all data from the specified table as a DataFrame."""
+        if not self.is_connected():
             raise Exception("Not connected")
+        query = f"SELECT * FROM {table_name}"
+        return self.connection.execute(query).df()
 
     def fetch_query(self, query: str):
         """
