@@ -116,6 +116,427 @@ class DataVisualizer:
                 raise PermissionError(f"Output directory {output_dir_path} is not writable.")
         return output_dir_path
 
+    def _generate_summary_stats(
+        self,
+        jobs_df: pd.DataFrame,
+        output_dir_path: Path | None,
+        summary_file_name: str
+    ) -> None:
+        """Generate summary statistics for each column.
+
+        Args:
+            jobs_df (pd.DataFrame): The DataFrame containing job data.
+            output_dir_path (Path | None): The directory to save the summary file.
+            summary_file_name (str): The name of the summary file.
+        """
+        if output_dir_path is not None:
+            # create text file to save column summary statistics
+            summary_file = output_dir_path / summary_file_name
+            if summary_file.exists():
+                print(f"Summary file already exists. Overwriting {summary_file.name}")
+
+            summary_lines = ["Column Summary Statistics\n", "=" * 30 + "\n"]
+            for col in jobs_df.columns:
+                summary_lines.append(f"\nColumn: {col}\n")
+                summary_lines.append(str(jobs_df[col].describe(include="all")) + "\n")
+
+            with open(summary_file, "w", encoding="utf-8") as f:
+                f.writelines(summary_lines)
+        else:
+            for col in jobs_df.columns:
+                print("\n" + "=" * 50)
+                print(f"Column: {col}")
+                print("-" * 50)
+                print(jobs_df[col].describe(include="all"))
+                print("=" * 50 + "\n")
+                print(jobs_df[col].describe())
+    
+    def _generate_boolean_bar_plot(
+        self,
+        jobs_df: pd.DataFrame,
+        col: str,
+        title: str,
+        output_dir_path: Path | None = None
+    ):
+        """Generate a bar plot for boolean columns.
+        Args:
+            jobs_df (pd.DataFrame): The DataFrame containing job data.
+            col (str): The name of the column to plot.
+            title (str): The title of the plot.
+            output_dir_path (Path | None): The directory to save the plot.
+        """
+        col_data = jobs_df[col]
+        # All nans should be False, so convert to bool
+        if not pd.api.types.is_bool_dtype(col_data):
+            col_data = col_data.astype(bool)
+        plt.figure(figsize=(5, 7))
+        ax = sns.countplot(x=col, stat="percent", data=jobs_df)
+        if isinstance(ax.containers[0], BarContainer):
+            # The heights are already in percent (0-100) due to stat="percent"
+            ax.bar_label(ax.containers[0], labels=[f"{h.get_height():.1f}%" for h in ax.containers[0]])
+        plt.title("Whether a job is submitted in an array")
+        plt.xticks(rotation=45, ha="right")
+        if output_dir_path is not None:
+            plt.savefig(output_dir_path / f"{col}_barplot.png")
+        plt.show()
+
+    def _plot_duration_histogram(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
+        """Plot histogram of durations in minutes, hours, days.
+        Args:
+            jobs_df (pd.DataFrame): The DataFrame containing job data.
+            col (str): The name of the column to plot.
+            output_dir_path (Path | None): The directory to save the plot.
+        """
+        col_data = jobs_df[col]
+        # Determine unit for conversion
+        if (col == "Elapsed" and not pd.api.types.is_timedelta64_dtype(col_data)):
+            col_data = pd.to_timedelta(col_data, unit="seconds", errors="coerce")
+        elif col == "TimeLimit" and not pd.api.types.is_timedelta64_dtype(col_data):
+            col_data = pd.to_timedelta(col_data, unit="minutes", errors="coerce")
+
+        # Convert to minutes for plotting
+        timelimit_minutes = col_data.dropna().dt.total_seconds() / 60
+
+        # Define breakpoints for minutes, hours, days
+        min_break = 60  # 1 hour in minutes
+        hour_break = 1440  # 1 day in minutes
+        max_val = timelimit_minutes.max()
+        total_count = len(timelimit_minutes)
+
+        # Prepare data for each section
+        minutes_data = timelimit_minutes[(timelimit_minutes <= min_break)]
+        hours_data = timelimit_minutes[(timelimit_minutes > min_break) & (timelimit_minutes <= hour_break)]
+        days_data = timelimit_minutes[(timelimit_minutes > hour_break)]
+
+        # Proportional widths: minutes (up to 1hr), hours (1hr-1d), days (>1d)
+        width_minutes = len(minutes_data) / total_count if total_count > 0 else 0
+        width_hours = len(hours_data) / total_count if total_count > 0 else 0
+        width_days = len(days_data) / total_count if total_count > 0 else 0
+
+
+        # Enforce minimum width for non-empty sections
+        min_width = 0.3  # Minimum width for any section
+
+        widths = []
+        for w, d in zip(
+            [width_minutes, width_hours, width_days],
+            [minutes_data, hours_data, days_data],
+            strict=True
+        ):
+            if not d.empty:
+                widths.append(max(w, min_width))
+            else:
+                widths.append(0)
+        # If all are empty (shouldn't happen), fallback to equal widths
+        if sum(widths) == 0:
+            widths = [1, 1, 1]
+        # Normalize so total is 1.0
+        total_width = sum(widths)
+        widths = [w / total_width for w in widths]
+        width_minutes, width_hours, width_days = widths
+
+        def pct(n, total_count=total_count):
+                return f"{(n / total_count * 100):.1f}%" if total_count > 0 else "0.0%"
+
+        # Helper to reduce xticks and rotate if width is small
+        def choose_ticks_and_rotation(ticks, width, max_labels=3):
+            # Always include first and last tick, and always have at least 4 ticks
+            if width < 0.38 and len(ticks) > max_labels:
+                # Always include first and last, and evenly space the rest
+                n = max(max_labels - 2, 2)
+                idxs = np.linspace(1, len(ticks) - 2, n, dtype=int)
+                selected = [ticks[0]] + [ticks[i] for i in idxs] + [ticks[-1]]
+                # Ensure at least 4 ticks (first, last, and two in the middle if possible)
+                selected = list(dict.fromkeys(selected))  # Remove duplicates if any
+                if len(selected) < 4 and len(ticks) >= 4:
+                    # Insert additional ticks from the middle if needed
+                    mids = [ticks[len(ticks)//2]]
+                    if len(ticks) > 4:
+                        mids.append(ticks[(len(ticks)-1)//3])
+                    for mid in mids:
+                        if mid not in selected:
+                            selected.insert(1, mid)
+                    selected = list(dict.fromkeys(selected))
+                return selected, 0
+            # If less than 4 ticks, just return all
+            if len(ticks) < 4:
+                return ticks, 0
+            return ticks, 0
+        
+
+        # Add space between sections to avoid overlapping xticks
+        section_gap = 0.05  # width of gap between sections (in axis units)
+        fig = plt.figure(figsize=(8, 5))
+        # Add a small gap between sections by adding blank axes
+        # We'll use 5 sections: [minutes, gap, hours, gap, days]
+        width_gap = section_gap
+        gs = GridSpec(
+            1, 5,
+            width_ratios=[width_minutes, width_gap, width_hours, width_gap, width_days],
+            wspace=0.0
+        )
+
+        # Minutes axis
+        ax0 = fig.add_subplot(gs[0])
+        if not minutes_data.empty:
+            ax0.hist(minutes_data, bins=20, color="tab:blue", alpha=0.7, log=True)
+        ax0.set_xlim(0, min_break)
+        min_ticks = [0, 15, 30, 45, 60]
+        min_ticklabels = ["0", "15m", "30m", "45m", "1h"]
+        min_ticks_sel, min_rot = choose_ticks_and_rotation(min_ticks, width_minutes)
+        min_ticklabels_sel = [min_ticklabels[i] for i, t in enumerate(min_ticks) if t in min_ticks_sel]
+        ax0.set_xticks(min_ticks_sel)
+        ax0.set_xticklabels(min_ticklabels_sel, rotation=min_rot, ha="right" if min_rot else "center")
+        ax0.set_ylabel("Count (log scale)")
+        ax0.set_title(f"Minutes (≤1h)\nN={len(minutes_data)} ({pct(len(minutes_data))})")
+        ax0.spines["right"].set_visible(False)
+        ax0.spines["top"].set_visible(False)
+
+        # Blank axis for gap between minutes and hours
+        ax_gap1 = fig.add_subplot(gs[1], frame_on=False)
+        ax_gap1.set_xticks([])
+        ax_gap1.set_yticks([])
+        ax_gap1.axis("off")
+
+        # Hours axis
+        ax1 = fig.add_subplot(gs[2], sharey=ax0)
+        if not hours_data.empty:
+            ax1.hist(hours_data, bins=20, color="tab:orange", alpha=0.7, log=True)
+        ax1.set_xlim(min_break, hour_break)
+        hour_ticks = [60, 360, 720, 1440]
+        hour_ticklabels = ["1h", "6h", "12h", "1d"]
+        hour_ticks_sel, hour_rot = choose_ticks_and_rotation(hour_ticks, width_hours)
+        hour_ticklabels_sel = [hour_ticklabels[i] for i, t in enumerate(hour_ticks) if t in hour_ticks_sel]
+        ax1.set_xticks(hour_ticks_sel)
+        ax1.set_xticklabels(hour_ticklabels_sel, rotation=hour_rot, ha="right" if hour_rot else "center")
+        ax1.set_title(f"Hours (1h–1d)\nN={len(hours_data)} ({pct(len(hours_data))})")
+        ax1.spines["left"].set_visible(False)
+        ax1.spines["right"].set_visible(False)
+        ax1.spines["top"].set_visible(False)
+        plt.setp(ax1.get_yticklabels(), visible=False)
+
+        # Blank axis for gap between hours and days
+        ax_gap2 = fig.add_subplot(gs[3], frame_on=False)
+        ax_gap2.set_xticks([])
+        ax_gap2.set_yticks([])
+        ax_gap2.axis("off")
+
+        # Days axis
+        ax2 = fig.add_subplot(gs[4], sharey=ax0)
+        if not days_data.empty:
+            ax2.hist(days_data, bins=20, color="tab:green", alpha=0.7, log=True)
+        ax2.set_xlim(hour_break, max_val)
+        # Choose ticks for days
+        if max_val > hour_break:
+            day_ticks = [
+                hour_break,
+                hour_break + (max_val - hour_break) / 3,
+                hour_break + 2 * (max_val - hour_break) / 3,
+                max_val,
+            ]
+            day_labels = ["1d"] + [f"{int(t / 1440)}d" for t in day_ticks[1:]]
+            day_ticks_sel, day_rot = choose_ticks_and_rotation(day_ticks, width_days)
+            day_labels_sel = [day_labels[i] for i, t in enumerate(day_ticks) if t in day_ticks_sel]
+            ax2.set_xticks(day_ticks_sel)
+            ax2.set_xticklabels(day_labels_sel, rotation=day_rot, ha="right" if day_rot else "center")
+        ax2.set_title(f"Days (>1d)\nN={len(days_data)} ({pct(len(days_data))})")
+        ax2.spines["left"].set_visible(False)
+        ax2.spines["top"].set_visible(False)
+        plt.setp(ax2.get_yticklabels(), visible=False)
+
+        # Remove space between subplots (handled by blank axes)
+        plt.subplots_adjust(wspace=0.0)
+        fig.suptitle(f"Histogram of {col} (minutes, hours, days)", y=1.04)
+
+        if output_dir_path is not None:
+            plt.savefig(output_dir_path / f"{col}_hist.png", bbox_inches="tight")
+        plt.show()
+
+    def _generate_start_time_histogram(self, jobs_df, col, output_dir_path, figsize=(7, 7)):
+        """Generate a histogram of job start times, either by day or by hour.
+        Args:
+            jobs_df (pd.DataFrame): The DataFrame containing job data.
+            col (str): The name of the column to plot.
+            output_dir_path (Path | None): The directory to save the plot.
+        """
+        col_data = jobs_df[col]
+        if not pd.api.types.is_datetime64_any_dtype(col_data):
+            # Convert to datetime if not already
+            col_data = pd.to_datetime(col_data, errors="coerce")  # invalid timestamps will be NaT
+
+        col_data = col_data.dropna().sort_values()
+        if col_data.empty:
+            print(f"No valid timestamps in {col}. Skipping visualization.")
+            plt.close()
+            return
+        min_time = col_data.min()
+        max_time = col_data.max()
+        total_days = (max_time - min_time).days + 1
+
+        plt.figure(figsize=(7, 7))
+        # If jobs span more than 2 days, plot jobs per day
+        if total_days > 2:
+            # Group by date, count jobs per day
+            jobs_per_day = col_data.dt.floor("D").value_counts().sort_index()
+            # Trim days at start/end with zero jobs
+            jobs_per_day = jobs_per_day[jobs_per_day > 0]
+            # A line plot is often better for time series to show trends over days
+            plt.plot(jobs_per_day.index, np.asarray(jobs_per_day.values, dtype=int), marker="o", linestyle="-")
+            ax = plt.gca()
+            ax.xaxis.set_major_locator(plt.MaxNLocator(10))
+            plt.xlabel("Date")
+            plt.ylabel("Number of jobs")
+            plt.title(f"Jobs per day for {col}")
+            plt.xticks(rotation=45, ha="right")
+            # Annotate points above the line with a vertical offset for readability
+            ylim = ax.get_ylim()
+            y_range = ylim[1] - ylim[0]
+            offset = max(5, 0.04 * y_range)
+            for x, y in zip(jobs_per_day.index, jobs_per_day.values, strict=True):
+                if y > 0:
+                    label_y = y + offset
+                    # Calculate the annotation box height in data coordinates
+                    # so the box does not go beyond the top spine
+                    ann = ax.annotate(
+                        f"{int(y)}",
+                        xy=(x, label_y),
+                        xytext=(0, 0),
+                        textcoords="offset points",
+                        ha="center",
+                        va="bottom",
+                        fontsize=10,
+                        bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7),
+                        clip_on=True,
+                    )
+                    # Adjust annotation if it goes out of bounds
+                    bbox = ann.get_window_extent(renderer=None)
+                    inv = ax.transData.inverted()
+                    bbox_data = inv.transform([[bbox.x0, bbox.y0], [bbox.x1, bbox.y1]])
+                    top_of_box = bbox_data[1][1]
+                    if top_of_box > ylim[1]:
+                        # Move annotation up so it fits inside the plot
+                        delta = top_of_box - ylim[1]
+                        ann.set_position((0, -delta * ax.bbox.height / y_range))
+            if output_dir_path is not None:
+                plt.savefig(output_dir_path / f"{col}_days_lineplot.png")
+        else:
+            # All jobs within a couple of days: plot by hour
+            jobs_per_hour = col_data.dt.floor("H").value_counts().sort_index()
+            jobs_per_hour = jobs_per_hour[jobs_per_hour > 0]
+            # Use line plot for time series to better show trends over hours
+            plt.plot(
+                jobs_per_hour.index, np.asarray(jobs_per_hour.values, dtype=int), marker="o", linestyle="-"
+            )
+            plt.gca().xaxis.set_major_locator(plt.MaxNLocator(12))
+            plt.xlabel("Hour")
+            plt.ylabel("Number of jobs")
+            plt.title(f"Jobs per hour for {col}")
+            plt.grid(True, which="both", axis="both", linestyle="--", alpha=0.5)
+
+            # Set x-axis labels: show date at midnight, hour otherwise
+            ax = plt.gca()
+            tick_locs = jobs_per_hour.index
+            tick_labels = []
+            for dt in tick_locs:
+                if dt.hour == 0:
+                    tick_labels.append(dt.strftime("%Y-%m-%d %H:00"))
+                else:
+                    tick_labels.append(dt.strftime("%H:00"))
+            # Show at most 12 labels to avoid crowding
+            step = max(1, len(tick_labels) // 12)
+            ax.set_xticks(tick_locs[::step])
+            ax.set_xticklabels(
+                [tick_labels[i] for i in range(0, len(tick_labels), step)], rotation=45, ha="right"
+            )
+
+            plt.tight_layout()
+            if output_dir_path is not None:
+                plt.savefig(output_dir_path / f"{col}_hourly_lineplot.png")
+        plt.show()
+
+    def _generate_interactive_pie_chart(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
+        """Generate a pie chart for interactive vs non-interactive jobs.
+        Args:
+            jobs_df (pd.DataFrame): The DataFrame containing job data.
+            col (str): The name of the column to plot.
+            output_dir_path (Path | None): The directory to save the plot.
+        """
+        # Replace empty/NaN with 'non interactive', others as their type
+        interactive_col = jobs_df[col].fillna('non interactive').astype(str)
+        counts = interactive_col.value_counts()
+        plt.figure(figsize=(5, 7))
+
+        # Define threshold for small slices
+        threshold_pct = 5
+        total = counts.sum()
+        pct_values = counts.div(total).multiply(100)
+
+        # Explode small slices to separate them visually
+        explode = [max(0.15 - p / 100 * 4, 0.1) if p < threshold_pct else 0 for p in pct_values]
+
+        # Prepare labels: only show label on pie if above threshold
+        labels = [
+            str(label) if p >= threshold_pct else ''
+            for label, p in zip(counts.index, pct_values, strict=True)
+        ]
+
+        # Prepare legend labels for all slices
+        legend_labels = [
+            f"{label}: {count} ({p:.1f}%)"
+            for label, count, p in zip(counts.index, counts, pct_values, strict=True)
+        ]
+
+        # Create a gridspec to reserve space for the legend above the pie
+        fig = plt.gcf()
+        fig.clf()
+
+        # Use 3 rows: title, legend, pie
+        gs = GridSpec(3, 1, height_ratios=[0.05, 0.75, 0.25], hspace=0.0)
+        ax_title = fig.add_subplot(gs[0])
+        ax_pie = fig.add_subplot(gs[1])
+        ax_legend = fig.add_subplot(gs[2])
+
+        def autopct_func(p, threshold_pct=threshold_pct):
+            return f"{p:.1f}%" if p >= threshold_pct else ''
+        
+        wedges, *_ = ax_pie.pie(
+            counts,
+            labels=labels,
+            autopct=autopct_func,
+            startangle=0,
+            colors=sns.color_palette("pastel")[0:len(counts)],
+            explode=explode,
+        )
+
+        ax_pie.axis('equal')
+
+        # Hide the legend and title axes
+        ax_legend.axis('off')
+        ax_title.axis('off')
+
+        # Place the title in its own axis, centered
+        ax_title.text(
+            0.5, 0.5,
+            "Job Type Distribution (Interactive vs Non Interactive)",
+            ha='center', va='center', fontsize=14,
+        )
+
+        # Place the legend below the title and above the pie chart
+        ax_legend.legend(
+            wedges,
+            legend_labels,
+            title="Job Type",
+            loc="center",
+            bbox_to_anchor=(0.5, 0.5),
+            ncol=1,
+            fontsize=10,
+            title_fontsize=11
+        )
+
+        if output_dir_path is not None:
+            plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
+        plt.show()
+    
     def visualize_columns(
         self,
         columns=None,
@@ -159,28 +580,7 @@ class DataVisualizer:
                 raise ValueError(f"Sample size {sample_size} is larger than the DataFrame size {len(jobs_df)}.")
             jobs_df = jobs_df.sample(sample_size, random_state=random_seed)
 
-        # Generate summary statistics for each column
-        if output_dir_path is not None:
-            # create text file to save column summary statistics
-            summary_file = output_dir_path / summary_file_name
-            if summary_file.exists():
-                print(f"Summary file already exists. Overwriting {summary_file.name}")
-
-            summary_lines = ["Column Summary Statistics\n", "=" * 30 + "\n"]
-            for col in jobs_df.columns:
-                summary_lines.append(f"\nColumn: {col}\n")
-                summary_lines.append(str(jobs_df[col].describe(include="all")) + "\n")
-
-            with open(summary_file, "w", encoding="utf-8") as f:
-                f.writelines(summary_lines)
-        else:
-            for col in jobs_df.columns:
-                print("\n" + "=" * 50)
-                print(f"Column: {col}")
-                print("-" * 50)
-                print(jobs_df[col].describe(include="all"))
-                print("=" * 50 + "\n")
-                print(jobs_df[col].describe())
+        self._generate_summary_stats(jobs_df, output_dir_path, summary_file_name)
 
         # Generate visualizations for each column
         for col in jobs_df.columns:
@@ -203,438 +603,28 @@ class DataVisualizer:
 
             # IsArray: bar plot of whether a job is submitted in an array
             elif col in ["IsArray"]:
-                # all nans should be False, so convert to bool
-                if not pd.api.types.is_bool_dtype(col_data):
-                    col_data = col_data.astype(bool)
-                plt.figure(figsize=(5, 7))
-                ax = sns.countplot(x=col, stat="percent", data=jobs_df)
-                if isinstance(ax.containers[0], BarContainer):
-                    # The heights are already in percent (0-100) due to stat="percent"
-                    ax.bar_label(ax.containers[0], labels=[f"{h.get_height():.1f}%" for h in ax.containers[0]])
-                plt.title("Whether a job is submitted in an array")
-                plt.xticks(rotation=45, ha="right")
-                if output_dir_path is not None:
-                    plt.savefig(output_dir_path / f"{col}_barplot.png")
-                plt.show()
+                self._generate_boolean_bar_plot(
+                    jobs_df, col, "Whether a job is submitted in an array", output_dir_path
+                )
 
             # Preempted: bar plot of whether a job was preempted
             elif col in ["Preempted"]:
-                # all nans should be False, so convert to bool
-                if not pd.api.types.is_bool_dtype(col_data):
-                    col_data = col_data.astype(bool)
-                plt.figure(figsize=(5, 5))
-                ax = sns.countplot(x=col, stat="count", data=jobs_df)
-                if isinstance(ax.containers[0], BarContainer):
-                    # The heights are counts, so we can use them directly
-                    ax.bar_label(ax.containers[0], labels=[f"{h.get_height():.1f}" for h in ax.containers[0]])
-                plt.title("Whether a job is preempted")
-                plt.xticks(rotation=45, ha="right")
-                if output_dir_path is not None:
-                    plt.savefig(output_dir_path / f"{col}_barplot.png")
-                plt.show()
+                self._generate_boolean_bar_plot(
+                    jobs_df, col, "Whether a job is preempted", output_dir_path
+                )
+
+            # Elapsed time and TimeLimit: histogram of durations in minutes, hours, days
+            elif col in ["Elapsed", "TimeLimit"]:
+                self._plot_duration_histogram(jobs_df, col, output_dir_path)
 
             # Timestamps: plot histogram of times and durations if possible
             elif col in ["StartTime"]:
-                if not pd.api.types.is_datetime64_any_dtype(col_data):
-                    # Convert to datetime if not already
-                    col_data = pd.to_datetime(col_data, errors="coerce")  # invalid timestamps will be NaT
+                self._generate_start_time_histogram(jobs_df, col, output_dir_path)
 
-                col_data = col_data.dropna().sort_values()
-                if col_data.empty:
-                    print(f"No valid timestamps in {col}. Skipping visualization.")
-                    plt.close()
-                    continue
-
-                min_time = col_data.min()
-                max_time = col_data.max()
-                total_days = (max_time - min_time).days + 1
-
-                plt.figure(figsize=(7, 7))
-                # If jobs span more than 2 days, plot jobs per day
-                if total_days > 2:
-                    # Group by date, count jobs per day
-                    jobs_per_day = col_data.dt.floor("D").value_counts().sort_index()
-                    # Trim days at start/end with zero jobs
-                    jobs_per_day = jobs_per_day[jobs_per_day > 0]
-                    # A line plot is often better for time series to show trends over days
-                    plt.plot(jobs_per_day.index, np.asarray(jobs_per_day.values, dtype=int), marker="o", linestyle="-")
-                    ax = plt.gca()
-                    ax.xaxis.set_major_locator(plt.MaxNLocator(10))
-                    plt.xlabel("Date")
-                    plt.ylabel("Number of jobs")
-                    plt.title(f"Jobs per day for {col}")
-                    plt.xticks(rotation=45, ha="right")
-                    # Annotate points above the line with a vertical offset for readability
-                    ylim = ax.get_ylim()
-                    y_range = ylim[1] - ylim[0]
-                    offset = max(5, 0.04 * y_range)
-                    for x, y in zip(jobs_per_day.index, jobs_per_day.values, strict=True):
-                        if y > 0:
-                            label_y = y + offset
-                            # Calculate the annotation box height in data coordinates
-                            # so the box does not go beyond the top spine
-                            ann = ax.annotate(
-                                f"{int(y)}",
-                                xy=(x, label_y),
-                                xytext=(0, 0),
-                                textcoords="offset points",
-                                ha="center",
-                                va="bottom",
-                                fontsize=10,
-                                bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7),
-                                clip_on=True,
-                            )
-                            # Adjust annotation if it goes out of bounds
-                            bbox = ann.get_window_extent(renderer=None)
-                            inv = ax.transData.inverted()
-                            bbox_data = inv.transform([[bbox.x0, bbox.y0], [bbox.x1, bbox.y1]])
-                            top_of_box = bbox_data[1][1]
-                            if top_of_box > ylim[1]:
-                                # Move annotation up so it fits inside the plot
-                                delta = top_of_box - ylim[1]
-                                ann.set_position((0, -delta * ax.bbox.height / y_range))
-                    if output_dir_path is not None:
-                        plt.savefig(output_dir_path / f"{col}_days_lineplot.png")
-                else:
-                    # All jobs within a couple of days: plot by hour
-                    jobs_per_hour = col_data.dt.floor("H").value_counts().sort_index()
-                    jobs_per_hour = jobs_per_hour[jobs_per_hour > 0]
-                    # Use line plot for time series to better show trends over hours
-                    plt.plot(
-                        jobs_per_hour.index, np.asarray(jobs_per_hour.values, dtype=int), marker="o", linestyle="-"
-                    )
-                    plt.gca().xaxis.set_major_locator(plt.MaxNLocator(12))
-                    plt.xlabel("Hour")
-                    plt.ylabel("Number of jobs")
-                    plt.title(f"Jobs per hour for {col}")
-                    plt.grid(True, which="both", axis="both", linestyle="--", alpha=0.5)
-
-                    # Set x-axis labels: show date at midnight, hour otherwise
-                    ax = plt.gca()
-                    tick_locs = jobs_per_hour.index
-                    tick_labels = []
-                    for dt in tick_locs:
-                        if dt.hour == 0:
-                            tick_labels.append(dt.strftime("%Y-%m-%d %H:00"))
-                        else:
-                            tick_labels.append(dt.strftime("%H:00"))
-                    # Show at most 12 labels to avoid crowding
-                    step = max(1, len(tick_labels) // 12)
-                    ax.set_xticks(tick_locs[::step])
-                    ax.set_xticklabels(
-                        [tick_labels[i] for i in range(0, len(tick_labels), step)], rotation=45, ha="right"
-                    )
-
-                    plt.tight_layout()
-                    if output_dir_path is not None:
-                        plt.savefig(output_dir_path / f"{col}_hourly_lineplot.png")
-                plt.show()
-
-            # Elapsed time: histogram of durations in minutes, hours, days
-            elif col in ["Elapsed"]:
-                # Convert to timedelta if not already
-                if not pd.api.types.is_timedelta64_dtype(col_data):
-                    col_data = pd.to_timedelta(col_data, unit="seconds", errors="coerce")
-                # Convert to minutes for plotting
-                timelimit_minutes = col_data.dropna().dt.total_seconds() / 60
-
-                # Define breakpoints for minutes, hours, days
-                min_break = 60  # 1 hour in minutes
-                hour_break = 1440  # 1 day in minutes
-                max_val = timelimit_minutes.max()
-                total_count = len(timelimit_minutes)
-
-                # Prepare data for each section
-                minutes_data = timelimit_minutes[(timelimit_minutes <= min_break)]
-                hours_data = timelimit_minutes[(timelimit_minutes > min_break) & (timelimit_minutes <= hour_break)]
-                days_data = timelimit_minutes[(timelimit_minutes > hour_break)]
-
-                # Proportional widths: minutes (up to 1hr), hours (1hr-1d), days (>1d)
-                width_minutes = min(0.4, len(minutes_data) / total_count + 0.1)
-                width_hours = min(0.4, len(hours_data) / total_count + 0.1)
-                width_days = 1.0 - width_minutes - width_hours
-
-                def pct(n, total_count=total_count):
-                    return f"{(n / total_count * 100):.1f}%" if total_count > 0 else "0.0%"
-
-                fig = plt.figure(figsize=(7, 5))
-                gs = GridSpec(1, 3, width_ratios=[width_minutes, width_hours, width_days], wspace=0.12)
-
-                # Minutes axis
-                ax0 = fig.add_subplot(gs[0])
-                if not minutes_data.empty:
-                    ax0.hist(minutes_data, bins=20, color="tab:blue", alpha=0.7, log=True)
-                ax0.set_xlim(0, min_break)
-                ax0.set_xticks([0, 15, 30, 45, 60])
-                ax0.set_xticklabels(["0", "15m", "30m", "45m", "1h"], rotation=0)
-                ax0.set_ylabel("Count (log scale)")
-                ax0.set_title(f"Minutes (≤1h)\nN={len(minutes_data)} ({pct(len(minutes_data))})")
-                ax0.spines["right"].set_visible(False)
-                ax0.spines["top"].set_visible(False)
-
-                # Hours axis
-                ax1 = fig.add_subplot(gs[1], sharey=ax0)
-                if not hours_data.empty:
-                    ax1.hist(hours_data, bins=20, color="tab:orange", alpha=0.7, log=True)
-                ax1.set_xlim(min_break, hour_break)
-                ax1.set_xticks([60, 180, 360, 720, 1440])
-                ax1.set_xticklabels(["1h", "3h", "6h", "12h", "1d"], rotation=0)
-                ax1.set_title(f"Hours (1h–1d)\nN={len(hours_data)} ({pct(len(hours_data))})")
-                ax1.spines["left"].set_visible(False)
-                ax1.spines["right"].set_visible(False)
-                ax1.spines["top"].set_visible(False)
-                plt.setp(ax1.get_yticklabels(), visible=False)
-
-                # Days axis
-                ax2 = fig.add_subplot(gs[2], sharey=ax0)
-                if not days_data.empty:
-                    ax2.hist(days_data, bins=20, color="tab:green", alpha=0.7, log=True)
-                ax2.set_xlim(hour_break, max_val)
-                # Choose ticks for days
-                if max_val > hour_break:
-                    day_ticks = [
-                        hour_break,
-                        hour_break + (max_val - hour_break) / 3,
-                        hour_break + 2 * (max_val - hour_break) / 3,
-                        max_val,
-                    ]
-                    day_labels = ["1d"] + [f"{int(t / 1440)}d" for t in day_ticks[1:]]
-                    ax2.set_xticks([hour_break] + day_ticks[1:])
-                    ax2.set_xticklabels(day_labels, rotation=0)
-                ax2.set_title(f"Days (>1d)\nN={len(days_data)} ({pct(len(days_data))})")
-                ax2.spines["left"].set_visible(False)
-                ax2.spines["top"].set_visible(False)
-                plt.setp(ax2.get_yticklabels(), visible=False)
-
-                # Remove space between subplots
-                plt.subplots_adjust(wspace=0.12)
-                fig.suptitle(f"Histogram of {col} (minutes, hours, days)", y=1.04)
-
-                if output_dir_path is not None:
-                    plt.savefig(output_dir_path / f"{col}_hist.png", bbox_inches="tight")
-                plt.show()
-
-            # TimeLimit: histogram of time limits in minutes, hours, days
-            elif col in ["TimeLimit"]:
-                # Convert to timedelta if not already
-                if not pd.api.types.is_timedelta64_dtype(col_data):
-                    col_data = pd.to_timedelta(col_data, unit="minutes", errors="coerce")
-                # Convert timelimits to minutes for plotting
-                timelimit_minutes = col_data.dropna().dt.total_seconds() / 60
-
-                # Define breakpoints for minutes, hours, days
-                min_break = 60  # 1 hour in minutes
-                hour_break = 1440  # 1 day in minutes
-                max_val = timelimit_minutes.max()
-                total_count = len(timelimit_minutes)
-
-                # Prepare data for each section
-                minutes_data = timelimit_minutes[(timelimit_minutes <= min_break)]
-                hours_data = timelimit_minutes[(timelimit_minutes > min_break) & (timelimit_minutes <= hour_break)]
-                days_data = timelimit_minutes[(timelimit_minutes > hour_break)]
-
-                # Ensure each section gets a reasonable width for readability
-                min_width = 0.3  # Minimum width for any section
-                # Compute proportional widths
-                width_minutes = len(minutes_data) / total_count if total_count > 0 else 0
-                width_hours = len(hours_data) / total_count if total_count > 0 else 0
-                width_days = len(days_data) / total_count if total_count > 0 else 0
-
-                # Enforce minimum width for non-empty sections
-                widths = []
-                for w, d in zip(
-                    [width_minutes, width_hours, width_days],
-                    [minutes_data, hours_data, days_data],
-                    strict=True
-                ):
-                    if not d.empty:
-                        widths.append(max(w, min_width))
-                    else:
-                        widths.append(0)
-                # If all are empty (shouldn't happen), fallback to equal widths
-                if sum(widths) == 0:
-                    widths = [1, 1, 1]
-                # Normalize so total is 1.0
-                total_width = sum(widths)
-                widths = [w / total_width for w in widths]
-                width_minutes, width_hours, width_days = widths
-
-                def pct(n, total_count=total_count):
-                    return f"{(n / total_count * 100):.1f}%" if total_count > 0 else "0.0%"
-
-                # Add space between sections to avoid overlapping xticks
-                section_gap = 0.1  # width of gap between sections (in axis units)
-                fig = plt.figure(figsize=(8, 5))
-                # Add a small gap between sections by adding blank axes
-                # We'll use 5 sections: [minutes, gap, hours, gap, days]
-                width_gap = section_gap
-                gs = GridSpec(
-                    1, 5,
-                    width_ratios=[width_minutes, width_gap, width_hours, width_gap, width_days],
-                    wspace=0.0
-                )
-
-                # Helper to reduce xticks and rotate if width is small
-                def choose_ticks_and_rotation(ticks, width, max_labels=3):
-                    # If width is small, reduce number of ticks and rotate
-                    if width < 0.38:
-                        step = max(1, int(np.ceil(len(ticks) / max_labels)))
-                        return ticks[::step], 45
-                    return ticks, 0
-
-                # Minutes axis
-                ax0 = fig.add_subplot(gs[0])
-                if not minutes_data.empty:
-                    ax0.hist(minutes_data, bins=20, color="tab:blue", alpha=0.7, log=True)
-                ax0.set_xlim(0, min_break)
-                min_ticks = [0, 15, 30, 45, 60]
-                min_ticklabels = ["0", "15m", "30m", "45m", "1h"]
-                min_ticks_sel, min_rot = choose_ticks_and_rotation(min_ticks, width_minutes)
-                min_ticklabels_sel = [min_ticklabels[i] for i, t in enumerate(min_ticks) if t in min_ticks_sel]
-                ax0.set_xticks(min_ticks_sel)
-                ax0.set_xticklabels(min_ticklabels_sel, rotation=min_rot, ha="right" if min_rot else "center")
-                ax0.set_ylabel("Count (log scale)")
-                ax0.set_title(f"Minutes (≤1h)\nN={len(minutes_data)} ({pct(len(minutes_data))})")
-                ax0.spines["right"].set_visible(False)
-                ax0.spines["top"].set_visible(False)
-
-                # Blank axis for gap between minutes and hours
-                ax_gap1 = fig.add_subplot(gs[1], frame_on=False)
-                ax_gap1.set_xticks([])
-                ax_gap1.set_yticks([])
-                ax_gap1.axis("off")
-
-                # Hours axis
-                ax1 = fig.add_subplot(gs[2], sharey=ax0)
-                if not hours_data.empty:
-                    ax1.hist(hours_data, bins=20, color="tab:orange", alpha=0.7, log=True)
-                ax1.set_xlim(min_break, hour_break)
-                hour_ticks = [60, 180, 360, 720, 1440]
-                hour_ticklabels = ["1h", "3h", "6h", "12h", "1d"]
-                hour_ticks_sel, hour_rot = choose_ticks_and_rotation(hour_ticks, width_hours)
-                hour_ticklabels_sel = [hour_ticklabels[i] for i, t in enumerate(hour_ticks) if t in hour_ticks_sel]
-                ax1.set_xticks(hour_ticks_sel)
-                ax1.set_xticklabels(hour_ticklabels_sel, rotation=hour_rot, ha="right" if hour_rot else "center")
-                ax1.set_title(f"Hours (1h–1d)\nN={len(hours_data)} ({pct(len(hours_data))})")
-                ax1.spines["left"].set_visible(False)
-                ax1.spines["right"].set_visible(False)
-                ax1.spines["top"].set_visible(False)
-                plt.setp(ax1.get_yticklabels(), visible=False)
-
-                # Blank axis for gap between hours and days
-                ax_gap2 = fig.add_subplot(gs[3], frame_on=False)
-                ax_gap2.set_xticks([])
-                ax_gap2.set_yticks([])
-                ax_gap2.axis("off")
-
-                # Days axis
-                ax2 = fig.add_subplot(gs[4], sharey=ax0)
-                if not days_data.empty:
-                    ax2.hist(days_data, bins=20, color="tab:green", alpha=0.7, log=True)
-                ax2.set_xlim(hour_break, max_val)
-                # Choose ticks for days
-                if max_val > hour_break:
-                    day_ticks = [
-                        hour_break,
-                        hour_break + (max_val - hour_break) / 3,
-                        hour_break + 2 * (max_val - hour_break) / 3,
-                        max_val,
-                    ]
-                    day_labels = ["1d"] + [f"{int(t / 1440)}d" for t in day_ticks[1:]]
-                    day_ticks_sel, day_rot = choose_ticks_and_rotation(day_ticks, width_days)
-                    day_labels_sel = [day_labels[i] for i, t in enumerate(day_ticks) if t in day_ticks_sel]
-                    ax2.set_xticks(day_ticks_sel)
-                    ax2.set_xticklabels(day_labels_sel, rotation=day_rot, ha="right" if day_rot else "center")
-                ax2.set_title(f"Days (>1d)\nN={len(days_data)} ({pct(len(days_data))})")
-                ax2.spines["left"].set_visible(False)
-                ax2.spines["top"].set_visible(False)
-                plt.setp(ax2.get_yticklabels(), visible=False)
-
-                # Remove space between subplots (handled by blank axes)
-                plt.subplots_adjust(wspace=0.0)
-                fig.suptitle(f"Histogram of {col} (minutes, hours, days)", y=1.04)
-
-                if output_dir_path is not None:
-                    plt.savefig(output_dir_path / f"{col}_hist.png", bbox_inches="tight")
-                plt.show()
 
             # Interactive: pie chart of interactive vs non-interactive jobs
             elif col in ["Interactive"]:
-                # Replace empty/NaN with 'non interactive', others as their type
-                interactive_col = jobs_df[col].fillna('non interactive').astype(str)
-                counts = interactive_col.value_counts()
-                plt.figure(figsize=(5, 7))
-
-                # Define threshold for small slices
-                threshold_pct = 5
-                total = counts.sum()
-                pct_values = counts.div(total).multiply(100)
-
-                # Explode small slices to separate them visually
-                explode = [max(0.15 - p / 100 * 4, 0.1) if p < threshold_pct else 0 for p in pct_values]
-
-                # Prepare labels: only show label on pie if above threshold
-                labels = [
-                    str(label) if p >= threshold_pct else ''
-                    for label, p in zip(counts.index, pct_values, strict=True)
-                ]
-
-                # Prepare legend labels for all slices
-                legend_labels = [
-                    f"{label}: {count} ({p:.1f}%)"
-                    for label, count, p in zip(counts.index, counts, pct_values, strict=True)
-                ]
-
-                # Create a gridspec to reserve space for the legend above the pie
-                fig = plt.gcf()
-                fig.clf()
-
-                # Use 3 rows: title, legend, pie
-                gs = GridSpec(3, 1, height_ratios=[0.05, 0.75, 0.25], hspace=0.0)
-                ax_title = fig.add_subplot(gs[0])
-                ax_pie = fig.add_subplot(gs[1])
-                ax_legend = fig.add_subplot(gs[2])
-
-                def autopct_func(p, threshold_pct=threshold_pct):
-                    return f"{p:.1f}%" if p >= threshold_pct else ''
-                
-                wedges, *_ = ax_pie.pie(
-                    counts,
-                    labels=labels,
-                    autopct=autopct_func,
-                    startangle=0,
-                    colors=sns.color_palette("pastel")[0:len(counts)],
-                    explode=explode,
-                )
-
-                ax_pie.axis('equal')
-
-                # Hide the legend and title axes
-                ax_legend.axis('off')
-                ax_title.axis('off')
-
-                # Place the title in its own axis, centered
-                ax_title.text(
-                    0.5, 0.5,
-                    "Job Type Distribution (Interactive vs Non Interactive)",
-                    ha='center', va='center', fontsize=14,
-                )
-
-                # Place the legend below the title and above the pie chart
-                ax_legend.legend(
-                    wedges,
-                    legend_labels,
-                    title="Job Type",
-                    loc="center",
-                    bbox_to_anchor=(0.5, 0.5),
-                    ncol=1,
-                    fontsize=10,
-                    title_fontsize=11
-                )
-
-                if output_dir_path is not None:
-                    plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
-                plt.show()
+                self._generate_interactive_pie_chart(jobs_df, col, output_dir_path)
 
             # GPUMemUsage: histogram of GPU memory usage (categorical bins)
             elif col in ["GPUMemUsage"]:
@@ -1318,7 +1308,7 @@ class DataVisualizer:
 
             # Constraints: plot node features selected as constraints
             elif col in ["Constraints"]:
-                # each row is an ndarray of constraints where each constraint is a string
+                # Each row is an ndarray of constraints where each constraint is a string
                 # Check if all non-null entries are ndarrays of strings
                 non_null = col_data.dropna()
                 if not all(isinstance(x, np.ndarray) and all(isinstance(item, str) for item in x) for x in non_null):
@@ -1370,6 +1360,7 @@ class DataVisualizer:
                 ax = sns.barplot(
                     x=constraint_flat_counts.index,
                     y=constraint_flat_percents.values,
+                    hue=constraint_flat_counts.index,
                     palette="viridis",
                     legend=False
                 )
@@ -1408,14 +1399,6 @@ class DataVisualizer:
                     zorder=10
                 )
 
-                # # Annotate bars with counts, ensuring a gap above the tallest bar label
-                # tallest = constraint_flat_counts.max()
-                # gap = max(2.5, tallest * 0.08)
-                # ax.set_ylim(0, tallest + gap)
-                # for i, v in enumerate(constraint_flat_counts.values):
-                #     label_y = v + gap * 0.2
-                #     ax.text(i, label_y, str(v), ha="center", va="bottom", fontsize=9,
-                #             bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7))
                 if output_dir_path is not None:
                     plt.savefig(output_dir_path / f"{col}_flat_barplot.png")
                 plt.show()
