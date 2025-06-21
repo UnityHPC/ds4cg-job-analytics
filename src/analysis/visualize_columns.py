@@ -174,7 +174,7 @@ class DataVisualizer:
         if isinstance(ax.containers[0], BarContainer):
             # The heights are already in percent (0-100) due to stat="percent"
             ax.bar_label(ax.containers[0], labels=[f"{h.get_height():.1f}%" for h in ax.containers[0]])
-        plt.title("Whether a job is submitted in an array")
+        plt.title(title)
         plt.xticks(rotation=45, ha="right")
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"{col}_barplot.png")
@@ -358,6 +358,7 @@ class DataVisualizer:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
             output_dir_path (Path | None): The directory to save the plot.
+            label_step (int, optional): Only annotate every Nth point. Default is 1 (all).
         """
         col_data = jobs_df[col]
         if not pd.api.types.is_datetime64_any_dtype(col_data):
@@ -387,36 +388,17 @@ class DataVisualizer:
             plt.xlabel("Date")
             plt.ylabel("Number of jobs")
             plt.title(f"Jobs per day for {col}")
-            plt.xticks(rotation=45, ha="right")
-            # Annotate points above the line with a vertical offset for readability
-            ylim = ax.get_ylim()
-            y_range = ylim[1] - ylim[0]
-            offset = max(5, 0.04 * y_range)
-            for x, y in zip(jobs_per_day.index, jobs_per_day.values, strict=True):
-                if y > 0:
-                    label_y = y + offset
-                    # Calculate the annotation box height in data coordinates
-                    # so the box does not go beyond the top spine
-                    ann = ax.annotate(
-                        f"{int(y)}",
-                        xy=(x, label_y),
-                        xytext=(0, 0),
-                        textcoords="offset points",
-                        ha="center",
-                        va="bottom",
-                        fontsize=10,
-                        bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7),
-                        clip_on=True,
-                    )
-                    # Adjust annotation if it goes out of bounds
-                    bbox = ann.get_window_extent(renderer=None)
-                    inv = ax.transData.inverted()
-                    bbox_data = inv.transform([[bbox.x0, bbox.y0], [bbox.x1, bbox.y1]])
-                    top_of_box = bbox_data[1][1]
-                    if top_of_box > ylim[1]:
-                        # Move annotation up so it fits inside the plot
-                        delta = top_of_box - ylim[1]
-                        ann.set_position((0, -delta * ax.bbox.height / y_range))
+            # Only show enough x-tick labels to keep the plot readable
+            tick_locs = jobs_per_day.index
+            max_labels = 10
+            if len(tick_locs) > max_labels:
+                step = max(1, len(tick_locs) // max_labels)
+                shown_locs = tick_locs[::step]
+                shown_labels = [dt.strftime("%Y-%m-%d") for dt in shown_locs]
+                ax.set_xticks(shown_locs)
+                ax.set_xticklabels(shown_labels, rotation=45, ha="right")
+            else:
+                plt.xticks(rotation=45, ha="right")
             if output_dir_path is not None:
                 plt.savefig(output_dir_path / f"{col}_days_lineplot.png")
         else:
@@ -647,7 +629,7 @@ class DataVisualizer:
                 plt.figure(figsize=figsize)
                 ax = plt.gca()
                 x_ticks = np.arange(len(vram_labels))
-                bar_positions = [0] + [i + 0.5 for i in range(1, len(vram_labels))]
+                bar_positions = [0] + [i + 0.5 for i in range(1, len(bin_counts))]
                 bar_width = 0.8
 
                 # Use a distinct color for 0 (e.g., red) and a colorblind-friendly palette for others
@@ -1018,7 +1000,7 @@ class DataVisualizer:
                     for label, p in zip(qos_counts.index, pct_values, strict=True)
                 ]
 
-                plt.figure(figsize=(5, 8))
+                plt.figure(figsize=(5, 10))
 
                 # Prepare legend labels for all slices
                 legend_labels = [
@@ -1320,7 +1302,6 @@ class DataVisualizer:
                 # Remove beginning and trailing single quotes from each string
                 non_null = non_null.apply(lambda x: tuple(str(item).strip("'") for item in x))
                 
-                
                 # Count constraint combinations where each job has multiple constraints
                 constraint_combo_counts = non_null.apply(lambda x: tuple(sorted(x))).value_counts()
                 constraint_df = constraint_combo_counts.reset_index()
@@ -1333,6 +1314,21 @@ class DataVisualizer:
                 # Flatten all constraints into a single list across all jobs
                 all_constraints = [constraint for arr in non_null for constraint in arr]
                 constraint_flat_counts = pd.Series(all_constraints).value_counts()
+
+                # --- Only plot top 20 constraints, bundle the rest ---
+                top_n = 20
+                if len(constraint_flat_counts) > top_n:
+                    top_constraints = constraint_flat_counts.iloc[:top_n]
+                    rest_constraints = constraint_flat_counts.iloc[top_n:]
+                    rest_count = rest_constraints.sum()
+                    rest_num = len(rest_constraints)
+                    # Use a placeholder label for the rest
+                    placeholder_label = f"{rest_num} others (<{top_constraints.iloc[-1]})"
+                    plot_counts = pd.concat([top_constraints, pd.Series({placeholder_label: rest_count})])
+                else:
+                    plot_counts = constraint_flat_counts
+
+                constraint_flat_percents = plot_counts / plot_counts.sum() * 100
 
                 # Build summary lines for each unique constraint combo
                 constraint_text_lines = []
@@ -1355,12 +1351,11 @@ class DataVisualizer:
                 else:
                     constraint_text = "\n".join(constraint_text_lines)
 
-                plt.figure(figsize=(10,5))
-                constraint_flat_percents = constraint_flat_counts / constraint_flat_counts.sum() * 100
+                plt.figure(figsize=(12,5))
                 ax = sns.barplot(
-                    x=constraint_flat_counts.index,
+                    x=plot_counts.index,
                     y=constraint_flat_percents.values,
-                    hue=constraint_flat_counts.index,
+                    hue=plot_counts.index,
                     palette="viridis",
                     legend=False
                 )
@@ -1373,7 +1368,7 @@ class DataVisualizer:
                 for i, (pct, count) in enumerate(
                     zip(
                         constraint_flat_percents.values,
-                        constraint_flat_counts.values,
+                        plot_counts.values,
                         strict=True
                     )
                 ):
