@@ -1316,6 +1316,109 @@ class DataVisualizer:
                     plt.savefig(output_dir_path / f"{col}_hist.png")
                 plt.show()
 
+            # Constraints: plot node features selected as constraints
+            elif col in ["Constraints"]:
+                # each row is an ndarray of constraints where each constraint is a string
+                # Check if all non-null entries are ndarrays of strings
+                non_null = col_data.dropna()
+                if not all(isinstance(x, np.ndarray) and all(isinstance(item, str) for item in x) for x in non_null):
+                    print(f"Error: Not all entries in column '{col}' are ndarrays of strings. Example values:")
+                    print(non_null.head())
+                    plt.close()
+                    continue
+                
+                # Remove beginning and trailing single quotes from each string
+                non_null = non_null.apply(lambda x: tuple(str(item).strip("'") for item in x))
+                
+                
+                # Count constraint combinations where each job has multiple constraints
+                constraint_combo_counts = non_null.apply(lambda x: tuple(sorted(x))).value_counts()
+                constraint_df = constraint_combo_counts.reset_index()
+                constraint_df.columns = ['constraints', 'count']
+                # Ensure each constraints is a tuple of strings
+                constraint_df['constraints'] = constraint_df['constraints'].apply(
+                    lambda x: tuple(x) if not isinstance(x, tuple) else x
+                ) 
+
+                # Flatten all constraints into a single list across all jobs
+                all_constraints = [constraint for arr in non_null for constraint in arr]
+                constraint_flat_counts = pd.Series(all_constraints).value_counts()
+
+                # Build summary lines for each unique constraint combo
+                constraint_text_lines = []
+                for combo, count in zip(constraint_df['constraints'], constraint_df['count'], strict=True):
+                    if len(combo) > 1:
+                        # Count occurrences of each constraint in the combo
+                        combo_counts: dict[str, int] = {}
+                        for constraint in combo:
+                            combo_counts[constraint] = combo_counts.get(constraint, 0) + 1
+                        # Format as "constraint (xN)"
+                        constraint_counts_str = ", ".join(f"{c} (x{cnt})" for c, cnt in sorted(combo_counts.items()))
+                        constraint_text_lines.append(
+                            f"Combo: [{constraint_counts_str}]  |  Jobs: {count}"
+                        )
+                # Limit to top 10 combos for readability, add a note if more
+                max_lines = 10
+                if len(constraint_text_lines) > max_lines:
+                    constraint_text = "\n".join(constraint_text_lines[:max_lines]) + \
+                        f"\n... ({len(constraint_text_lines) - max_lines} more combos)"
+                else:
+                    constraint_text = "\n".join(constraint_text_lines)
+
+                plt.figure(figsize=(10,5))
+                constraint_flat_percents = constraint_flat_counts / constraint_flat_counts.sum() * 100
+                ax = sns.barplot(
+                    x=constraint_flat_counts.index,
+                    y=constraint_flat_percents.values,
+                    palette="viridis",
+                    legend=False
+                )
+                plt.ylabel("Percent of Jobs")
+
+                # Annotate bars with count values at the correct height
+                tallest = constraint_flat_percents.max()
+                gap = max(2.5, tallest * 0.08)
+                ax.set_ylim(0, tallest + gap)
+                for i, (pct, count) in enumerate(
+                    zip(
+                        constraint_flat_percents.values,
+                        constraint_flat_counts.values,
+                        strict=True
+                    )
+                ):
+                    label_y = pct + gap * 0.2
+                    ax.text(
+                        i, label_y, f"{count}",
+                        ha="center", va="bottom", fontsize=9,
+                        bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7)
+                    )
+                # Set y-axis label to indicate percentage
+                ax.set_ylabel("Percent of Jobs (%)")
+                plt.title(f"Constraint Occurrences Across All Jobs ({col})")
+                plt.xlabel("Constraint")
+                plt.ylabel("Total Occurrences")
+                plt.xticks(rotation=45, ha="right")
+
+                # Add constraint summary text box
+                ax.text(
+                    0.98, 0.98, constraint_text,
+                    ha="right", va="top", fontsize=10,
+                    bbox=dict(boxstyle="round,pad=0.4", fc="white", ec="gray", alpha=0.8),
+                    transform=ax.transAxes,
+                    zorder=10
+                )
+
+                # # Annotate bars with counts, ensuring a gap above the tallest bar label
+                # tallest = constraint_flat_counts.max()
+                # gap = max(2.5, tallest * 0.08)
+                # ax.set_ylim(0, tallest + gap)
+                # for i, v in enumerate(constraint_flat_counts.values):
+                #     label_y = v + gap * 0.2
+                #     ax.text(i, label_y, str(v), ha="center", va="bottom", fontsize=9,
+                #             bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7))
+                if output_dir_path is not None:
+                    plt.savefig(output_dir_path / f"{col}_flat_barplot.png")
+                plt.show()
 
             # Unrecognized column type
             else:
