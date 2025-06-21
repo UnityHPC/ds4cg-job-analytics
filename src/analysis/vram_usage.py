@@ -1,6 +1,5 @@
 """
-Functions to analyze jobs that requested no GPUs but got GPU allocations
-and used some memory. The aim is to identify potential inefficiencies
+Functions to analyze efficiency of Jobs based on their VRAM usage. The aim is to identify potential inefficiencies
 in GPU usage and notify users or PIs about these issues.
 """
 
@@ -8,6 +7,7 @@ import pandas as pd
 from pathlib import Path
 from src.preprocess.preprocess import preprocess_data
 from src.database.DatabaseConnection import DatabaseConnection
+from src.config.constants import MIN_ELAPSED_SECONDS
 
 
 def load_jobs_dataframe_from_duckdb(db_path=None, table_name="Jobs"):
@@ -25,29 +25,33 @@ def load_jobs_dataframe_from_duckdb(db_path=None, table_name="Jobs"):
         db_path = Path(__file__).resolve().parents[2] / "data" / "slurm_data_small.db"
     db = DatabaseConnection(str(db_path))
 
-    df = db.fetch_all(table_name=table_name)
-    # all jobs including CPU only jobs
-    data = preprocess_data(df, min_elapsed_second=0, include_failed_cancelled_jobs=False, include_CPU_only_job=True)
+    jobs_df = db.fetch_all(table_name=table_name)
+    processed_data = preprocess_data(
+        jobs_df,
+        min_elapsed_second=0,
+        include_failed_cancelled_jobs=False,
+        include_CPU_only_job=False
+    )
     db.disconnect()
-    return data
+    return processed_data
 
 
-def analyze_hybrid_workload_efficiency(
+def analyze_workload_efficiency(
     df,
-    requested_vram_filter=0,
+    vram_constraint_filter=0,
     allocated_vram_greater_than=0,
     gpu_mem_usage_min=None,
     gpu_mem_usage_max=None,
     gpu_mem_usage_exact=None,
     gpus_min=1,
-    elapsed_seconds_min=600, #TODO: make it a parameter
+    elapsed_seconds_min=MIN_ELAPSED_SECONDS,
 ):
     """
-    Analyze jobs requesting a specific VRAM, GPU allocation, and usage criteria.
+    Analyze jobs based on constraints, GPU allocation, and usage criteria.
 
     Args:
         df (DataFrame): Main job dataframe from GPUMetrics
-        requested_vram_filter (int, float, or callable): Value or function to filter requested_vram
+        vram_constraint_filter (int, float, or callable): Value or function to filter requested_vram
         allocated_vram_greater_than (int, float): allocated_vram greater than this value
         gpu_mem_usage_min (int, float, optional): Minimum GPUMemUsage (inclusive)
         gpu_mem_usage_max (int, float, optional): Maximum GPUMemUsage (inclusive)
@@ -60,10 +64,10 @@ def analyze_hybrid_workload_efficiency(
     """
     df["Elapsed_seconds"] = df["Elapsed"].dt.total_seconds()
     # Flexible filter for requested_vram
-    if callable(requested_vram_filter):
-        mask = df["requested_vram"].apply(requested_vram_filter)
+    if callable(vram_constraint_filter):
+        mask = df["requested_vram"].apply(vram_constraint_filter)
     else:
-        mask = df["requested_vram"] == requested_vram_filter
+        mask = df["requested_vram"] == vram_constraint_filter
 
     # GPU memory usage filter
     gpu_mem_mask = pd.Series([True] * len(df), index=df.index)
