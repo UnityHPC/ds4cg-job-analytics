@@ -35,7 +35,6 @@ Thumbs.db
 *.backup
 *.csv
 !tests/**/*.csv
-!tests/**/*.db
 data/
 
 # Other common ignore rules

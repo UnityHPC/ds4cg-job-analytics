@@ -2,9 +2,11 @@ import duckdb
 import pandas as pd
 
 
+# TODO: clean private data in csv
+# TODO: resetup the conftest such that it will generate a mock db and then will destroy it after test
+# TODO: readjust the test properly bc you're having new data, it is best to come up with some automatic way of testing instead of harcode values
 # Use this script to convert csv into a duckdb database
-def connect(path_to_csv: str, path_to_db: str):
-    # Connect to DuckDB (creates file if it doesn't exist)
+def convert_csv_to_db(path_to_csv: str, path_to_db: str):
     conn = duckdb.connect(path_to_db)
     df = pd.read_csv(path_to_csv)
     for col in ["SubmitTime", "StartTime", "EndTime"]:
@@ -15,8 +17,6 @@ def connect(path_to_csv: str, path_to_db: str):
         df[col] = pd.to_numeric(df[col], errors="coerce")
         df[col] = df[col].astype("float64")
 
-    # csv_path = os.path.abspath("mock1.csv")
-    # Create table directly from CSV with automatic schema detection
     conn.execute("""
     DROP TABLE IF EXISTS Jobs;
 """)
@@ -57,15 +57,3 @@ def connect(path_to_csv: str, path_to_db: str):
     conn.register("df_view", df)
     conn.execute("INSERT INTO Jobs SELECT * FROM df_view")
     conn.close()
-
-
-if __name__ == "__main__":
-    connect("tests/mockData/mock2.csv", "tests/mockData/mock2.db")
-# obj = duckdb.connect("tests/mockData/mock2.db")
-# df = obj.query("SELECT * FROM Jobs").to_df()
-# print(df["CPUMemUsage"][4])
-# obj.close()
-#     connect()
-#     obj = duckdb.connect("mock2.db")
-#     df = obj.query("select * from Jobs").to_df()
-#     ground_truth = pd.read_csv("tests/mockData/mock2.csv")

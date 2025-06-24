@@ -2,24 +2,24 @@ import pytest
 import pandas as pd
 import numpy as np
 from src.database import DatabaseConnection
+from mockData.convert_csv_to_db import convert_csv_to_db
 
-
-# @pytest.fixture(scope="session")
-# def load_big_data():
-#     db = DatabaseConnection("data/slurm_data_small.db")
+# @pytest.fixture
+# def load_mock_data_1():
+#     db = DatabaseConnection("tests/mockData/mock1.db")
 #     return db.fetch_all()
 
 
-# loading small local data before every test modules run
-@pytest.fixture
-def load_mock_data_1():
-    db = DatabaseConnection("tests/mockData/mock1.db")
-    return db.fetch_all()
+# @pytest.fixture
+# def load_mock_data_2():
+#     db = DatabaseConnection("tests/mockData/mock2.db")
+#     return db.fetch_all()
 
 
 @pytest.fixture
-def load_mock_data_2():
-    db = DatabaseConnection("tests/mockData/mock2.db")
+def load_mock_data():
+    convert_csv_to_db("tests/mockData/mock_data.csv", "tests/mockData/mock_data.db")
+    db = DatabaseConnection("tests/mockData/mock_data.db")
     return db.fetch_all()
 
 

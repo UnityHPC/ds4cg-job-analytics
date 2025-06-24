@@ -39,39 +39,39 @@ def test_pre_process_data_fill_missing_small_arrayID(small_sample_data):
     assert data["ArrayID"].tolist() == [-1, 1, 2, -1]
 
 
-def test_preprocess_data_filtred_columns_total_data(load_mock_data_1):
-    data = preprocess_data(data=load_mock_data_1, min_elapsed_second=600)
+def test_pre_process_data_filtred_columns_mock_data(load_mock_data):
+    data = preprocess_data(data=load_mock_data, min_elapsed_second=600)
     assert "UUID" not in data.columns
     assert "EndTime" not in data.columns
     assert "Nodes" not in data.columns
 
 
-def test_pre_preocess_data_filtered_GPU_total_data(load_mock_data_1):
-    data = preprocess_data(data=load_mock_data_1, min_elapsed_second=600)
+def test_pre_pre_process_data_filtered_GPU_mock_data(load_mock_data):
+    data = preprocess_data(data=load_mock_data, min_elapsed_second=600)
     GPUTypeNull = data["GPUType"].isnull()
     GPUNull = data["GPUs"].isnull()
     assert not any(GPUTypeNull)
     assert not any(GPUNull)
 
 
-def test_pre_process_data_filtered_status_total_data(load_mock_data_1):
-    data = preprocess_data(data=load_mock_data_1, min_elapsed_second=600)
+def test_pre_process_data_filtered_status_mock_data(load_mock_data):
+    data = preprocess_data(data=load_mock_data, min_elapsed_second=600)
     statusFailed = data["Status"] == "FAILED"
     statusCancelled = data["Status"] == "CANCELLED"
     assert not any(statusFailed)
     assert not any(statusCancelled)
 
 
-def test_pre_process_data_filtered_elapsed_total_data(load_mock_data_1):
-    data = preprocess_data(data=load_mock_data_1, min_elapsed_second=300)
+def test_pre_process_data_filtered_elapsed_mock_data(load_mock_data):
+    data = preprocess_data(data=load_mock_data, min_elapsed_second=300)
     elapsedLessThanMin = data["Elapsed"] < pd.to_timedelta(
         300, unit="s"
     )  # final version of Elapsed column is timedelta so convert for comparison
     assert not any(elapsedLessThanMin)
 
 
-def test_pre_process_data_filtered_root_account_total_data(load_mock_data_1):
-    data = preprocess_data(data=load_mock_data_1, min_elapsed_second=600)
+def test_pre_process_data_filtered_root_account_mock_data(load_mock_data):
+    data = preprocess_data(data=load_mock_data, min_elapsed_second=600)
     partitionBuilding = data["Partition"] == "building"
     qosUpdates = data["QOS"] == "updates"
     accountRoot = data["Account"] == "root"
@@ -80,8 +80,8 @@ def test_pre_process_data_filtered_root_account_total_data(load_mock_data_1):
     assert not any(partitionBuilding)
 
 
+# TODO: avoid hardcoding values from here
 def test_pre_preprocess_data_include_CPU_job(load_mock_data_1):
-    print(type(load_mock_data_1["Constraints"][3]))
     data = preprocess_data(data=load_mock_data_1, min_elapsed_second=600, include_CPU_only_job=True)
     assert sum(x == ["cpu"] for x in data["GPUType"]) == 2
     assert data["GPUs"].value_counts()[0] == 2
