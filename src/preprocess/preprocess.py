@@ -2,35 +2,42 @@
 
 The following describes some preprocessing criteria for the job data:
 
-- Ignore columns:
+- Attributes omitted in preprocessing the provided data:
 UUID
-Nodes(NodesList have more specific information)
-EndTime (can be calculated from StartTime and Elapsed)
+Nodes : NodesList have more specific information
+EndTime : can be calculated from StartTime and Elapsed
 
-- Add optional parameter for keeping/ deleting columns:
-If include:
-GPUType is null, keep this and replace as CPU
-GPUs is null or is 0, keep this replace as 0
-status os Failed or Cancelled, don't drop this
+- Providing the option of including or omitting certain types of jobs:
+  - Keeping CPU jobs:
+      - If GPUType is null, the value will be filled with "CPU"
+      - If GPUs is null or is 0, the value will be 0.
+- Keeping jobs where the status is "Failed" or "Cancelled"
 
-- Ignore record which has:
-Elapsed < min_elapsed
-account is root
-partion is building
-QOS is updates
-Need to fill in missing values for arrayID, interactive, and constraints
 
-- Type of starttime, endtime, submit time will be converted into datetime
-- Type of Queued Time, TimeLimit, Elapsed will be converted into timedelta
+- Records with the following conditions are omitted:
+   - Elapsed is less than the minimum threshold
+   - account is root
+   - partion is building
+   - QOS is updates
 
-- Convert the following to categorical:
-Interactive, Status, ExitCode, QOS, partition,Account
+- Null attributes in the data are filled with default values as described below:
+  - ArrayID is set to -1
+  - Interactive is set to "non-interactive"
+  - Constraints is set to an empty numpy array
+  - GPUs is be set to 0 (when CPU jobs are kept)
+  - GPUType is set to an empty numpy array (when CPU jobs are kept)
+
+- Type of the following attributes is be set as `datetime`: StartTime, SubmitTime
+- Type of the following attributes is be set as `timedelta`: TimeLimit, Elapsed
+- Type of the following attributes is set as `Categorical`: Interactive, Status, ExitCode, QOS, Partition, Account
+
 """
+
+# TODO: convert the partition to Categorical type
 
 import pandas as pd
 import numpy as np
 
-#! add requested_vram, allocated_vram, user_jobs, account_jobs
 
 ram_map = {
     "a100": 80,
@@ -118,9 +125,10 @@ def get_requested_vram(constraints: list[str]) -> int:
             requested_vrams.append(ram_map[gpu_type])
     if not (len(requested_vrams)):
         return 0
-    return min(requested_vrams)
+    return max(requested_vrams)
 
 
+# TODO: for a100 and v100, look at the nodes for vram computation; for multiple GPUTypes, return min for now
 def get_allocated_vram(gpu_type: list[str]) -> int:
     return min(ram_map[x] for x in gpu_type)
 

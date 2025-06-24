@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from src import DatabaseConnection
+from src.database import DatabaseConnection
 
 
 # @pytest.fixture(scope="session")

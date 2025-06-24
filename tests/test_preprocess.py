@@ -1,4 +1,4 @@
-from src import preprocess_data, _fill_missing
+from src.preprocess import preprocess_data, _fill_missing
 import pandas as pd
 
 
