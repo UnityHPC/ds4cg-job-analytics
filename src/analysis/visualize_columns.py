@@ -518,7 +518,92 @@ class DataVisualizer:
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
         plt.show()
-    
+
+    def _generate_status_pie_chart(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
+        """Generate a pie chart for job statuses.
+        
+        Args:
+            jobs_df (pd.DataFrame): The DataFrame containing job data.
+            col (str): The name of the column to plot.
+            output_dir_path (Path | None): The directory to save the plot.
+
+        Returns:
+            None
+        """
+        col_data = jobs_df[col]
+        # Count occurrences of each status
+        exit_code_counts = col_data.value_counts()
+        total_count = exit_code_counts.sum()
+        if total_count == 0:
+            raise ValueError(f"No valid statuses in {col}. Skipping visualization.")
+
+        # Prepare labels and explode small slices
+        threshold_pct = 5
+        pct_values = exit_code_counts.div(total_count).multiply(100)
+        explode = [max(0.15 - p / 100 * 4, 0.1) if p < threshold_pct else 0 for p in pct_values]
+
+        # Prepare labels: only show label on pie if above threshold
+        labels = [
+            str(label) if p >= threshold_pct else ''
+            for label, p in zip(exit_code_counts.index, pct_values, strict=True)
+        ]
+
+        plt.figure(figsize=(5, 7))
+
+        # Prepare legend labels for all slices
+        legend_labels = [
+            f"{label}: {count} ({p:.1f}%)"
+            for label, count, p in zip(exit_code_counts.index, exit_code_counts, pct_values, strict=True)
+        ]
+
+        # Create a gridspec to reserve space for the legend above the pie
+        fig = plt.gcf()
+        fig.clf()
+
+        # Use 3 rows: title, legend, pie
+        gs = GridSpec(3, 1, height_ratios=[0.05, 0.75, 0.25], hspace=0.0)
+        ax_title = fig.add_subplot(gs[0])
+        ax_pie = fig.add_subplot(gs[1])
+        ax_legend = fig.add_subplot(gs[2])
+
+        def autopct_func(p, threshold_pct=threshold_pct):
+            return f"{p:.1f}%" if p >= threshold_pct else ''
+
+        wedges, *_ = ax_pie.pie(
+            exit_code_counts,
+            labels=labels,
+            autopct=autopct_func,
+            startangle=0,
+            colors=sns.color_palette("pastel")[0:len(exit_code_counts)],
+            explode=explode,
+        )
+        
+        ax_pie.axis('equal')
+
+        # Hide the legend and title axes
+        ax_legend.axis('off')
+        ax_title.axis('off')
+
+        ax_title.text(
+            0.5, 0.5,
+            f"Job Status Distribution ({col})",
+            ha='center', va='center', fontsize=14,
+        )
+        plt.grid(axis="y", linestyle="--", alpha=0.5)
+        # Add a legend below the pie chart
+        ax_legend.legend(
+            wedges,
+            legend_labels,
+            title="Job Status",
+            loc="center",
+            bbox_to_anchor=(0.5, 0.5),
+            fontsize=10,
+            title_fontsize=11
+        )
+        if output_dir_path is not None:
+            plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
+        plt.show()
+
     def _generate_gpu_type_bar_plot(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
         """Generate a bar plot for GPU types (GPUType column) that also shows number of jobs with more than one GPU type.
         
@@ -554,7 +639,7 @@ class DataVisualizer:
         # Count occurrences of each GPU type (across all jobs)
         gpu_counts = flat_gpu_types.value_counts()
 
-        plt.figure(figsize=figsize)
+        plt.figure(figsize=(7,4))
         ax = sns.barplot(
             x=gpu_counts.index,
             y=gpu_counts.values,
@@ -586,6 +671,56 @@ class DataVisualizer:
             transform=ax.transAxes,
             zorder=10
         )
+
+        if output_dir_path is not None:
+            plt.savefig(output_dir_path / f"{col}_barplot.png")
+        plt.show()
+
+
+    def _generate_partition_bar_plot(
+        self,
+        jobs_df: pd.DataFrame,
+        col: str,
+        output_dir_path: Path | None = None,
+        figsize=(7, 4)
+    ):
+        """Generate a bar plot for job partitions.
+        
+        Args:
+            jobs_df (pd.DataFrame): The DataFrame containing job data.
+            col (str): The name of the column to plot.
+            output_dir_path (Path | None): The directory to save the plot.
+            figsize (tuple[int, int]): Size of the figure for the plot.
+
+        Returns:
+            None
+        """
+        col_data = jobs_df[col]
+        # Partition should be a categorical column
+        # Count occurrences of each partition
+        partition_counts = col_data.value_counts()
+        partition_percents = partition_counts / partition_counts.sum() * 100
+        plt.figure(figsize=(figsize))
+        ax = sns.barplot(
+            x=partition_counts.index,
+            y=partition_percents.values,
+            hue=partition_counts.index,
+            palette="viridis",
+            legend=False
+        )
+        plt.title(f"{col}")
+        plt.xlabel("Partitions")
+        plt.ylabel("Percent of Jobs")
+        plt.xticks(rotation=45, ha="right")
+
+        # Annotate bars with counts, ensuring a gap above the tallest bar label
+        tallest = partition_percents.max()
+        gap = max(2.5, tallest * 0.08)
+        ax.set_ylim(0, tallest + gap)
+        for i, (pct, count) in enumerate(zip(partition_percents.values, partition_counts.values, strict=True)):
+            label_y = pct + gap * 0.2  # offset above bar, proportional to gap
+            ax.text(i, label_y, f"{count}", ha="center", va="bottom", fontsize=9,
+                    bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7))
 
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"{col}_barplot.png")
@@ -767,35 +902,7 @@ class DataVisualizer:
 
             # Partition: bar plot of job partitions
             elif col in ["Partition"]:
-                # Partition should be a categorical column
-                # Count occurrences of each partition
-                partition_counts = col_data.value_counts()
-                partition_percents = partition_counts / partition_counts.sum() * 100
-                plt.figure(figsize=figsize)
-                ax = sns.barplot(
-                    x=partition_counts.index,
-                    y=partition_percents.values,
-                    hue=partition_counts.index,
-                    palette="viridis",
-                    legend=False
-                )
-                plt.title(f"{col}")
-                plt.xlabel("Partitions")
-                plt.ylabel("Percent of Jobs")
-                plt.xticks(rotation=45, ha="right")
-
-                # Annotate bars with counts, ensuring a gap above the tallest bar label
-                tallest = partition_percents.max()
-                gap = max(2.5, tallest * 0.08)
-                ax.set_ylim(0, tallest + gap)
-                for i, (pct, count) in enumerate(zip(partition_percents.values, partition_counts.values, strict=True)):
-                    label_y = pct + gap * 0.2  # offset above bar, proportional to gap
-                    ax.text(i, label_y, f"{count}", ha="center", va="bottom", fontsize=9,
-                            bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7))
-
-                if output_dir_path is not None:
-                    plt.savefig(output_dir_path / f"{col}_barplot.png")
-                plt.show()
+                self._generate_partition_bar_plot(jobs_df, col, output_dir_path, figsize)
 
             # Memory: histogram of memory usage (logarithmic x-axis, percent)
             elif col in ["Memory"]:
@@ -841,80 +948,7 @@ class DataVisualizer:
 
             # Status: pie chart of job statuses
             elif col in ["Status"]:
-                # Count occurrences of each status
-                exit_code_counts = col_data.value_counts()
-                total_count = exit_code_counts.sum()
-                if total_count == 0:
-                    print(f"No valid statuses in {col}. Skipping visualization.")
-                    plt.close()
-                    continue
-
-                # Prepare labels and explode small slices
-                threshold_pct = 5
-                pct_values = exit_code_counts.div(total_count).multiply(100)
-                explode = [max(0.15 - p / 100 * 4, 0.1) if p < threshold_pct else 0 for p in pct_values]
-
-                # Prepare labels: only show label on pie if above threshold
-                labels = [
-                    str(label) if p >= threshold_pct else ''
-                    for label, p in zip(exit_code_counts.index, pct_values, strict=True)
-                ]
-
-                plt.figure(figsize=(5, 7))
-
-                # Prepare legend labels for all slices
-                legend_labels = [
-                    f"{label}: {count} ({p:.1f}%)"
-                    for label, count, p in zip(exit_code_counts.index, exit_code_counts, pct_values, strict=True)
-                ]
-
-                # Create a gridspec to reserve space for the legend above the pie
-                fig = plt.gcf()
-                fig.clf()
-
-                # Use 3 rows: title, legend, pie
-                gs = GridSpec(3, 1, height_ratios=[0.05, 0.75, 0.25], hspace=0.0)
-                ax_title = fig.add_subplot(gs[0])
-                ax_pie = fig.add_subplot(gs[1])
-                ax_legend = fig.add_subplot(gs[2])
-
-                def autopct_func(p, threshold_pct=threshold_pct):
-                    return f"{p:.1f}%" if p >= threshold_pct else ''
-
-                wedges, *_ = ax_pie.pie(
-                    exit_code_counts,
-                    labels=labels,
-                    autopct=autopct_func,
-                    startangle=0,
-                    colors=sns.color_palette("pastel")[0:len(exit_code_counts)],
-                    explode=explode,
-                )
-                
-                ax_pie.axis('equal')
-
-                # Hide the legend and title axes
-                ax_legend.axis('off')
-                ax_title.axis('off')
-
-                ax_title.text(
-                    0.5, 0.5,
-                    f"Job Status Distribution ({col})",
-                    ha='center', va='center', fontsize=14,
-                )
-                plt.grid(axis="y", linestyle="--", alpha=0.5)
-                # Add a legend below the pie chart
-                ax_legend.legend(
-                    wedges,
-                    legend_labels,
-                    title="Job Status",
-                    loc="center",
-                    bbox_to_anchor=(0.5, 0.5),
-                    fontsize=10,
-                    title_fontsize=11
-                )
-                if output_dir_path is not None:
-                    plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
-                plt.show()
+                self._generate_status_pie_chart(jobs_df, col, output_dir_path)
 
             # ExitCode: pie chart of job exit codes
             elif col in ["ExitCode"]:
