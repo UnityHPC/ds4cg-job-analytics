@@ -1,5 +1,6 @@
 from src.preprocess import preprocess_data
 import pandas as pd
+from src.config.enum_constants import InteractiveEnum, QOSEnum, StatusEnum, ExitCodeEnum, PartitionEnum, AccountEnum
 
 
 def _helper_filter_irrelevants_record(input_df: pd.DataFrame, min_elapsed_seconds: int) -> pd.DataFrame:
@@ -21,236 +22,336 @@ def _helper_filter_irrelevants_record(input_df: pd.DataFrame, min_elapsed_second
 
     res = input_df[
         (input_df["Elapsed"] >= min_elapsed_seconds)
-        & (input_df["Account"] != "root")
-        & (input_df["Partition"] != "building")
-        & (input_df["QOS"] != "updates")
+        & (input_df["Account"] != AccountEnum.ROOT.value)
+        & (input_df["Partition"] != PartitionEnum.BUILDING.value)
+        & (input_df["QOS"] != QOSEnum.UPDATES.value)
     ]
 
     return res
 
 
-def test_pre_process_data_filtred_columns(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=600)
+def test_pre_process_data_filtred_columns(mock_data_frame):
+    """
+    Test that the preprocessed data does not contain irrelevant columns.
+    """
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
     assert "UUID" not in data.columns
     assert "EndTime" not in data.columns
     assert "Nodes" not in data.columns
 
 
-def test_pre_process_data_filtered_GPU(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=600)
-    is_GPUType_Null = data["GPUType"].isnull()
-    is_GPU_Null = data["GPUs"].isnull()
-    assert not any(is_GPUType_Null)
-    assert not any(is_GPU_Null)
+def test_pre_process_data_filtered_gpu(mock_data_frame):
+    """
+    Test that the preprocessed data does not contain null GPUType and GPUs.
+    """
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
+    is_gpu_type_null = data["GPUType"].isna()
+    is_gpu_null = data["GPUs"].isna()
+    assert not any(is_gpu_type_null)
+    assert not any(is_gpu_null)
 
 
-def test_pre_process_data_filtered_status(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=600)
-    statusFailed = data["Status"] == "FAILED"
-    statusCancelled = data["Status"] == "CANCELLED"
-    assert not any(statusFailed)
-    assert not any(statusCancelled)
+def test_pre_process_data_filtered_status(mock_data_frame):
+    """
+    Test that the preprocessed data does not contain FAILED or CANCELLED jobs.
+    """
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
+    status_failed = data["Status"] == StatusEnum.FAILED.value
+    status_cancelled = data["Status"] == StatusEnum.CANCELLED.value
+    assert not any(status_failed)
+    assert not any(status_cancelled)
 
 
-def test_pre_process_data_filtered_elapsed(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=300)
-    elapsedLessThanMin = data["Elapsed"] < pd.to_timedelta(
+def test_pre_process_data_filtered_min_elapses_1(mock_data_frame):
+    """
+    Test that the preprocessed data does not contain jobs with elapsed time below the threshold (300 seconds).
+    """
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=300)
+    elapsed_below_threshold = data["Elapsed"] < pd.to_timedelta(
         300, unit="s"
     )  # final version of Elapsed column is timedelta so convert for comparison
-    assert not any(elapsedLessThanMin)
+    assert not any(elapsed_below_threshold)
 
 
-def test_pre_process_data_filtered_root_account(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=600)
-    partitionBuilding = data["Partition"] == "building"
-    qosUpdates = data["QOS"] == "updates"
-    accountRoot = data["Account"] == "root"
-    assert not any(accountRoot)
-    assert not any(qosUpdates)
-    assert not any(partitionBuilding)
+def test_pre_process_data_filter_min_esplapes_2(mock_data_frame):
+    """
+    Test that the preprocessed data contains only jobs with elapsed time below the threshold (700 seconds).
+    """
+    data = preprocess_data(
+        input_df=mock_data_frame,
+        min_elapsed_seconds=700,
+        include_CPU_only_jobs=True,
+        include_failed_cancelled_jobs=True,
+    )
+
+    ground_truth = _helper_filter_irrelevants_record(mock_data_frame, 700)
+    assert len(data) == len(ground_truth)
 
 
-def test_pre_process_data_include_CPU_job(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=600, include_CPU_only_jobs=True)
-    ground_truth = _helper_filter_irrelevants_record(load_mock_data, 600)
+def test_pre_process_data_filtered_root_account(mock_data_frame):
+    """
+    Test that the preprocessed data does not contain jobs with root account, partition building, or qos updates.
+    """
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
+    partition_building = data["Partition"] == PartitionEnum.BUILDING.value
+    qos_updates = data["QOS"] == QOSEnum.UPDATES.value
+    account_root = data["Account"] == AccountEnum.ROOT.value
+    assert not any(account_root)
+    assert not any(qos_updates)
+    assert not any(partition_building)
+
+
+def test_pre_process_data_include_cpu_job(mock_data_frame):
+    """
+    Test that the preprocessed data includes CPU-only jobs when specified.
+    """
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_CPU_only_jobs=True)
+    ground_truth = _helper_filter_irrelevants_record(mock_data_frame, 600)
     expected_cpu_type = len(
         ground_truth[
-            ground_truth["GPUType"].isnull()
-            & (ground_truth["Status"] != "FAILED")
-            & (ground_truth["Status"] != "CANCELLED")
+            ground_truth["GPUType"].isna()
+            & (ground_truth["Status"] != StatusEnum.FAILED.value)
+            & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
         ]
     )
     expected_gpus_count_0 = len(
         ground_truth[
-            ground_truth["GPUs"].isnull()
-            & (ground_truth["Status"] != "FAILED")
-            & (ground_truth["Status"] != "CANCELLED")
+            ground_truth["GPUs"].isna()
+            & (ground_truth["Status"] != StatusEnum.FAILED.value)
+            & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
         ]
     )
     assert sum(x == ["cpu"] for x in data["GPUType"]) == expected_cpu_type
     assert data["GPUs"].value_counts()[0] == expected_gpus_count_0
 
 
-def test_pre_process_data_include_FAILED_CANCELLED_job(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=600, include_failed_cancelled_jobs=True)
-    ground_truth = _helper_filter_irrelevants_record(load_mock_data, 600)
+def test_pre_process_data_include_failed_cancelled_job(mock_data_frame):
+    """
+    Test that the preprocessed data includes FAILED and CANCELLED jobs when specified.
+    """
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_failed_cancelled_jobs=True)
+    ground_truth = _helper_filter_irrelevants_record(mock_data_frame, 600)
     expect_failed_status = len(
         ground_truth[
-            (ground_truth["Status"] == "FAILED")
-            & (ground_truth["GPUType"].notnull())
-            & (ground_truth["GPUs"].notnull())
+            (ground_truth["Status"] == StatusEnum.FAILED.value)
+            & (ground_truth["GPUType"].notna())
+            & (ground_truth["GPUs"].notna())
         ]
     )
     expect_cancelled_status = len(
         ground_truth[
-            (ground_truth["Status"] == "CANCELLED")
-            & (ground_truth["GPUType"].notnull())
-            & (ground_truth["GPUs"].notnull())
+            (ground_truth["Status"] == StatusEnum.CANCELLED.value)
+            & (ground_truth["GPUType"].notna())
+            & (ground_truth["GPUs"].notna())
         ]
     )
-    assert data["Status"].value_counts()["FAILED"] == expect_failed_status
-    assert data["Status"].value_counts()["CANCELLED"] == expect_cancelled_status
+    assert data["Status"].value_counts()[StatusEnum.FAILED.value] == expect_failed_status
+    assert data["Status"].value_counts()[StatusEnum.CANCELLED.value] == expect_cancelled_status
 
 
-def test_pre_process_data_include_all(load_mock_data):
+def test_pre_process_data_include_all(mock_data_frame):
+    """
+    Test that the preprocessed data includes all jobs when both CPU-only and FAILED/CANCELLED
+    jobs are specified.
+    """
     data = preprocess_data(
-        input_df=load_mock_data,
+        input_df=mock_data_frame,
         min_elapsed_seconds=600,
         include_failed_cancelled_jobs=True,
         include_CPU_only_jobs=True,
     )
-    ground_truth = _helper_filter_irrelevants_record(load_mock_data, 600)
+    ground_truth = _helper_filter_irrelevants_record(mock_data_frame, 600)
 
-    expect_failed_status = len(ground_truth[(ground_truth["Status"] == "FAILED")])
-    expect_cancelled_status = len(ground_truth[(ground_truth["Status"] == "CANCELLED")])
-    expect_completed_status = len(ground_truth[(ground_truth["Status"] == "COMPLETED")])
-    expect_GPUType_null = len(ground_truth[(ground_truth["GPUType"].isnull())])
-    expect_GPUs_null = len(ground_truth[(ground_truth["GPUs"].isnull())])
+    expect_failed_status = len(ground_truth[(ground_truth["Status"] == StatusEnum.FAILED.value)])
+    expect_cancelled_status = len(ground_truth[(ground_truth["Status"] == StatusEnum.CANCELLED.value)])
+    expect_completed_status = len(ground_truth[(ground_truth["Status"] == StatusEnum.COMPLETED.value)])
+    expect_gpu_type_null = len(ground_truth[(ground_truth["GPUType"].isna())])
+    expect_gpus_null = len(ground_truth[(ground_truth["GPUs"].isna())])
 
     assert len(data) == len(ground_truth)
-    assert sum(x == ["cpu"] for x in data["GPUType"]) == expect_GPUType_null
-    assert data["GPUs"].value_counts()[0] == expect_GPUs_null
-    assert data["Status"].value_counts()["FAILED"] == expect_failed_status
-    assert data["Status"].value_counts()["CANCELLED"] == expect_cancelled_status
-    assert data["Status"].value_counts()["COMPLETED"] == expect_completed_status
+    assert sum(x == ["cpu"] for x in data["GPUType"]) == expect_gpu_type_null
+    assert data["GPUs"].value_counts()[0] == expect_gpus_null
+    assert data["Status"].value_counts()[StatusEnum.FAILED.value] == expect_failed_status
+    assert data["Status"].value_counts()[StatusEnum.CANCELLED.value] == expect_cancelled_status
+    assert data["Status"].value_counts()[StatusEnum.COMPLETED.value] == expect_completed_status
 
 
-def test_pre_process_data_fill_missing_Interactive(load_mock_data):
+def test_pre_process_data_fill_missing_interactive(mock_data_frame):
+    """
+    Test that the preprocessed data fills missing interactive job types with 'non-interactive' correctly.
+    """
     data = preprocess_data(
-        input_df=load_mock_data,
+        input_df=mock_data_frame,
         min_elapsed_seconds=100,
         include_CPU_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
-    ground_truth = _helper_filter_irrelevants_record(load_mock_data, 100)
+    ground_truth = _helper_filter_irrelevants_record(mock_data_frame, 100)
 
-    expect_matlab = len(ground_truth[(ground_truth["Interactive"] == "matlab")])
-    expect_shell = len(ground_truth[(ground_truth["Interactive"] == "shell")])
-    expect_jupyter = len(ground_truth[(ground_truth["Interactive"] == "jupyter")])
-    expect_non_interactive = len(ground_truth[(ground_truth["Interactive"].isnull())])
+    expect_non_interactive = len(ground_truth[(ground_truth["Interactive"].isna())])
 
     interactive_stat = data["Interactive"].value_counts()
-    assert interactive_stat["matlab"] == expect_matlab
-    assert interactive_stat["shell"] == expect_shell
-    assert interactive_stat["jupyter"] == expect_jupyter
-    assert interactive_stat["non-interactive"] == expect_non_interactive
+    assert interactive_stat[InteractiveEnum.NON_INTERACTIVE.value] == expect_non_interactive
 
 
-def test_pre_process_data_fill_missing_ArrayID(load_mock_data):
+def test_pre_process_data_fill_missing_array_id(mock_data_frame):
+    """
+    Test that the preprocessed data fills missing ArrayID with -1 correctly.
+    """
     data = preprocess_data(
-        input_df=load_mock_data,
+        input_df=mock_data_frame,
         min_elapsed_seconds=100,
         include_CPU_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
-    ground_truth = _helper_filter_irrelevants_record(load_mock_data, 100)
-    expect_array_id_null = len(ground_truth[(ground_truth["ArrayID"].isnull())])
+    ground_truth = _helper_filter_irrelevants_record(mock_data_frame, 100)
+    expect_array_id_null = len(ground_truth[(ground_truth["ArrayID"].isna())])
     array_id_stat = data["ArrayID"].value_counts()
     assert array_id_stat[-1] == expect_array_id_null
 
 
-def test_pre_process_data_fill_missing_GPUType(load_mock_data):
+def test_pre_process_data_fill_missing_gpu_type(mock_data_frame):
+    """
+    Test that the preprocessed data fills missing GPUType with 'cpu' correctly.
+    """
     data = preprocess_data(
-        input_df=load_mock_data,
+        input_df=mock_data_frame,
         min_elapsed_seconds=100,
         include_CPU_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
 
-    ground_truth = _helper_filter_irrelevants_record(load_mock_data, 100)
-    expect_GPUType_null = len(ground_truth[(ground_truth["GPUType"].isnull())])
-    expect_GPUs_null = len(ground_truth[(ground_truth["GPUs"].isnull())])
-    GPUs_stat = data["GPUs"].value_counts()
+    ground_truth = _helper_filter_irrelevants_record(mock_data_frame, 100)
+    expect_gpu_type_null = len(ground_truth[(ground_truth["GPUType"].isna())])
+    expect_gpus_null = len(ground_truth[(ground_truth["GPUs"].isna())])
+    gpus_stat = data["GPUs"].value_counts()
 
-    assert sum(x == ["cpu"] for x in data["GPUType"]) == expect_GPUType_null
-    assert GPUs_stat[0] == expect_GPUs_null
+    assert sum(x == ["cpu"] for x in data["GPUType"]) == expect_gpu_type_null
+    assert gpus_stat[0] == expect_gpus_null
 
 
-def test_pre_process_data_fill_missing_Constraints(load_mock_data):
+def test_pre_process_data_fill_missing_constraints(mock_data_frame):
+    """
+    Test that the preprocessed data fills missing Constraints with empty numpy array correctly.
+    """
     data = preprocess_data(
-        input_df=load_mock_data,
+        input_df=mock_data_frame,
         min_elapsed_seconds=100,
         include_CPU_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
-    ground_truth = _helper_filter_irrelevants_record(load_mock_data, 100)
-    expect_constraints_null = len(ground_truth[(ground_truth["Constraints"].isnull())])
+    ground_truth = _helper_filter_irrelevants_record(mock_data_frame, 100)
+    expect_constraints_null = len(ground_truth[(ground_truth["Constraints"].isna())])
     assert sum(len(x) == 0 for x in data["Constraints"]) == expect_constraints_null
 
 
-def test_pre_process_data_filter_min_esplapes_mock2(load_mock_data):
-    data = preprocess_data(
-        input_df=load_mock_data,
-        min_elapsed_seconds=700,
-        include_CPU_only_jobs=True,
-        include_failed_cancelled_jobs=True,
-    )
+def test_category_interactive(mock_data_frame):
+    """
+    Test that the preprocessed data has 'Interactive' as a categorical variable and check values contained within it.
+    """
 
-    ground_truth = _helper_filter_irrelevants_record(load_mock_data, 700)
-    assert len(data) == len(ground_truth)
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
+    ground_truth = _helper_filter_irrelevants_record(mock_data_frame, 600)
+    ground_truth_filtered = ground_truth[
+        (ground_truth["GPUType"].notna())
+        & (ground_truth["GPUs"].notna())
+        & (ground_truth["Status"] != StatusEnum.FAILED.value)
+        & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
+    ]
+    expected = set(ground_truth_filtered["Interactive"].dropna().to_numpy()) | set([e.value for e in InteractiveEnum])
 
-
-def test_category_interactive(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=600)
     assert data["Interactive"].dtype == "category"
+    assert expected.issubset(set(data["Interactive"].cat.categories))
 
 
-def test_category_QOS(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=600)
+def test_category_qos(mock_data_frame):
+    """
+    Test that the preprocessed data has 'QOS' as a categorical variable and check values contained within it.
+    """
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
+    ground_truth = _helper_filter_irrelevants_record(mock_data_frame, 600)
+    ground_truth_filtered = ground_truth[
+        (ground_truth["GPUType"].notna())
+        & (ground_truth["GPUs"].notna())
+        & (ground_truth["Status"] != StatusEnum.FAILED.value)
+        & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
+    ]
+    expected = set(ground_truth_filtered["QOS"].dropna().to_numpy()) | set([e.value for e in QOSEnum])
+
     assert data["QOS"].dtype == "category"
-    expected = {"short", "long", "normal"}
     assert expected.issubset(set(data["QOS"].cat.categories))
 
 
-def test_category_exit_code(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=600)
+def test_category_exit_code(mock_data_frame):
+    """
+    Test that the preprocessed data has 'ExitCode' as a categorical variable and check values contained within it.
+    """
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
+
+    ground_truth = _helper_filter_irrelevants_record(mock_data_frame, 600)
+    ground_truth_filtered = ground_truth[
+        (ground_truth["GPUType"].notna())
+        & (ground_truth["GPUs"].notna())
+        & (ground_truth["Status"] != StatusEnum.FAILED.value)
+        & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
+    ]
+    expected = set(ground_truth_filtered["ExitCode"].dropna().to_numpy()) | set([e.value for e in ExitCodeEnum])
+
     assert data["ExitCode"].dtype == "category"
-    expected = {"SUCCESS", "ERROR", "SIGNALED"}
     assert expected.issubset(set(data["ExitCode"].cat.categories))
 
 
-def test_category_partition(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=600)
+def test_category_partition(mock_data_frame):
+    """
+    Test that the preprocessed data has 'Partition' as a categorical variable and check values contained within it.
+    """
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
+
+    ground_truth = _helper_filter_irrelevants_record(mock_data_frame, 600)
+    ground_truth_filtered = ground_truth[
+        (ground_truth["GPUType"].notna())
+        & (ground_truth["GPUs"].notna())
+        & (ground_truth["Status"] != StatusEnum.FAILED.value)
+        & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
+    ]
+    expected = set(ground_truth_filtered["Partition"].dropna().to_numpy()) | set([e.value for e in PartitionEnum])
+
     assert data["Partition"].dtype == "category"
-    expected = {"building", "gpu", "cpu"}
     assert expected.issubset(set(data["Partition"].cat.categories))
 
 
-def test_category_account(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=600)
+def test_category_account(mock_data_frame):
+    """
+    Test that the preprocessed data has 'Account' as a categorical variable and check values contained within it.
+    """
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
+
+    ground_truth = _helper_filter_irrelevants_record(mock_data_frame, 600)
+    ground_truth_filtered = ground_truth[
+        (ground_truth["GPUType"].notna())
+        & (ground_truth["GPUs"].notna())
+        & (ground_truth["Status"] != StatusEnum.FAILED.value)
+        & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
+    ]
+    expected = set(ground_truth_filtered["Account"].dropna().to_numpy()) | set([e.value for e in AccountEnum])
+
     assert data["Account"].dtype == "category"
+    assert expected.issubset(set(data["Account"].cat.categories))
 
 
-def test_pre_proess_timedelta_conversion(load_mock_data):
+def test_pre_proess_timedelta_conversion(mock_data_frame):
+    """
+    Test that the preprocessed data converts elapsed time to timedelta.
+    """
     data = preprocess_data(
-        input_df=load_mock_data,
+        input_df=mock_data_frame,
         min_elapsed_seconds=600,
         include_CPU_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
-    ground_truth = _helper_filter_irrelevants_record(load_mock_data, 600)
-    maxLen = len(ground_truth)
+    ground_truth = _helper_filter_irrelevants_record(mock_data_frame, 600)
+    max_len = len(ground_truth)
     time_limit = data["TimeLimit"]
     assert time_limit.dtype == "timedelta64[ns]"
     assert time_limit[0].total_seconds() == ground_truth["TimeLimit"][0]
-    assert time_limit[maxLen - 1].total_seconds() == ground_truth["TimeLimit"][maxLen - 1]
+    assert time_limit[max_len - 1].total_seconds() == ground_truth["TimeLimit"][max_len - 1]

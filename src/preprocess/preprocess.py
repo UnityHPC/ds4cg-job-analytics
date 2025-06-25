@@ -36,6 +36,7 @@ EndTime : can be calculated from StartTime and Elapsed
 import pandas as pd
 import numpy as np
 from ..config.constants import RAM_MAP, DEFAULT_MIN_ELAPSED_SECONDS, ATTRIBUTE_CATEGORIES
+from ..config.enum_constants import StatusEnum
 
 
 def get_requested_vram(constraints: list[str]) -> int:
@@ -111,7 +112,8 @@ def preprocess_data(
         data["GPUs"].notnull() | include_CPU_only_jobs
     )  # filter out GPUs is null, except when include_CPU_only_job is True
     cond_failed_cancelled_jobs = (
-        ((data["Status"] != "FAILED") & (data["Status"] != "CANCELLED")) | include_failed_cancelled_jobs
+        ((data["Status"] != StatusEnum.FAILED.value) & (data["Status"] != StatusEnum.CANCELLED.value))
+        | include_failed_cancelled_jobs
     )  # filter out failed or cancelled jobs, except when include_fail_cancel_jobs is True
 
     res = data[
@@ -143,8 +145,9 @@ def preprocess_data(
 
     #! convert columns to categorical
 
-    for col in ATTRIBUTE_CATEGORIES:
-        all_categories = list(set(ATTRIBUTE_CATEGORIES[col] + list(res[col].unique())))
+    for col, enum_obj in ATTRIBUTE_CATEGORIES.items():
+        enum_values = [e.value for e in enum_obj]
+        unique_values = res[col].unique().tolist()
+        all_categories = list(set(enum_values) | set(unique_values))
         res[col] = pd.Categorical(res[col], categories=all_categories, ordered=False)
-
     return res

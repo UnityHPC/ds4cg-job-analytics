@@ -1,3 +1,5 @@
+from .enum_constants import InteractiveEnum, QOSEnum, StatusEnum, ExitCodeEnum, PartitionEnum, AccountEnum
+
 RAM_MAP = {
     "a100": 80,  # have 80GB and 40GB variants, variants will be added in another PR
     "v100": 16,  # have 32GB and 16GB variants, variants will be added in another PR
@@ -59,20 +61,12 @@ CATEGORY_PARTITION = [
 DEFAULT_MIN_ELAPSED_SECONDS = 600
 
 # A map for categorical type construction, containing some values that exist in each type
+# TODO: convert to enum
 ATTRIBUTE_CATEGORIES = {
-    "Interactive": ["non-interactive", "shell"],
-    "QOS": ["normal", "updates", "short", "long"],
-    "Status": [
-        "COMPLETED",
-        "FAILED",
-        "CANCELLED",
-        "TIMEOUT",
-        "PREEMPTED",
-        "OUT_OF_MEMORY",
-        "PENDING",
-        "NODE_FAIL",
-    ],
-    "ExitCode": ["SUCCESS", "ERROR", "SIGNALED"],
-    "Account": ["root"],
-    "Partition": CATEGORY_PARTITION,
+    "Interactive": InteractiveEnum,
+    "QOS": QOSEnum,
+    "Status": StatusEnum,
+    "ExitCode": ExitCodeEnum,
+    "Account": AccountEnum,
+    "Partition": PartitionEnum,
 }
