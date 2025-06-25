@@ -352,24 +352,36 @@ class DataVisualizer:
             plt.savefig(output_dir_path / f"{col}_hist.png", bbox_inches="tight")
         plt.show()
 
-    def _generate_start_time_histogram(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
+    def _generate_start_time_histogram(
+        self,
+        jobs_df: pd.DataFrame,
+        col: str,
+        output_dir_path: Path | None = None,
+        timestamp_range: tuple[pd.Timestamp, pd.Timestamp] | None = None
+    ):
         """Generate a histogram of job start times, either by day or by hour.
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
             output_dir_path (Path | None): The directory to save the plot.
-            label_step (int, optional): Only annotate every Nth point. Default is 1 (all).
+            timestamp_range (tuple[pd.Timestamp, pd.Timestamp] | None): The time range to filter the data.
+        
+        Raises:
+            ValueError: If the column does not contain valid timestamps or if no valid timestamps are found.
+
+        Returns:
+            None
         """
         col_data = jobs_df[col]
+        if timestamp_range is not None:
+            col_data = col_data[col_data.between(timestamp_range[0], timestamp_range[1])]
         if not pd.api.types.is_datetime64_any_dtype(col_data):
             # Convert to datetime if not already
             col_data = pd.to_datetime(col_data, errors="coerce")  # invalid timestamps will be NaT
 
         col_data = col_data.dropna().sort_values()
         if col_data.empty:
-            print(f"No valid timestamps in {col}. Skipping visualization.")
-            plt.close()
-            return
+            raise ValueError(f"No valid timestamps in {col}. Skipping visualization.")
         min_time = col_data.min()
         max_time = col_data.max()
         total_days = (max_time - min_time).days + 1
@@ -387,20 +399,21 @@ class DataVisualizer:
             ax.xaxis.set_major_locator(plt.MaxNLocator(10))
             plt.xlabel("Date")
             plt.ylabel("Number of jobs")
-            plt.title(f"Jobs per day for {col}")
+            plt.title(f"Histogram of Number of Jobs per day for {col}")
             # Only show enough x-tick labels to keep the plot readable
             tick_locs = jobs_per_day.index
             max_labels = 10
             if len(tick_locs) > max_labels:
-                step = max(1, len(tick_locs) // max_labels)
-                shown_locs = tick_locs[::step]
+                # Always include first and last, then evenly space the rest
+                idxs = np.linspace(0, len(tick_locs) - 1, max_labels, dtype=int)
+                shown_locs = tick_locs[idxs]
                 shown_labels = [dt.strftime("%Y-%m-%d") for dt in shown_locs]
                 ax.set_xticks(shown_locs)
                 ax.set_xticklabels(shown_labels, rotation=45, ha="right")
             else:
                 plt.xticks(rotation=45, ha="right")
             if output_dir_path is not None:
-                plt.savefig(output_dir_path / f"{col}_days_lineplot.png")
+                plt.savefig(output_dir_path / f"{col}_days_lineplot.png", bbox_inches="tight")
         else:
             # All jobs within a couple of days: plot by hour
             jobs_per_hour = col_data.dt.floor("H").value_counts().sort_index()
@@ -412,7 +425,7 @@ class DataVisualizer:
             plt.gca().xaxis.set_major_locator(plt.MaxNLocator(12))
             plt.xlabel("Hour")
             plt.ylabel("Number of jobs")
-            plt.title(f"Jobs per hour for {col}")
+            plt.title(f"Histogram of Numer of Jobs per hour for {col}")
             plt.grid(True, which="both", axis="both", linestyle="--", alpha=0.5)
 
             # Set x-axis labels: show date at midnight, hour otherwise
@@ -433,7 +446,7 @@ class DataVisualizer:
 
             plt.tight_layout()
             if output_dir_path is not None:
-                plt.savefig(output_dir_path / f"{col}_hourly_lineplot.png")
+                plt.savefig(output_dir_path / f"{col}_hourly_lineplot.png", bbox_inches="tight")
         plt.show()
 
     def _generate_interactive_pie_chart(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
@@ -638,6 +651,7 @@ class DataVisualizer:
 
         # Count occurrences of each GPU type (across all jobs)
         gpu_counts = flat_gpu_types.value_counts()
+        gpu_percents = gpu_counts / gpu_counts.sum() * 100
 
         plt.figure(figsize=(7,4))
         ax = sns.barplot(
@@ -648,17 +662,17 @@ class DataVisualizer:
             legend=False
         )
         plt.title(f"GPU Types ({col})")
-        plt.xlabel("GPU Type")
-        plt.ylabel("Count (across all jobs)")
+        plt.xlabel("GPU type")
+        plt.ylabel("Number of jobs using this GPU type")
         plt.xticks(rotation=45, ha="right")
 
         # Annotate bars with counts, ensuring a gap above the tallest bar label
         tallest = np.asarray(gpu_counts.values).max()
         gap = max(2.5, tallest * 0.08)
         ax.set_ylim(0, tallest + gap)
-        for i, v in enumerate(gpu_counts.values):
-            label_y = v + gap * 0.2  # offset above bar, proportional to gap
-            ax.text(i, label_y, str(v), ha="center", va="bottom", fontsize=9,
+        for i, (count, percent) in enumerate(zip(gpu_counts.values, gpu_percents.values, strict=True)):
+            label_y = count + gap * 0.2  # offset above bar, proportional to gap
+            ax.text(i, label_y, f"{percent:.1f}%", ha="center", va="bottom", fontsize=9,
                     bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7))
 
         # Add a text box showing number of jobs with multiple GPU types
@@ -937,7 +951,7 @@ class DataVisualizer:
         plt.figure(figsize=figsize)
         ax = sns.barplot(
             x=node_counts.index,
-            y=node_percents.values,
+            y=node_counts.values,
             hue=node_counts.index,
             palette="viridis",
             legend=False
@@ -946,7 +960,7 @@ class DataVisualizer:
         # Set a long xlabel and wrap it to fit within the figure width
         xlabel = "Nodes (trailing numbers removed, e.g., gpu10,gpu50 → gpu,gpu; counts are combined)"
         plt.xlabel(xlabel)
-        plt.ylabel("Percent of Jobs")
+        plt.ylabel("Number of Jobs")
         plt.tight_layout()
         # Now wrap the xlabel based on the actual axes width in pixels
         ax = plt.gca()
@@ -969,12 +983,12 @@ class DataVisualizer:
         )
 
         # Annotate bars with counts, ensuring a gap above the tallest bar label
-        tallest = node_percents.max()
+        tallest = node_counts.max()
         gap = max(2.5, tallest * 0.08)
         ax.set_ylim(0, tallest + gap)
         for i, (pct, count) in enumerate(zip(node_percents.values, node_counts.values, strict=True)):
-            label_y = pct + gap * 0.2  # offset above bar, proportional to gap
-            ax.text(i, label_y, f"{count}", ha="center", va="bottom", fontsize=9,
+            label_y = count + gap * 0.2  # offset above bar, proportional to gap
+            ax.text(i, label_y, f"{pct:.1f}%", ha="center", va="bottom", fontsize=9,
                     bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7))
 
         if output_dir_path is not None:
@@ -986,7 +1000,7 @@ class DataVisualizer:
         jobs_df: pd.DataFrame,
         col: str,
         output_dir_path: Path | None = None,
-        figsize=(7, 4)
+        figsize=(9, 4)
     ):
         """Generate a bar plot for job partitions.
         
@@ -1007,27 +1021,27 @@ class DataVisualizer:
         plt.figure(figsize=(figsize))
         ax = sns.barplot(
             x=partition_counts.index,
-            y=partition_percents.values,
+            y=partition_counts.values,
             hue=partition_counts.index,
             palette="viridis",
             legend=False
         )
         plt.title(f"{col}")
         plt.xlabel("Partitions")
-        plt.ylabel("Percent of Jobs")
+        plt.ylabel("Number of Jobs")
         plt.xticks(rotation=45, ha="right")
 
         # Annotate bars with counts, ensuring a gap above the tallest bar label
-        tallest = partition_percents.max()
+        tallest = partition_counts.max()
         gap = max(2.5, tallest * 0.08)
         ax.set_ylim(0, tallest + gap)
         for i, (pct, count) in enumerate(zip(partition_percents.values, partition_counts.values, strict=True)):
-            label_y = pct + gap * 0.2  # offset above bar, proportional to gap
-            ax.text(i, label_y, f"{count}", ha="center", va="bottom", fontsize=9,
+            label_y = count + gap * 0.2  # offset above bar, proportional to gap
+            ax.text(i, label_y, f"{pct:.0f}%", ha="center", va="bottom", fontsize=8,
                     bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7))
 
         if output_dir_path is not None:
-            plt.savefig(output_dir_path / f"{col}_barplot.png")
+            plt.savefig(output_dir_path / f"{col}_barplot.png", bbox_inches="tight")
         plt.show()
 
     def _generate_constraints_bar_plot(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
@@ -1318,7 +1332,7 @@ class DataVisualizer:
         plt.grid(axis="y", linestyle="--", alpha=0.5)
 
         if output_dir_path is not None:
-            plt.savefig(output_dir_path / f"{col}_hist.png")
+            plt.savefig(output_dir_path / f"{col}_hist.png", bbox_inches='tight')
         plt.show()
 
     def _generate_exit_code_pie_chart(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
@@ -1485,7 +1499,12 @@ class DataVisualizer:
 
             # Timestamps: plot histogram of times and durations if possible
             elif col in ["StartTime"]:
-                self._generate_start_time_histogram(jobs_df, col, output_dir_path)
+                self._generate_start_time_histogram(
+                    jobs_df,
+                    col,
+                    output_dir_path,
+                    timestamp_range=None,
+                )
 
             # Interactive: pie chart of interactive vs non-interactive jobs
             elif col in ["Interactive"]:
