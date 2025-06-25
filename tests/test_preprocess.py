@@ -80,7 +80,7 @@ def test_pre_process_data_filter_min_esplapes_2(mock_data_frame):
     data = preprocess_data(
         input_df=mock_data_frame,
         min_elapsed_seconds=700,
-        include_CPU_only_jobs=True,
+        include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
 
@@ -105,7 +105,7 @@ def test_pre_process_data_include_cpu_job(mock_data_frame):
     """
     Test that the preprocessed data includes CPU-only jobs when specified.
     """
-    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_CPU_only_jobs=True)
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_cpu_only_jobs=True)
     ground_truth = _helper_filter_irrelevants_record(mock_data_frame, 600)
     expected_cpu_type = len(
         ground_truth[
@@ -158,7 +158,7 @@ def test_pre_process_data_include_all(mock_data_frame):
         input_df=mock_data_frame,
         min_elapsed_seconds=600,
         include_failed_cancelled_jobs=True,
-        include_CPU_only_jobs=True,
+        include_cpu_only_jobs=True,
     )
     ground_truth = _helper_filter_irrelevants_record(mock_data_frame, 600)
 
@@ -183,7 +183,7 @@ def test_pre_process_data_fill_missing_interactive(mock_data_frame):
     data = preprocess_data(
         input_df=mock_data_frame,
         min_elapsed_seconds=100,
-        include_CPU_only_jobs=True,
+        include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
     ground_truth = _helper_filter_irrelevants_record(mock_data_frame, 100)
@@ -201,7 +201,7 @@ def test_pre_process_data_fill_missing_array_id(mock_data_frame):
     data = preprocess_data(
         input_df=mock_data_frame,
         min_elapsed_seconds=100,
-        include_CPU_only_jobs=True,
+        include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
     ground_truth = _helper_filter_irrelevants_record(mock_data_frame, 100)
@@ -217,7 +217,7 @@ def test_pre_process_data_fill_missing_gpu_type(mock_data_frame):
     data = preprocess_data(
         input_df=mock_data_frame,
         min_elapsed_seconds=100,
-        include_CPU_only_jobs=True,
+        include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
 
@@ -237,7 +237,7 @@ def test_pre_process_data_fill_missing_constraints(mock_data_frame):
     data = preprocess_data(
         input_df=mock_data_frame,
         min_elapsed_seconds=100,
-        include_CPU_only_jobs=True,
+        include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
     ground_truth = _helper_filter_irrelevants_record(mock_data_frame, 100)
@@ -346,7 +346,7 @@ def test_pre_proess_timedelta_conversion(mock_data_frame):
     data = preprocess_data(
         input_df=mock_data_frame,
         min_elapsed_seconds=600,
-        include_CPU_only_jobs=True,
+        include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
     ground_truth = _helper_filter_irrelevants_record(mock_data_frame, 600)

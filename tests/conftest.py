@@ -5,7 +5,6 @@ import os
 import tempfile
 
 
-# TODO: use temp file to store the mock data db
 @pytest.fixture(scope="module")
 def mock_data_frame():
     fd, temp_db_path = tempfile.mkstemp(suffix=".db")

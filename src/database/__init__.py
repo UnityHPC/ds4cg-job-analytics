@@ -1,1 +1,1 @@
-from .DatabaseConnection import DatabaseConnection as DatabaseConnection
+from .database_connection import DatabaseConnection as DatabaseConnection

@@ -71,13 +71,13 @@ def _fill_missing(res: pd.DataFrame) -> None:
     res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)
     res.loc[:, "Interactive"] = res["Interactive"].fillna("non-interactive")
 
-    mask_constraints_null = res["Constraints"].isnull()
+    mask_constraints_null = res["Constraints"].isna()
     res.loc[mask_constraints_null, "Constraints"] = res.loc[mask_constraints_null, "Constraints"].apply(
         lambda _: np.array([])
     )
 
-    mask_GPUType_null = res["GPUType"].isnull()
-    res.loc[mask_GPUType_null, "GPUType"] = res.loc[mask_GPUType_null, "GPUType"].apply(lambda _: np.array(["cpu"]))
+    mask_gpu_type_null = res["GPUType"].isna()
+    res.loc[mask_gpu_type_null, "GPUType"] = res.loc[mask_gpu_type_null, "GPUType"].apply(lambda _: np.array(["cpu"]))
 
     res.loc[:, "GPUs"] = res["GPUs"].fillna(0)
 
@@ -86,7 +86,7 @@ def preprocess_data(
     input_df: pd.DataFrame,
     min_elapsed_seconds: int = DEFAULT_MIN_ELAPSED_SECONDS,
     include_failed_cancelled_jobs=False,
-    include_CPU_only_jobs=False,
+    include_cpu_only_jobs=False,
 ) -> pd.DataFrame:
     """
     Preprocess dataframe, filtering out unwanted rows and columns, filling missing values and converting types.
@@ -97,7 +97,7 @@ def preprocess_data(
         data (pd.DataFrame): The input dataframe containing job data.
         min_elapsed_seconds (int, optional): Minimum elapsed time in seconds to keep a job record. Defaults to 600.
         include_failed_cancelled_jobs (bool, optional): Whether to include jobs with status FAILED or CANCELLED.
-        include_CPU_only_jobs (bool, optional): Whether to include jobs that do not use GPUs (CPU-only jobs).
+        include_cpu_only_jobs (bool, optional): Whether to include jobs that do not use GPUs (CPU-only jobs).
 
     Returns:
         pd.DataFrame: The preprocessed dataframe
@@ -105,11 +105,11 @@ def preprocess_data(
 
     data = input_df.drop(columns=["UUID", "EndTime", "Nodes"], axis=1, inplace=False)
 
-    cond_GPU_Type = (
-        data["GPUType"].notnull() | include_CPU_only_jobs
+    cond_gpu_type = (
+        data["GPUType"].notna() | include_cpu_only_jobs
     )  # filter out GPUType is null, except when include_CPU_only_job is True
-    cond_GPUs = (
-        data["GPUs"].notnull() | include_CPU_only_jobs
+    cond_gpus = (
+        data["GPUs"].notna() | include_cpu_only_jobs
     )  # filter out GPUs is null, except when include_CPU_only_job is True
     cond_failed_cancelled_jobs = (
         ((data["Status"] != StatusEnum.FAILED.value) & (data["Status"] != StatusEnum.CANCELLED.value))
@@ -117,8 +117,8 @@ def preprocess_data(
     )  # filter out failed or cancelled jobs, except when include_fail_cancel_jobs is True
 
     res = data[
-        cond_GPU_Type
-        & cond_GPUs
+        cond_gpu_type
+        & cond_gpus
         & cond_failed_cancelled_jobs
         & (data["Elapsed"] >= min_elapsed_seconds)  # filter in unit of second, not timedelta object
         & (data["Account"] != "root")
