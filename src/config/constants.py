@@ -61,7 +61,6 @@ CATEGORY_PARTITION = [
 DEFAULT_MIN_ELAPSED_SECONDS = 600
 
 # A map for categorical type construction, containing some values that exist in each type
-# TODO: convert to enum
 ATTRIBUTE_CATEGORIES = {
     "Interactive": InteractiveEnum,
     "QOS": QOSEnum,
