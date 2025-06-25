@@ -352,7 +352,7 @@ class DataVisualizer:
             plt.savefig(output_dir_path / f"{col}_hist.png", bbox_inches="tight")
         plt.show()
 
-    def _generate_start_time_histogram(self, jobs_df, col, output_dir_path, figsize=(7, 7)):
+    def _generate_start_time_histogram(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
         """Generate a histogram of job start times, either by day or by hour.
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
@@ -519,6 +519,78 @@ class DataVisualizer:
             plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
         plt.show()
     
+    def _generate_gpu_type_bar_plot(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
+        """Generate a bar plot for GPU types (GPUType column) that also shows number of jobs with more than one GPU type.
+        
+        Args:
+            jobs_df (pd.DataFrame): The DataFrame containing job data.
+            col (str): The name of the column to plot.
+            output_dir_path (Path | None): The directory to save the plot.
+
+        Raises:
+            ValueError: If the column does not contain numpy arrays or if any entry is not a numpy array.
+
+        Returns:
+            None
+        """
+
+        # GPUType should be a numpy array or list-like per row
+        # Check if all non-null entries are numpy arrays
+        col_data = jobs_df[col]
+        non_null = col_data.dropna()
+        if not all(isinstance(x, np.ndarray) for x in non_null):
+            msg = f"Error: Not all entries in column '{col}' are numpy arrays. Example values:\n{non_null.head()}"
+            print(msg)
+            raise ValueError(msg)
+
+        # Drop NaN and flatten all GPU types (each entry is a numpy array)
+        flat_gpu_types = pd.Series(np.concatenate(non_null.values))
+
+        # Count single and multi-GPU-type jobs
+        is_multi = non_null.apply(lambda x: len(x) > 1)
+        multi_count = is_multi.sum()
+        single_count = (~is_multi).sum()
+
+        # Count occurrences of each GPU type (across all jobs)
+        gpu_counts = flat_gpu_types.value_counts()
+
+        plt.figure(figsize=figsize)
+        ax = sns.barplot(
+            x=gpu_counts.index,
+            y=gpu_counts.values,
+            hue=gpu_counts.index,
+            palette="viridis",
+            legend=False
+        )
+        plt.title(f"GPU Types ({col})")
+        plt.xlabel("GPU Type")
+        plt.ylabel("Count (across all jobs)")
+        plt.xticks(rotation=45, ha="right")
+
+        # Annotate bars with counts, ensuring a gap above the tallest bar label
+        tallest = np.asarray(gpu_counts.values).max()
+        gap = max(2.5, tallest * 0.08)
+        ax.set_ylim(0, tallest + gap)
+        for i, v in enumerate(gpu_counts.values):
+            label_y = v + gap * 0.2  # offset above bar, proportional to gap
+            ax.text(i, label_y, str(v), ha="center", va="bottom", fontsize=9,
+                    bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7))
+
+        # Add a text box showing number of jobs with multiple GPU types
+        info_text = f"Jobs with 1 GPU type: {single_count}\nJobs with >1 GPU type: {multi_count}"
+        # Place the text box inside the axes, top right, with a small offset
+        ax.text(
+            0.98, 0.98, info_text,
+            ha="right", va="top", fontsize=10,
+            bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.7),
+            transform=ax.transAxes,
+            zorder=10
+        )
+
+        if output_dir_path is not None:
+            plt.savefig(output_dir_path / f"{col}_barplot.png")
+        plt.show()
+    
     def visualize_columns(
         self,
         columns=None,
@@ -602,7 +674,6 @@ class DataVisualizer:
             # Timestamps: plot histogram of times and durations if possible
             elif col in ["StartTime"]:
                 self._generate_start_time_histogram(jobs_df, col, output_dir_path)
-
 
             # Interactive: pie chart of interactive vs non-interactive jobs
             elif col in ["Interactive"]:
@@ -692,62 +763,7 @@ class DataVisualizer:
 
             # GPUType: bar plot of GPU types arrays
             elif col in ["GPUType"]:
-                # GPUType should be a numpy array or list-like per row
-                # Check if all non-null entries are numpy arrays
-                non_null = col_data.dropna()
-                if not all(isinstance(x, np.ndarray) for x in non_null):
-                    print(f"Error: Not all entries in column '{col}' are numpy arrays. Example values:")
-                    print(non_null.head())
-                    plt.close()
-                    continue
-
-                # Drop NaN and flatten all GPU types (each entry is a numpy array)
-                flat_gpu_types = pd.Series(np.concatenate(non_null.values))
-
-                # Count single and multi-GPU-type jobs
-                is_multi = non_null.apply(lambda x: len(x) > 1)
-                multi_count = is_multi.sum()
-                single_count = (~is_multi).sum()
-
-                # Count occurrences of each GPU type (across all jobs)
-                gpu_counts = flat_gpu_types.value_counts()
-
-                plt.figure(figsize=figsize)
-                ax = sns.barplot(
-                    x=gpu_counts.index,
-                    y=gpu_counts.values,
-                    hue=gpu_counts.index,
-                    palette="viridis",
-                    legend=False
-                )
-                plt.title(f"GPU Types ({col})")
-                plt.xlabel("GPU Type")
-                plt.ylabel("Count (across all jobs)")
-                plt.xticks(rotation=45, ha="right")
-
-                # Annotate bars with counts, ensuring a gap above the tallest bar label
-                tallest = np.asarray(gpu_counts.values).max()
-                gap = max(2.5, tallest * 0.08)
-                ax.set_ylim(0, tallest + gap)
-                for i, v in enumerate(gpu_counts.values):
-                    label_y = v + gap * 0.2  # offset above bar, proportional to gap
-                    ax.text(i, label_y, str(v), ha="center", va="bottom", fontsize=9,
-                            bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7))
-
-                # Add a text box showing number of jobs with multiple GPU types
-                info_text = f"Jobs with 1 GPU type: {single_count}\nJobs with >1 GPU type: {multi_count}"
-                # Place the text box inside the axes, top right, with a small offset
-                ax.text(
-                    0.98, 0.98, info_text,
-                    ha="right", va="top", fontsize=10,
-                    bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.7),
-                    transform=ax.transAxes,
-                    zorder=10
-                )
-
-                if output_dir_path is not None:
-                    plt.savefig(output_dir_path / f"{col}_barplot.png")
-                plt.show()
+                self._generate_gpu_type_bar_plot(jobs_df, col, output_dir_path)
 
             # Partition: bar plot of job partitions
             elif col in ["Partition"]:
