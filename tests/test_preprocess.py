@@ -2,7 +2,7 @@ from src.preprocess import preprocess_data
 import pandas as pd
 
 
-def _helper_filter_irrelevants_record(input_df: pd.DataFrame, min_elapsed: int) -> pd.DataFrame:
+def _helper_filter_irrelevants_record(input_df: pd.DataFrame, min_elapsed_seconds: int) -> pd.DataFrame:
     """
     Private function to help generate expected ground truth dataframe for test.
     Given a ground truth dataframe, this will create a new dataframe without records meeting the following criteria:
@@ -13,14 +13,14 @@ def _helper_filter_irrelevants_record(input_df: pd.DataFrame, min_elapsed: int) 
 
     Args:
         input_df (pd.DataFrame): Input dataframe to filter. Note that the Elapsed field should be in unit seconds.
-        min_elapsed (int): Minimum elapsed time in seconds.
+        min_elapsed_seconds (int): Minimum elapsed time in seconds.
 
     Returns:
         pd.DataFrame: Filtered dataframe.
     """
 
     res = input_df[
-        (input_df["Elapsed"] >= min_elapsed)
+        (input_df["Elapsed"] >= min_elapsed_seconds)
         & (input_df["Account"] != "root")
         & (input_df["Partition"] != "building")
         & (input_df["QOS"] != "updates")
@@ -30,22 +30,22 @@ def _helper_filter_irrelevants_record(input_df: pd.DataFrame, min_elapsed: int) 
 
 
 def test_pre_process_data_filtred_columns(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_second=600)
+    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=600)
     assert "UUID" not in data.columns
     assert "EndTime" not in data.columns
     assert "Nodes" not in data.columns
 
 
-def test_pre_pre_process_data_filtered_GPU(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_second=600)
-    GPUTypeNull = data["GPUType"].isnull()
-    GPUNull = data["GPUs"].isnull()
-    assert not any(GPUTypeNull)
-    assert not any(GPUNull)
+def test_pre_process_data_filtered_GPU(load_mock_data):
+    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=600)
+    is_GPUType_Null = data["GPUType"].isnull()
+    is_GPU_Null = data["GPUs"].isnull()
+    assert not any(is_GPUType_Null)
+    assert not any(is_GPU_Null)
 
 
 def test_pre_process_data_filtered_status(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_second=600)
+    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=600)
     statusFailed = data["Status"] == "FAILED"
     statusCancelled = data["Status"] == "CANCELLED"
     assert not any(statusFailed)
@@ -53,7 +53,7 @@ def test_pre_process_data_filtered_status(load_mock_data):
 
 
 def test_pre_process_data_filtered_elapsed(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_second=300)
+    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=300)
     elapsedLessThanMin = data["Elapsed"] < pd.to_timedelta(
         300, unit="s"
     )  # final version of Elapsed column is timedelta so convert for comparison
@@ -61,7 +61,7 @@ def test_pre_process_data_filtered_elapsed(load_mock_data):
 
 
 def test_pre_process_data_filtered_root_account(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_second=600)
+    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=600)
     partitionBuilding = data["Partition"] == "building"
     qosUpdates = data["QOS"] == "updates"
     accountRoot = data["Account"] == "root"
@@ -70,8 +70,8 @@ def test_pre_process_data_filtered_root_account(load_mock_data):
     assert not any(partitionBuilding)
 
 
-def test_pre_preprocess_data_include_CPU_job(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_second=600, include_CPU_only_job=True)
+def test_pre_process_data_include_CPU_job(load_mock_data):
+    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=600, include_CPU_only_jobs=True)
     ground_truth = _helper_filter_irrelevants_record(load_mock_data, 600)
     expected_cpu_type = len(
         ground_truth[
@@ -92,7 +92,7 @@ def test_pre_preprocess_data_include_CPU_job(load_mock_data):
 
 
 def test_pre_process_data_include_FAILED_CANCELLED_job(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_second=600, include_failed_cancelled_jobs=True)
+    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=600, include_failed_cancelled_jobs=True)
     ground_truth = _helper_filter_irrelevants_record(load_mock_data, 600)
     expect_failed_status = len(
         ground_truth[
@@ -114,7 +114,10 @@ def test_pre_process_data_include_FAILED_CANCELLED_job(load_mock_data):
 
 def test_pre_process_data_include_all(load_mock_data):
     data = preprocess_data(
-        input_df=load_mock_data, min_elapsed_second=600, include_failed_cancelled_jobs=True, include_CPU_only_job=True
+        input_df=load_mock_data,
+        min_elapsed_seconds=600,
+        include_failed_cancelled_jobs=True,
+        include_CPU_only_jobs=True,
     )
     ground_truth = _helper_filter_irrelevants_record(load_mock_data, 600)
 
@@ -134,7 +137,10 @@ def test_pre_process_data_include_all(load_mock_data):
 
 def test_pre_process_data_fill_missing_Interactive(load_mock_data):
     data = preprocess_data(
-        input_df=load_mock_data, min_elapsed_second=100, include_CPU_only_job=True, include_failed_cancelled_jobs=True
+        input_df=load_mock_data,
+        min_elapsed_seconds=100,
+        include_CPU_only_jobs=True,
+        include_failed_cancelled_jobs=True,
     )
     ground_truth = _helper_filter_irrelevants_record(load_mock_data, 100)
 
@@ -152,7 +158,10 @@ def test_pre_process_data_fill_missing_Interactive(load_mock_data):
 
 def test_pre_process_data_fill_missing_ArrayID(load_mock_data):
     data = preprocess_data(
-        input_df=load_mock_data, min_elapsed_second=100, include_CPU_only_job=True, include_failed_cancelled_jobs=True
+        input_df=load_mock_data,
+        min_elapsed_seconds=100,
+        include_CPU_only_jobs=True,
+        include_failed_cancelled_jobs=True,
     )
     ground_truth = _helper_filter_irrelevants_record(load_mock_data, 100)
     expect_array_id_null = len(ground_truth[(ground_truth["ArrayID"].isnull())])
@@ -162,7 +171,10 @@ def test_pre_process_data_fill_missing_ArrayID(load_mock_data):
 
 def test_pre_process_data_fill_missing_GPUType(load_mock_data):
     data = preprocess_data(
-        input_df=load_mock_data, min_elapsed_second=100, include_CPU_only_job=True, include_failed_cancelled_jobs=True
+        input_df=load_mock_data,
+        min_elapsed_seconds=100,
+        include_CPU_only_jobs=True,
+        include_failed_cancelled_jobs=True,
     )
 
     ground_truth = _helper_filter_irrelevants_record(load_mock_data, 100)
@@ -176,7 +188,10 @@ def test_pre_process_data_fill_missing_GPUType(load_mock_data):
 
 def test_pre_process_data_fill_missing_Constraints(load_mock_data):
     data = preprocess_data(
-        input_df=load_mock_data, min_elapsed_second=100, include_CPU_only_job=True, include_failed_cancelled_jobs=True
+        input_df=load_mock_data,
+        min_elapsed_seconds=100,
+        include_CPU_only_jobs=True,
+        include_failed_cancelled_jobs=True,
     )
     ground_truth = _helper_filter_irrelevants_record(load_mock_data, 100)
     expect_constraints_null = len(ground_truth[(ground_truth["Constraints"].isnull())])
@@ -185,7 +200,10 @@ def test_pre_process_data_fill_missing_Constraints(load_mock_data):
 
 def test_pre_process_data_filter_min_esplapes_mock2(load_mock_data):
     data = preprocess_data(
-        input_df=load_mock_data, min_elapsed_second=700, include_CPU_only_job=True, include_failed_cancelled_jobs=True
+        input_df=load_mock_data,
+        min_elapsed_seconds=700,
+        include_CPU_only_jobs=True,
+        include_failed_cancelled_jobs=True,
     )
 
     ground_truth = _helper_filter_irrelevants_record(load_mock_data, 700)
@@ -193,41 +211,44 @@ def test_pre_process_data_filter_min_esplapes_mock2(load_mock_data):
 
 
 def test_category_interactive(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_second=600)
+    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=600)
     assert data["Interactive"].dtype == "category"
 
 
 def test_category_QOS(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_second=600)
+    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=600)
     assert data["QOS"].dtype == "category"
     expected = {"short", "long", "normal"}
     assert expected.issubset(set(data["QOS"].cat.categories))
 
 
 def test_category_exit_code(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_second=600)
+    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=600)
     assert data["ExitCode"].dtype == "category"
     expected = {"SUCCESS", "ERROR", "SIGNALED"}
     assert expected.issubset(set(data["ExitCode"].cat.categories))
 
 
 def test_category_partition(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_second=600)
+    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=600)
     assert data["Partition"].dtype == "category"
     expected = {"building", "gpu", "cpu"}
     assert expected.issubset(set(data["Partition"].cat.categories))
 
 
 def test_category_account(load_mock_data):
-    data = preprocess_data(input_df=load_mock_data, min_elapsed_second=600)
+    data = preprocess_data(input_df=load_mock_data, min_elapsed_seconds=600)
     assert data["Account"].dtype == "category"
 
 
 def test_pre_proess_timedelta_conversion(load_mock_data):
     data = preprocess_data(
-        input_df=load_mock_data, min_elapsed_second=600, include_CPU_only_job=True, include_failed_cancelled_jobs=True
+        input_df=load_mock_data,
+        min_elapsed_seconds=600,
+        include_CPU_only_jobs=True,
+        include_failed_cancelled_jobs=True,
     )
-    ground_truth = _helper_filter_irrelevants_record(load_mock_data, min_elapsed=600)
+    ground_truth = _helper_filter_irrelevants_record(load_mock_data, 600)
     maxLen = len(ground_truth)
     time_limit = data["TimeLimit"]
     assert time_limit.dtype == "timedelta64[ns]"

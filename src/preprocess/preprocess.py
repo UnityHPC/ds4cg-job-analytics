@@ -33,85 +33,9 @@ EndTime : can be calculated from StartTime and Elapsed
 
 """
 
-# TODO: convert the partition to Categorical type
-
 import pandas as pd
 import numpy as np
-
-
-ram_map = {
-    "a100": 80,
-    "v100": 16,
-    "a40": 48,
-    "gh200": 95,
-    "rtx_8000": 48,
-    "2080_ti": 11,
-    "1080_ti": 11,
-    "2080": 8,
-    "h100": 80,
-    "l4": 23,
-    "m40": 23,
-    "l40s": 48,
-    "titan_x": 12,
-    "a16": 16,
-    "cpu": 0,
-}
-
-CATEGORY_PARTITION = [
-    "building",
-    "arm-gpu",
-    "arm-preempt",
-    "cpu",
-    "cpu-preempt",
-    "gpu",
-    "gpu-preempt",
-    "power9",
-    "power9-gpu",
-    "power9-gpu-preempt",
-    "astroth-cpu",
-    "astroth-gpu",
-    "cbio-cpu",
-    "cbio-gpu",
-    "ceewater_casey-cpu",
-    "ceewater_cjgleason-cpu",
-    "ceewater_kandread-cpu",
-    "ece-gpu",
-    "fsi-lab",
-    "gaoseismolab-cpu",
-    "superpod-a100",
-    "gpupod-l40s",
-    "ials-gpu",
-    "jdelhommelle",
-    "lan",
-    "mpi",
-    "power9-gpu-osg",
-    "toltec-cpu",
-    "umd-cscdr-arm",
-    "umd-cscdr-cpu",
-    "umd-cscdr-gpu",
-    "uri-cpu",
-    "uri-gpu",
-    "uri-richamp",
-    "visterra",
-    "zhoulin-cpu",
-]
-
-CATEGORY_GPUTYPE = [
-    "titanx",
-    "m40",
-    "1080ti",
-    "v100",
-    "2080",
-    "2080ti",
-    "rtx8000",
-    "a100-40g",
-    "a100-80g",
-    "a16",
-    "a40",
-    "gh200",
-    "l40s",
-    "l4",
-]
+from ..config.constants import RAM_MAP, DEFAULT_MIN_ELAPSED_SECONDS, ATTRIBUTE_CATEGORIES
 
 
 def get_requested_vram(constraints: list[str]) -> int:
@@ -122,15 +46,14 @@ def get_requested_vram(constraints: list[str]) -> int:
             requested_vrams.append(int(constr.replace("vram", "")))
         elif constr.startswith("gpu"):
             gpu_type = constr.split(":")[1]
-            requested_vrams.append(ram_map[gpu_type])
+            requested_vrams.append(RAM_MAP[gpu_type])
     if not (len(requested_vrams)):
         return 0
     return max(requested_vrams)
 
 
-# TODO: for a100 and v100, look at the nodes for vram computation; for multiple GPUTypes, return min for now
 def get_allocated_vram(gpu_type: list[str]) -> int:
-    return min(ram_map[x] for x in gpu_type)
+    return min(RAM_MAP[x] for x in gpu_type)
 
 
 def _fill_missing(res: pd.DataFrame) -> None:
@@ -144,22 +67,25 @@ def _fill_missing(res: pd.DataFrame) -> None:
         None: The function modifies the DataFrame in place.
     """
 
-    #! all Nan value are np.nan
-    # fill default values for specific columns
     res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)
     res.loc[:, "Interactive"] = res["Interactive"].fillna("non-interactive")
-    res.loc[:, "Constraints"] = res["Constraints"].fillna("").apply(lambda x: np.array(list(x)))
-    res.loc[:, "GPUType"] = (
-        res["GPUType"].fillna("").apply(lambda x: np.array(["cpu"]) if isinstance(x, str) else np.array(x))
+
+    mask_constraints_null = res["Constraints"].isnull()
+    res.loc[mask_constraints_null, "Constraints"] = res.loc[mask_constraints_null, "Constraints"].apply(
+        lambda _: np.array([])
     )
+
+    mask_GPUType_null = res["GPUType"].isnull()
+    res.loc[mask_GPUType_null, "GPUType"] = res.loc[mask_GPUType_null, "GPUType"].apply(lambda _: np.array(["cpu"]))
+
     res.loc[:, "GPUs"] = res["GPUs"].fillna(0)
 
 
 def preprocess_data(
     input_df: pd.DataFrame,
-    min_elapsed_second: int = 600,
+    min_elapsed_seconds: int = DEFAULT_MIN_ELAPSED_SECONDS,
     include_failed_cancelled_jobs=False,
-    include_CPU_only_job=False,
+    include_CPU_only_jobs=False,
 ) -> pd.DataFrame:
     """
     Preprocess dataframe, filtering out unwanted rows and columns, filling missing values and converting types.
@@ -168,9 +94,9 @@ def preprocess_data(
 
     Args:
         data (pd.DataFrame): The input dataframe containing job data.
-        min_elapsed_second (int, optional): Minimum elapsed time in seconds to keep a job record. Defaults to 600.
+        min_elapsed_seconds (int, optional): Minimum elapsed time in seconds to keep a job record. Defaults to 600.
         include_failed_cancelled_jobs (bool, optional): Whether to include jobs with status FAILED or CANCELLED.
-        include_CPU_only_job (bool, optional): Whether to include jobs that do not use GPUs (CPU-only jobs).
+        include_CPU_only_jobs (bool, optional): Whether to include jobs that do not use GPUs (CPU-only jobs).
 
     Returns:
         pd.DataFrame: The preprocessed dataframe
@@ -179,10 +105,10 @@ def preprocess_data(
     data = input_df.drop(columns=["UUID", "EndTime", "Nodes"], axis=1, inplace=False)
 
     cond_GPU_Type = (
-        data["GPUType"].notnull() | include_CPU_only_job
+        data["GPUType"].notnull() | include_CPU_only_jobs
     )  # filter out GPUType is null, except when include_CPU_only_job is True
     cond_GPUs = (
-        data["GPUs"].notnull() | include_CPU_only_job
+        data["GPUs"].notnull() | include_CPU_only_jobs
     )  # filter out GPUs is null, except when include_CPU_only_job is True
     cond_failed_cancelled_jobs = (
         ((data["Status"] != "FAILED") & (data["Status"] != "CANCELLED")) | include_failed_cancelled_jobs
@@ -192,7 +118,7 @@ def preprocess_data(
         cond_GPU_Type
         & cond_GPUs
         & cond_failed_cancelled_jobs
-        & (data["Elapsed"] >= min_elapsed_second)  # filter in unit of second, not timedelta object
+        & (data["Elapsed"] >= min_elapsed_seconds)  # filter in unit of second, not timedelta object
         & (data["Account"] != "root")
         & (data["Partition"] != "building")
         & (data["QOS"] != "updates")
@@ -216,28 +142,9 @@ def preprocess_data(
     res.loc[:, "account_jobs"] = res.groupby("Account")["Account"].transform("size")
 
     #! convert columns to categorical
-    # a map from columns to some of its possible values, any values not in the map will be added automatically
-    custom_category_map = {
-        "Interactive": ["non-interactive", "shell"],
-        "QOS": ["normal", "updates", "short", "long"],
-        "Status": [
-            "COMPLETED",
-            "FAILED",
-            "CANCELLED",
-            "TIMEOUT",
-            "PREEMPTED",
-            "OUT_OF_MEMORY",
-            "PENDING",
-            "NODE_FAIL",
-        ],
-        "ExitCode": ["SUCCESS", "ERROR", "SIGNALED"],
-        "Account": ["root"],
-    }
-    for col in custom_category_map:
-        all_categories = list(set(custom_category_map[col] + list(res[col].unique())))
-        res[col] = pd.Categorical(res[col], categories=all_categories, ordered=False)
 
-    #! some category that we have access to all possible values on Unity documentation
-    res["Partition"] = pd.Categorical(res["Partition"], categories=CATEGORY_PARTITION, ordered=False)
+    for col in ATTRIBUTE_CATEGORIES:
+        all_categories = list(set(ATTRIBUTE_CATEGORIES[col] + list(res[col].unique())))
+        res[col] = pd.Categorical(res[col], categories=all_categories, ordered=False)
 
     return res
