@@ -100,8 +100,8 @@ python_version = "3.11"
 ignore_missing_imports = true
 exclude = [
     # Exclude Benjamin's code from type checking
-    "./scripts/cpu_metrics.py",
-    "./scripts/gpu_metrics.py",
-    "./scripts/zero_gpu_usage_list.py",
-    "./notebooks/SlurmGPU.ipynb"
+    "scripts/cpu_metrics.py",
+    "scripts/gpu_metrics.py",
+    "scripts/zero_gpu_usage_list.py",
+    "notebooks/SlurmGPU.ipynb"
 ]
