@@ -2,8 +2,7 @@ import pytest
 import pandas as pd
 import numpy as np
 from src.database import DatabaseConnection
-from mockData.convert_csv_to_db import convert_csv_to_db
-
+from .mockData.convert_csv_to_db import convert_csv_to_db
 # @pytest.fixture
 # def load_mock_data_1():
 #     db = DatabaseConnection("tests/mockData/mock1.db")
@@ -16,10 +15,10 @@ from mockData.convert_csv_to_db import convert_csv_to_db
 #     return db.fetch_all()
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def load_mock_data():
-    convert_csv_to_db("tests/mockData/mock_data.csv", "tests/mockData/mock_data.db")
-    db = DatabaseConnection("tests/mockData/mock_data.db")
+    convert_csv_to_db("tests/mockData/mock.csv", "tests/mockData/mock.db")
+    db = DatabaseConnection("tests/mockData/mock.db")
     return db.fetch_all()
 
 

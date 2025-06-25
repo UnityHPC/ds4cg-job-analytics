@@ -156,10 +156,15 @@ def _fill_missing(res: pd.DataFrame) -> None:
 
 
 def preprocess_data(
-    data: pd.DataFrame, min_elapsed_second: int = 600, include_failed_cancelled_jobs=False, include_CPU_only_job=False
+    input_df: pd.DataFrame,
+    min_elapsed_second: int = 600,
+    include_failed_cancelled_jobs=False,
+    include_CPU_only_job=False,
 ) -> pd.DataFrame:
     """
     Preprocess dataframe, filtering out unwanted rows and columns, filling missing values and converting types.
+    This function will take in a dataframe and create a new dataframe satisfying criterias,
+    original dataframe is intact.
 
     Args:
         data (pd.DataFrame): The input dataframe containing job data.
@@ -171,7 +176,7 @@ def preprocess_data(
         pd.DataFrame: The preprocessed dataframe
     """
 
-    data.drop(columns=["UUID", "EndTime", "Nodes"], axis=1, inplace=True)
+    data = input_df.drop(columns=["UUID", "EndTime", "Nodes"], axis=1, inplace=False)
 
     cond_GPU_Type = (
         data["GPUType"].notnull() | include_CPU_only_job
@@ -209,8 +214,6 @@ def preprocess_data(
     res.loc[:, "allocated_vram"] = res["GPUType"].apply(lambda x: get_allocated_vram(x))
     res.loc[:, "user_jobs"] = res.groupby("User")["User"].transform("size")
     res.loc[:, "account_jobs"] = res.groupby("Account")["Account"].transform("size")
-    # res["queued_seconds"] = res["Queued"].apply(lambda x: x.total_seconds())
-    # res["total_seconds"] = res["Elapsed"] + res["queued_seconds"]
 
     #! convert columns to categorical
     # a map from columns to some of its possible values, any values not in the map will be added automatically
