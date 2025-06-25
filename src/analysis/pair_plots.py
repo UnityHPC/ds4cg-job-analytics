@@ -1,7 +1,7 @@
-import duckdb
 import seaborn as sns
 import matplotlib.pyplot as plt
 from pathlib import Path
+from database import DatabaseConnection
 
 
 def get_db_dataframe(db_path=None, table_name="Jobs"):
@@ -10,17 +10,16 @@ def get_db_dataframe(db_path=None, table_name="Jobs"):
     DataFrame.
 
     Args:
-        db_path (str or Path, optional): Path to the DuckDB database. Defaults to 'data/slurm_data_small.db'.
+        db_path (str or Path, optional): Path to the DuckDB database. Defaults to 'data/slurm_data.db'.
         table_name (str, optional): Table name to query. Defaults to 'Jobs'.
 
     Returns:
         pd.DataFrame: DataFrame containing the table data.
     """
     if db_path is None:
-        db_path = Path(__file__).resolve().parents[2] / "data" / "slurm_data_small.db"
-    con = duckdb.connect(str(db_path))
-    df = con.execute(f"SELECT * FROM {table_name}").df()
-    con.close()
+        db_path = Path(__file__).resolve().parents[2] / "data" / "slurm_data.db"
+    db = DatabaseConnection(db_path)
+    df = db.con.execute(f"SELECT * FROM {table_name}").df()
     return df
 
 
