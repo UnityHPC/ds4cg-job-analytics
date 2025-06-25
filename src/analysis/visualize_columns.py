@@ -1109,35 +1109,29 @@ class DataVisualizer:
         plt.figure(figsize=(12,5))
         ax = sns.barplot(
             x=plot_counts.index,
-            y=constraint_flat_percents.values,
+            y=plot_counts.values,
             hue=plot_counts.index,
             palette="viridis",
             legend=False
         )
-        plt.ylabel("Percent of Jobs")
 
         # Annotate bars with count values at the correct height
-        tallest = constraint_flat_percents.max()
+        tallest = plot_counts.max()
         gap = max(2.5, tallest * 0.08)
         ax.set_ylim(0, tallest + gap)
         for i, (pct, count) in enumerate(
-            zip(
-                constraint_flat_percents.values,
-                plot_counts.values,
-                strict=True
-            )
-        ):
-            label_y = pct + gap * 0.2
+            zip(constraint_flat_percents.values, plot_counts.values, strict=True)):
+            label_y = count + gap * 0.2
             ax.text(
-                i, label_y, f"{count}",
+                i, label_y, f"{pct:.1f}%",
                 ha="center", va="bottom", fontsize=9,
                 bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7)
             )
         # Set y-axis label to indicate percentage
-        ax.set_ylabel("Percent of Jobs (%)")
+        ax.set_ylabel("Number of Jobs")
         plt.title(f"Constraint Occurrences Across All Jobs ({col})")
         plt.xlabel("Constraint")
-        plt.ylabel("Total Occurrences")
+        plt.ylabel("Number of Jobs")
         plt.xticks(rotation=45, ha="right")
 
         # Add constraint summary text box
