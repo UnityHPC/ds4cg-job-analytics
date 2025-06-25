@@ -2,9 +2,6 @@ import duckdb
 import pandas as pd
 
 
-# TODO: clean private data in csv
-# TODO: resetup the conftest such that it will generate a mock db and then will destroy it after test
-# TODO: readjust the test properly bc you're having new data, it is best to come up with some automatic way of testing instead of harcode values
 # Use this script to convert csv into a duckdb database
 def convert_csv_to_db(path_to_csv: str, path_to_db: str):
     conn = duckdb.connect(path_to_db)
