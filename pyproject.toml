@@ -63,6 +63,7 @@ exclude = [
 addopts = [
     "--import-mode=importlib", "-ra"
 ]
+pythonpath = "."
 testpaths = ["tests"]
 
 [tool.mkdocs]
