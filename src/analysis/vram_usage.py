@@ -6,11 +6,15 @@ in GPU usage and notify users or PIs about these issues.
 import pandas as pd
 from pathlib import Path
 from src.preprocess.preprocess import preprocess_data
-from src.database.DatabaseConnection import DatabaseConnection
+from src.database import DatabaseConnection
 from src.config.constants import MIN_ELAPSED_SECONDS
+from datetime import timedelta, datetime
 
 
-def load_jobs_dataframe_from_duckdb(db_path=None, table_name="Jobs", sample_size=None, random_state=None):
+# TODO: add docstring to further clarify parameters you just added
+def load_jobs_dataframe_from_duckdb(
+    db_path=None, table_name="Jobs", sample_size=None, random_state=None, days_back=None, custom_query=""
+):
     """
     Connect to the DuckDB slurm_data_small.db and return the jobs table as a pandas DataFrame.
 
@@ -25,9 +29,16 @@ def load_jobs_dataframe_from_duckdb(db_path=None, table_name="Jobs", sample_size
         db_path = Path(__file__).resolve().parents[2] / "data" / "slurm_data_small.db"
     db = DatabaseConnection(str(db_path))
 
-    jobs_df = db.fetch_all(table_name=table_name)
+    jobs_df = None
+    if not custom_query:
+        custom_query = f"SELECT * FROM {table_name}"
+        if days_back is not None:
+            cutoff = datetime.now() - timedelta(days=days_back)
+            custom_query += f" WHERE StartTime>={cutoff}"
+    jobs_df = db.fetch_query(custom_query)
+
     processed_data = preprocess_data(
-        jobs_df, min_elapsed_second=0, include_failed_cancelled_jobs=False, include_CPU_only_job=False
+        jobs_df, min_elapsed_seconds=0, include_failed_cancelled_jobs=False, include_cpu_only_jobs=False
     )
     db.disconnect()
     if sample_size is not None:
