@@ -148,8 +148,6 @@ class DataVisualizer:
                 print(f"Column: {col}")
                 print("-" * 50)
                 print(jobs_df[col].describe(include="all"))
-                print("=" * 50 + "\n")
-                print(jobs_df[col].describe())
     
     def _generate_boolean_bar_plot(
         self,
