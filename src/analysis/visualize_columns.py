@@ -1,3 +1,10 @@
+"""
+Visualization utilities for pre-processed Unity job data.
+
+Provides a function to visualize and summarize each column of a DataFrame, including appropriate
+plots and statistics for numeric and categorical columns.
+"""
+
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.container import BarContainer
@@ -9,13 +16,6 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Patch
 from ..config.constants import VRAM_CATEGORIES
 import textwrap
-
-"""
-Visualization utilities for pre-processed Unity job data.
-
-Provides a function to visualize and summarize each column of a DataFrame, including appropriate
-plots and statistics for numeric and categorical columns.
-"""
 
 
 class DataVisualizer:
@@ -48,11 +48,16 @@ class DataVisualizer:
             raise ValueError("DataFrame has no columns.")
         return self.df
 
-    def validate_sample_size(self, sample_size: int | None) -> int | None:
-        """Validate the sample size for visualization.
+    def validate_sampling_arguments(
+        self,
+        sample_size: int | None,
+        random_seed: int | None
+    ) -> tuple[int | None, int | None]:
+        """Validate the sample size and random seed for visualization.
 
         Args:
             sample_size (int): The number of rows to sample for visualization.
+            random_seed (int): The random seed for reproducibility.
 
         Returns:
             int or None: Validated sample size.
@@ -62,23 +67,9 @@ class DataVisualizer:
         """
         if sample_size is not None and (not isinstance(sample_size, int) or sample_size <= 0):
             raise ValueError("Sample size must be a positive integer.")
-        return sample_size
-
-    def validate_random_seed(self, random_seed: int | None) -> int | None:
-        """Validate the random seed for reproducibility.
-
-        Args:
-            random_seed (int): The random seed to use for sampling.
-
-        Returns:
-            int or None: Validated random seed.
-
-        Raises:
-            ValueError: If random_seed is provided but is not an integer.
-        """
-        if not isinstance(random_seed, int):
+        if sample_size is not None and (not isinstance(random_seed, int)):
             raise ValueError("Random seed must be an integer.")
-        return random_seed
+        return sample_size, random_seed
 
     def validate_columns(self, columns: list[str]) -> list[str]:
         """Validate the provided columns against the DataFrame.
@@ -1447,8 +1438,7 @@ class DataVisualizer:
             None
         """
         jobs_df = self.validate_dataframe()
-        self.validate_sample_size(sample_size)
-        self.validate_random_seed(random_seed)
+        self.validate_sampling_arguments(sample_size, random_seed)
         self.validate_columns(columns if columns is not None else jobs_df.columns.tolist())
         self.validate_output_dir(output_dir_path)
 
