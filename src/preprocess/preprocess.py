@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from ..config.constants import RAM_MAP, DEFAULT_MIN_ELAPSED_SECONDS, ATTRIBUTE_CATEGORIES
-from ..config.enum_constants import StatusEnum, AdminsAccountEnum
+from ..config.enum_constants import StatusEnum, AdminsAccountEnum, PartitionEnum, QOSEnum
 
 
 def get_requested_vram(constraints: list[str]) -> int:
@@ -87,8 +87,8 @@ def preprocess_data(
         & cond_failed_cancelled_jobs
         & (data["Elapsed"] >= min_elapsed_seconds)  # filter in unit of second, not timedelta object
         & (data["Account"] != AdminsAccountEnum.ROOT)
-        & (data["Partition"] != "building")
-        & (data["QOS"] != "updates")
+        & (data["Partition"] != PartitionEnum.BUILDING)
+        & (data["QOS"] != QOSEnum.UPDATES)
     ].copy()
 
     _fill_missing(res)
