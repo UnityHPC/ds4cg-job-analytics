@@ -5,12 +5,12 @@ in GPU usage and notify users or PIs about these issues.
 
 import pandas as pd
 from pathlib import Path
-from preprocess.preprocess import preprocess_data
+from src.preprocess.preprocess import preprocess_data
 from database.DatabaseConnection import DatabaseConnection
 from config.constants import MIN_ELAPSED_SECONDS
 
 
-def load_jobs_dataframe_from_duckdb(db_path=None, table_name="Jobs", sample_size=None, random_state=None):
+def load_jobs_dataframe_from_duckdb(db_path=None, table_name="Jobs", query=None, sample_size=None, random_state=None):
     """
     Connect to the DuckDB slurm_data_small.db and return the jobs table as a pandas DataFrame.
 
@@ -23,9 +23,14 @@ def load_jobs_dataframe_from_duckdb(db_path=None, table_name="Jobs", sample_size
     """
     if db_path is None:
         db_path = Path(__file__).resolve().parents[2] / "data" / "slurm_data.db"
+
     db = DatabaseConnection(str(db_path))
 
-    jobs_df = db.fetch_all(table_name=table_name)
+    if query:
+        jobs_df = db.fetch_query(query)
+    else:
+        jobs_df = db.fetch_all(table_name=table_name)
+
     processed_data = preprocess_data(
         jobs_df, min_elapsed_second=0, include_failed_cancelled_jobs=False, include_CPU_only_job=False
     )
@@ -41,11 +46,11 @@ class EfficiencyAnalysis:
     It provides methods to load data, analyze workload efficiency, and evaluate CPU-GPU usage patterns.
     """
 
-    def __init__(self, db_path=None, table_name="Jobs", sample_size=None, random_state=None, df=None):
+    def __init__(self, db_path=None, table_name="Jobs", query=None, sample_size=None, random_state=None, df=None):
         if df is not None:
             self.jobs_df = df
         else:
-            self.jobs_df = load_jobs_dataframe_from_duckdb(db_path, table_name, sample_size, random_state)
+            self.jobs_df = load_jobs_dataframe_from_duckdb(db_path, table_name, query, sample_size, random_state)
         self.efficiency_df = None
         self.analysis_results = None
 

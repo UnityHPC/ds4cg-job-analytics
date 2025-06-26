@@ -1,5 +1,5 @@
 import pytest
-from src.database.DatabaseConnection import DatabaseConnection
+from database.DatabaseConnection import DatabaseConnection
 import tempfile
 import os
 
