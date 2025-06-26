@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 
 from fire import Fire
 import numpy as np
-
 import duckdb
 
 
