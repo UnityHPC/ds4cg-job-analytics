@@ -1,36 +1,35 @@
 """
 
-The following describes some preprocessing criteria for the job data:
+# Preprocessing Criteria for Job Data
 
-- Attributes omitted in preprocessing the provided data:
-UUID
-Nodes : NodesList have more specific information
-EndTime : can be calculated from StartTime and Elapsed
+## Attributes Omitted
+- **UUID**
+- **Nodes**: NodesList have more specific information
+- **EndTime**: Can be calculated from StartTime and Elapsed
 
-- Providing the option of including or omitting certain types of jobs:
-  - Keeping CPU jobs:
-      - If GPUType is null, the value will be filled with "CPU"
-      - If GPUs is null or is 0, the value will be 0.
-- Keeping jobs where the status is "Failed" or "Cancelled"
+## Options for Including/Omitting Jobs
+- **Keeping CPU jobs:**
+    - If `GPUType` is null, the value will be filled with `["cpu"]`
+    - If `GPUs` is null or is 0, the value will be 0.
+- **Keeping jobs where the status is "Failed" or "Cancelled"**
 
+## Records Omitted If:
+- `Elapsed` is less than the minimum threshold
+- `account` is root
+- `partition` is building
+- `QOS` is updates
 
-- Records with the following conditions are omitted:
-   - Elapsed is less than the minimum threshold
-   - account is root
-   - partion is building
-   - QOS is updates
+## Null Attribute Defaults
+- `ArrayID`: set to -1
+- `Interactive`: set to `"non-interactive"`
+- `Constraints`: set to an empty numpy array
+- `GPUs`: set to 0 (when CPU jobs are kept)
+- `GPUType`: set to an numpy array ["cpu"] (when CPU jobs are kept)
 
-- Null attributes in the data are filled with default values as described below:
-  - ArrayID is set to -1
-  - Interactive is set to "non-interactive"
-  - Constraints is set to an empty numpy array
-  - GPUs is be set to 0 (when CPU jobs are kept)
-  - GPUType is set to an empty numpy array (when CPU jobs are kept)
-
-- Type of the following attributes is be set as `datetime`: StartTime, SubmitTime
-- Type of the following attributes is be set as `timedelta`: TimeLimit, Elapsed
-- Type of the following attributes is set as `Categorical`: Interactive, Status, ExitCode, QOS, Partition, Account
-
+## Attribute Types
+- `StartTime`, `SubmitTime`: **datetime**
+- `TimeLimit`, `Elapsed`: **timedelta**
+- `Interactive`, `Status`, `ExitCode`, `QOS`, `Partition`, `Account`: **Categorical**
 """
 
 import pandas as pd
