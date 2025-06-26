@@ -53,9 +53,7 @@ class DataVisualizer:
         return self.df
 
     def validate_sampling_arguments(
-        self,
-        sample_size: int | None,
-        random_seed: int | None
+        self, sample_size: int | None, random_seed: int | None
     ) -> tuple[int | None, int | None]:
         """Validate the sample size and random seed for visualization.
 
@@ -115,10 +113,7 @@ class DataVisualizer:
         return output_dir_path
 
     def _generate_summary_stats(
-        self,
-        jobs_df: pd.DataFrame,
-        output_dir_path: Path | None,
-        summary_file_name: str
+        self, jobs_df: pd.DataFrame, output_dir_path: Path | None, summary_file_name: str
     ) -> None:
         """Generate summary statistics for each column.
 
@@ -149,16 +144,12 @@ class DataVisualizer:
                 print(f"Column: {col}")
                 print("-" * 50)
                 print(jobs_df[col].describe(include="all"))
-    
+
     def _generate_boolean_bar_plot(
-        self,
-        jobs_df: pd.DataFrame,
-        col: str,
-        title: str,
-        output_dir_path: Path | None = None
+        self, jobs_df: pd.DataFrame, col: str, title: str, output_dir_path: Path | None = None
     ):
         """Generate a bar plot for boolean columns.
-        
+
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
@@ -193,7 +184,7 @@ class DataVisualizer:
         """
         col_data = jobs_df[col]
         # Determine unit for conversion
-        if (col == "Elapsed" and not pd.api.types.is_timedelta64_dtype(col_data)):
+        if col == "Elapsed" and not pd.api.types.is_timedelta64_dtype(col_data):
             col_data = pd.to_timedelta(col_data, unit="seconds", errors="coerce")
         elif col == "TimeLimit" and not pd.api.types.is_timedelta64_dtype(col_data):
             col_data = pd.to_timedelta(col_data, unit="minutes", errors="coerce")
@@ -217,16 +208,11 @@ class DataVisualizer:
         width_hours = len(hours_data) / total_count if total_count > 0 else 0
         width_days = len(days_data) / total_count if total_count > 0 else 0
 
-
         # Enforce minimum width for non-empty sections
         min_width = 0.3  # Minimum width for any section
 
         widths = []
-        for w, d in zip(
-            [width_minutes, width_hours, width_days],
-            [minutes_data, hours_data, days_data],
-            strict=True
-        ):
+        for w, d in zip([width_minutes, width_hours, width_days], [minutes_data, hours_data, days_data], strict=True):
             if not d.empty:
                 widths.append(max(w, min_width))
             else:
@@ -240,7 +226,7 @@ class DataVisualizer:
         width_minutes, width_hours, width_days = widths
 
         def pct(n, total_count=total_count):
-                return f"{(n / total_count * 100):.1f}%" if total_count > 0 else "0.0%"
+            return f"{(n / total_count * 100):.1f}%" if total_count > 0 else "0.0%"
 
         # Helper to reduce xticks and rotate if width is small
         def choose_ticks_and_rotation(ticks, width, max_labels=3):
@@ -254,9 +240,9 @@ class DataVisualizer:
                 selected = list(dict.fromkeys(selected))  # Remove duplicates if any
                 if len(selected) < 4 and len(ticks) >= 4:
                     # Insert additional ticks from the middle if needed
-                    mids = [ticks[len(ticks)//2]]
+                    mids = [ticks[len(ticks) // 2]]
                     if len(ticks) > 4:
-                        mids.append(ticks[(len(ticks)-1)//3])
+                        mids.append(ticks[(len(ticks) - 1) // 3])
                     for mid in mids:
                         if mid not in selected:
                             selected.insert(1, mid)
@@ -266,7 +252,6 @@ class DataVisualizer:
             if len(ticks) < 4:
                 return ticks, 0
             return ticks, 0
-        
 
         # Add space between sections to avoid overlapping xticks
         section_gap = 0.05  # width of gap between sections (in axis units)
@@ -274,11 +259,7 @@ class DataVisualizer:
         # Add a small gap between sections by adding blank axes
         # We'll use 5 sections: [minutes, gap, hours, gap, days]
         width_gap = section_gap
-        gs = GridSpec(
-            1, 5,
-            width_ratios=[width_minutes, width_gap, width_hours, width_gap, width_days],
-            wspace=0.0
-        )
+        gs = GridSpec(1, 5, width_ratios=[width_minutes, width_gap, width_hours, width_gap, width_days], wspace=0.0)
 
         # Minutes axis
         ax0 = fig.add_subplot(gs[0])
@@ -361,7 +342,7 @@ class DataVisualizer:
         jobs_df: pd.DataFrame,
         col: str,
         output_dir_path: Path | None = None,
-        timestamp_range: tuple[pd.Timestamp, pd.Timestamp] | None = None
+        timestamp_range: tuple[pd.Timestamp, pd.Timestamp] | None = None,
     ):
         """Generate a histogram of job start times, either by day or by hour.
 
@@ -370,7 +351,7 @@ class DataVisualizer:
             col (str): The name of the column to plot.
             output_dir_path (Path | None): The directory to save the plot.
             timestamp_range (tuple[pd.Timestamp, pd.Timestamp] | None): The time range to filter the data.
-        
+
         Raises:
             ValueError: If the column does not contain valid timestamps or if no valid timestamps are found.
 
@@ -424,9 +405,7 @@ class DataVisualizer:
             jobs_per_hour = col_data.dt.floor("H").value_counts().sort_index()
             jobs_per_hour = jobs_per_hour[jobs_per_hour > 0]
             # Use line plot for time series to better show trends over hours
-            plt.plot(
-                jobs_per_hour.index, np.asarray(jobs_per_hour.values, dtype=int), marker="o", linestyle="-"
-            )
+            plt.plot(jobs_per_hour.index, np.asarray(jobs_per_hour.values, dtype=int), marker="o", linestyle="-")
             plt.gca().xaxis.set_major_locator(plt.MaxNLocator(12))
             plt.xlabel("Hour")
             plt.ylabel("Number of jobs")
@@ -445,9 +424,7 @@ class DataVisualizer:
             # Show at most 12 labels to avoid crowding
             step = max(1, len(tick_labels) // 12)
             ax.set_xticks(tick_locs[::step])
-            ax.set_xticklabels(
-                [tick_labels[i] for i in range(0, len(tick_labels), step)], rotation=45, ha="right"
-            )
+            ax.set_xticklabels([tick_labels[i] for i in range(0, len(tick_labels), step)], rotation=45, ha="right")
 
             plt.tight_layout()
             if output_dir_path is not None:
@@ -456,13 +433,17 @@ class DataVisualizer:
 
     def _generate_interactive_pie_chart(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
         """Generate a pie chart for interactive vs non-interactive jobs.
+
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
             output_dir_path (Path | None): The directory to save the plot.
+
+        Returns:
+            None
         """
         # Replace empty/NaN with 'non interactive', others as their type
-        interactive_col = jobs_df[col].fillna('non interactive').astype(str)
+        interactive_col = jobs_df[col].fillna("non interactive").astype(str)
         counts = interactive_col.value_counts()
         plt.figure(figsize=(5, 7))
 
@@ -475,15 +456,11 @@ class DataVisualizer:
         explode = [max(0.15 - p / 100 * 4, 0.1) if p < threshold_pct else 0 for p in pct_values]
 
         # Prepare labels: only show label on pie if above threshold
-        labels = [
-            str(label) if p >= threshold_pct else ''
-            for label, p in zip(counts.index, pct_values, strict=True)
-        ]
+        labels = [str(label) if p >= threshold_pct else "" for label, p in zip(counts.index, pct_values, strict=True)]
 
         # Prepare legend labels for all slices
         legend_labels = [
-            f"{label}: {count} ({p:.1f}%)"
-            for label, count, p in zip(counts.index, counts, pct_values, strict=True)
+            f"{label}: {count} ({p:.1f}%)" for label, count, p in zip(counts.index, counts, pct_values, strict=True)
         ]
 
         # Create a gridspec to reserve space for the legend above the pie
@@ -497,28 +474,31 @@ class DataVisualizer:
         ax_legend = fig.add_subplot(gs[2])
 
         def autopct_func(p, threshold_pct=threshold_pct):
-            return f"{p:.1f}%" if p >= threshold_pct else ''
-        
+            return f"{p:.1f}%" if p >= threshold_pct else ""
+
         wedges, *_ = ax_pie.pie(
             counts,
             labels=labels,
             autopct=autopct_func,
             startangle=0,
-            colors=sns.color_palette("pastel")[0:len(counts)],
+            colors=sns.color_palette("pastel")[0 : len(counts)],
             explode=explode,
         )
 
-        ax_pie.axis('equal')
+        ax_pie.axis("equal")
 
         # Hide the legend and title axes
-        ax_legend.axis('off')
-        ax_title.axis('off')
+        ax_legend.axis("off")
+        ax_title.axis("off")
 
         # Place the title in its own axis, centered
         ax_title.text(
-            0.5, 0.5,
+            0.5,
+            0.5,
             "Job Type Distribution (Interactive vs Non Interactive)",
-            ha='center', va='center', fontsize=14,
+            ha="center",
+            va="center",
+            fontsize=14,
         )
 
         # Place the legend below the title and above the pie chart
@@ -530,7 +510,7 @@ class DataVisualizer:
             bbox_to_anchor=(0.5, 0.5),
             ncol=1,
             fontsize=10,
-            title_fontsize=11
+            title_fontsize=11,
         )
 
         if output_dir_path is not None:
@@ -539,7 +519,7 @@ class DataVisualizer:
 
     def _generate_status_pie_chart(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
         """Generate a pie chart for job statuses.
-        
+
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
@@ -562,7 +542,7 @@ class DataVisualizer:
 
         # Prepare labels: only show label on pie if above threshold
         labels = [
-            str(label) if p >= threshold_pct else ''
+            str(label) if p >= threshold_pct else ""
             for label, p in zip(exit_code_counts.index, pct_values, strict=True)
         ]
 
@@ -585,27 +565,30 @@ class DataVisualizer:
         ax_legend = fig.add_subplot(gs[2])
 
         def autopct_func(p, threshold_pct=threshold_pct):
-            return f"{p:.1f}%" if p >= threshold_pct else ''
+            return f"{p:.1f}%" if p >= threshold_pct else ""
 
         wedges, *_ = ax_pie.pie(
             exit_code_counts,
             labels=labels,
             autopct=autopct_func,
             startangle=0,
-            colors=sns.color_palette("pastel")[0:len(exit_code_counts)],
+            colors=sns.color_palette("pastel")[0 : len(exit_code_counts)],
             explode=explode,
         )
-        
-        ax_pie.axis('equal')
+
+        ax_pie.axis("equal")
 
         # Hide the legend and title axes
-        ax_legend.axis('off')
-        ax_title.axis('off')
+        ax_legend.axis("off")
+        ax_title.axis("off")
 
         ax_title.text(
-            0.5, 0.5,
+            0.5,
+            0.5,
             f"Job Status Distribution ({col})",
-            ha='center', va='center', fontsize=14,
+            ha="center",
+            va="center",
+            fontsize=14,
         )
         plt.grid(axis="y", linestyle="--", alpha=0.5)
         # Add a legend below the pie chart
@@ -616,7 +599,7 @@ class DataVisualizer:
             loc="center",
             bbox_to_anchor=(0.5, 0.5),
             fontsize=10,
-            title_fontsize=11
+            title_fontsize=11,
         )
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
@@ -624,7 +607,7 @@ class DataVisualizer:
 
     def _generate_gpu_type_bar_plot(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
         """Generate a bar plot for GPU types (GPUType column) and show number of jobs with more than one GPU type.
-        
+
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
@@ -658,13 +641,9 @@ class DataVisualizer:
         gpu_counts = flat_gpu_types.value_counts()
         gpu_percents = gpu_counts / gpu_counts.sum() * 100
 
-        plt.figure(figsize=(7,4))
+        plt.figure(figsize=(7, 4))
         ax = sns.barplot(
-            x=gpu_counts.index,
-            y=gpu_counts.values,
-            hue=gpu_counts.index,
-            palette="viridis",
-            legend=False
+            x=gpu_counts.index, y=gpu_counts.values, hue=gpu_counts.index, palette="viridis", legend=False
         )
         plt.title(f"GPU Types ({col})")
         plt.xlabel("GPU type")
@@ -677,18 +656,29 @@ class DataVisualizer:
         ax.set_ylim(0, tallest + gap)
         for i, (count, percent) in enumerate(zip(gpu_counts.values, gpu_percents.values, strict=True)):
             label_y = count + gap * 0.2  # offset above bar, proportional to gap
-            ax.text(i, label_y, f"{percent:.1f}%", ha="center", va="bottom", fontsize=9,
-                    bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7))
+            ax.text(
+                i,
+                label_y,
+                f"{percent:.1f}%",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+                bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7),
+            )
 
         # Add a text box showing number of jobs with multiple GPU types
         info_text = f"Jobs with 1 GPU type: {single_count}\nJobs with >1 GPU type: {multi_count}"
         # Place the text box inside the axes, top right, with a small offset
         ax.text(
-            0.98, 0.98, info_text,
-            ha="right", va="top", fontsize=10,
+            0.98,
+            0.98,
+            info_text,
+            ha="right",
+            va="top",
+            fontsize=10,
             bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.7),
             transform=ax.transAxes,
-            zorder=10
+            zorder=10,
         )
 
         if output_dir_path is not None:
@@ -697,7 +687,7 @@ class DataVisualizer:
 
     def _generate_qos_pie_chart(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
         """Generate a pie chart for QoS (Quality of Service) distribution.
-        
+
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
@@ -720,8 +710,7 @@ class DataVisualizer:
 
         # Prepare labels: only show label on pie if above threshold
         labels = [
-            str(label) if p >= threshold_pct else ''
-            for label, p in zip(qos_counts.index, pct_values, strict=True)
+            str(label) if p >= threshold_pct else "" for label, p in zip(qos_counts.index, pct_values, strict=True)
         ]
 
         plt.figure(figsize=(5, 10))
@@ -743,27 +732,30 @@ class DataVisualizer:
         ax_legend = fig.add_subplot(gs[2])
 
         def autopct_func(p, threshold_pct=threshold_pct):
-            return f"{p:.1f}%" if p >= threshold_pct else ''
+            return f"{p:.1f}%" if p >= threshold_pct else ""
 
         wedges, *_ = ax_pie.pie(
             qos_counts,
             labels=labels,
             autopct=autopct_func,
             startangle=0,
-            colors=sns.color_palette("pastel")[0:len(qos_counts)],
+            colors=sns.color_palette("pastel")[0 : len(qos_counts)],
             explode=explode,
         )
-        
-        ax_pie.axis('equal')
+
+        ax_pie.axis("equal")
 
         # Hide the legend and title axes
-        ax_legend.axis('off')
-        ax_title.axis('off')
+        ax_legend.axis("off")
+        ax_title.axis("off")
 
         ax_title.text(
-            0.5, 0.5,
+            0.5,
+            0.5,
             f"Job QOS Distribution ({col})",
-            ha='center', va='center', fontsize=14,
+            ha="center",
+            va="center",
+            fontsize=14,
         )
         plt.grid(axis="y", linestyle="--", alpha=0.5)
         # Add a legend below the pie chart
@@ -774,7 +766,7 @@ class DataVisualizer:
             loc="center",
             bbox_to_anchor=(0.5, 0.5),
             fontsize=10,
-            title_fontsize=11
+            title_fontsize=11,
         )
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
@@ -787,10 +779,10 @@ class DataVisualizer:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
             output_dir_path (Path | None): The directory to save the plot.
-        
+
         Raises:
             ValueError: If the column does not contain valid GPU counts or if all counts are zero
-        
+
         Returns:
             None
         """
@@ -809,8 +801,7 @@ class DataVisualizer:
 
         # Prepare labels: only show label on pie if above threshold
         labels = [
-            str(label) if p >= threshold_pct else ''
-            for label, p in zip(gpu_counts.index, pct_values, strict=True)
+            str(label) if p >= threshold_pct else "" for label, p in zip(gpu_counts.index, pct_values, strict=True)
         ]
 
         plt.figure(figsize=(5, 7))
@@ -832,29 +823,29 @@ class DataVisualizer:
         ax_legend = fig.add_subplot(gs[2])
 
         def autopct_func(p, threshold_pct=threshold_pct):
-            return f"{p:.1f}%" if p >= threshold_pct else ''
+            return f"{p:.1f}%" if p >= threshold_pct else ""
 
         # Format labels as "x GPU(s)" for each wedge
-        formatted_labels = [
-            f"{label} GPU{'s' if int(label) != 1 else ''}" if label != '' else ''
-            for label in labels
-        ]
+        formatted_labels = [f"{label} GPU{'s' if int(label) != 1 else ''}" if label != "" else "" for label in labels]
         wedges, *_ = ax_pie.pie(
             gpu_counts,
             labels=formatted_labels,
             autopct=autopct_func,
             startangle=0,
-            colors=sns.color_palette("pastel")[0:len(gpu_counts)],
+            colors=sns.color_palette("pastel")[0 : len(gpu_counts)],
             explode=explode,
         )
-        ax_pie.axis('equal')
+        ax_pie.axis("equal")
         # Hide the legend and title axes
-        ax_legend.axis('off')
-        ax_title.axis('off')
+        ax_legend.axis("off")
+        ax_title.axis("off")
         ax_title.text(
-            0.5, 0.5,
+            0.5,
+            0.5,
             f"GPU Count Distribution ({col})",
-            ha='center', va='center', fontsize=14,
+            ha="center",
+            va="center",
+            fontsize=14,
         )
         plt.grid(axis="y", linestyle="--", alpha=0.5)
         # Add a legend below the pie chart
@@ -865,23 +856,23 @@ class DataVisualizer:
             loc="center",
             bbox_to_anchor=(0.5, 0.5),
             fontsize=10,
-            title_fontsize=11
+            title_fontsize=11,
         )
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
         plt.show()
-    
+
     def _generate_node_list_bar_plot_combine_trailing_digits(
         self,
         jobs_df: pd.DataFrame,
         col: str,
         output_dir_path: Path | None = None,
-        figsize: tuple[float, float] = (7, 4)
+        figsize: tuple[float, float] = (7, 4),
     ):
         """Generate a bar plot for node lists, combining trailing digits before counting.
 
         This function combines nodes with the same prefix (e.g., "gpu010" and "gpu053" become "gpu").
-        
+
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
@@ -899,10 +890,10 @@ class DataVisualizer:
         if not all(isinstance(x, np.ndarray) for x in non_null):
             # Try to convert list-like to np.ndarray
             try:
-                non_null = pd.Series([
-                    np.array(x) if isinstance(x, list | tuple | np.ndarray) else np.array([x])
-                    for x in non_null
-                ], index=non_null.index)
+                non_null = pd.Series(
+                    [np.array(x) if isinstance(x, list | tuple | np.ndarray) else np.array([x]) for x in non_null],
+                    index=non_null.index,
+                )
             except Exception as err:
                 msg = (
                     f"Error: Not all entries in column '{col}' are arrays or list-like. "
@@ -913,38 +904,36 @@ class DataVisualizer:
         # For each job, create a tuple of sorted prefixes (with multiplicity)
         # Remove trailing digits from node names (combine nodes like gypsum-gpu010 and gypsumgpu053)
         # This will combine nodes with the same prefix, regardless of dashes
-        nodes_clean = non_null.apply(
-            lambda arr: tuple(sorted([re.sub(r'[-]?\d+$', '', str(x)) for x in arr]))
-        )
+        nodes_clean = non_null.apply(lambda arr: tuple(sorted([re.sub(r"[-]?\d+$", "", str(x)) for x in arr])))
 
-        # --- Count prefix combinations (with multiplicity) for jobs with >1 node ---                
+        # --- Count prefix combinations (with multiplicity) for jobs with >1 node ---
         multi_node_jobs = nodes_clean[nodes_clean.apply(lambda arr: len(arr) > 1)]
         prefix_combo_counts = multi_node_jobs.value_counts()
         prefix_combo_df = prefix_combo_counts.reset_index()
-        prefix_combo_df.columns = ['prefix_combo', 'count']
+        prefix_combo_df.columns = ["prefix_combo", "count"]
         # Ensure each prefix_combo is a tuple of strings
-        prefix_combo_df['prefix_combo'] = prefix_combo_df['prefix_combo'].apply(
+        prefix_combo_df["prefix_combo"] = prefix_combo_df["prefix_combo"].apply(
             lambda x: tuple(x) if not isinstance(x, tuple) else x
         )
 
         # Build summary lines for each unique prefix combo
         prefix_combo_text_lines = []
-        for combo, count in zip(prefix_combo_df['prefix_combo'], prefix_combo_df['count'], strict=True):
+        for combo, count in zip(prefix_combo_df["prefix_combo"], prefix_combo_df["count"], strict=True):
             # Count occurrences of each prefix in the combo
             prefix_counts: dict[str, int] = {}
             for prefix in combo:
                 prefix_counts[prefix] = prefix_counts.get(prefix, 0) + 1
             # Format as "prefix (xN)"
             prefix_counts_str = ", ".join(f"{p} (x{c})" for p, c in sorted(prefix_counts.items()))
-            prefix_combo_text_lines.append(
-                f"Combo: [{prefix_counts_str}]  |  Jobs: {count}"
-            )
+            prefix_combo_text_lines.append(f"Combo: [{prefix_counts_str}]  |  Jobs: {count}")
 
         # Limit to top 10 combos for readability, add a note if more
         max_lines = 10
         if len(prefix_combo_text_lines) > max_lines:
-            prefix_combo_text = "\n".join(prefix_combo_text_lines[:max_lines]) + \
-                f"\n... ({len(prefix_combo_text_lines) - max_lines} more combos)"
+            prefix_combo_text = (
+                "\n".join(prefix_combo_text_lines[:max_lines])
+                + f"\n... ({len(prefix_combo_text_lines) - max_lines} more combos)"
+            )
         else:
             prefix_combo_text = "\n".join(prefix_combo_text_lines)
 
@@ -955,11 +944,7 @@ class DataVisualizer:
         node_percents = node_counts / node_counts.sum() * 100
         plt.figure(figsize=figsize)
         ax = sns.barplot(
-            x=node_counts.index,
-            y=node_counts.values,
-            hue=node_counts.index,
-            palette="viridis",
-            legend=False
+            x=node_counts.index, y=node_counts.values, hue=node_counts.index, palette="viridis", legend=False
         )
         plt.title(f"{col} (nodes combined by removing trailing numbers)")
         # Set a long xlabel and wrap it to fit within the figure width
@@ -980,11 +965,15 @@ class DataVisualizer:
         plt.xticks(rotation=45, ha="right")
 
         ax.text(
-            0.98, 0.98, prefix_combo_text,
-            ha="right", va="top", fontsize=10,
+            0.98,
+            0.98,
+            prefix_combo_text,
+            ha="right",
+            va="top",
+            fontsize=10,
             bbox=dict(boxstyle="round,pad=0.4", fc="white", ec="gray", alpha=0.8),
             transform=ax.transAxes,
-            zorder=10
+            zorder=10,
         )
 
         # Annotate bars with counts, ensuring a gap above the tallest bar label
@@ -993,22 +982,25 @@ class DataVisualizer:
         ax.set_ylim(0, tallest + gap)
         for i, (pct, count) in enumerate(zip(node_percents.values, node_counts.values, strict=True)):
             label_y = count + gap * 0.2  # offset above bar, proportional to gap
-            ax.text(i, label_y, f"{pct:.1f}%", ha="center", va="bottom", fontsize=9,
-                    bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7))
+            ax.text(
+                i,
+                label_y,
+                f"{pct:.1f}%",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+                bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7),
+            )
 
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"{col}_barplot.png")
         plt.show()
 
     def _generate_partition_bar_plot(
-        self,
-        jobs_df: pd.DataFrame,
-        col: str,
-        output_dir_path: Path | None = None,
-        figsize=(9, 4)
+        self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None, figsize=(9, 4)
     ):
         """Generate a bar plot for job partitions.
-        
+
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
@@ -1029,7 +1021,7 @@ class DataVisualizer:
             y=partition_counts.values,
             hue=partition_counts.index,
             palette="viridis",
-            legend=False
+            legend=False,
         )
         plt.title(f"{col}")
         plt.xlabel("Partitions")
@@ -1042,8 +1034,15 @@ class DataVisualizer:
         ax.set_ylim(0, tallest + gap)
         for i, (pct, count) in enumerate(zip(partition_percents.values, partition_counts.values, strict=True)):
             label_y = count + gap * 0.2  # offset above bar, proportional to gap
-            ax.text(i, label_y, f"{pct:.0f}%", ha="center", va="bottom", fontsize=8,
-                    bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7))
+            ax.text(
+                i,
+                label_y,
+                f"{pct:.0f}%",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+                bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7),
+            )
 
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"{col}_barplot.png", bbox_inches="tight")
@@ -1051,7 +1050,7 @@ class DataVisualizer:
 
     def _generate_constraints_bar_plot(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
         """Generate a bar plot for job constraints.
-        
+
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
@@ -1068,22 +1067,21 @@ class DataVisualizer:
         non_null = jobs_df[col].dropna()
         if not all(isinstance(x, np.ndarray) and all(isinstance(item, str) for item in x) for x in non_null):
             msg = (
-            f"Error: Not all entries in column '{col}' are ndarrays of strings. Example values:\n"
-            f"{non_null.head()}"
+                f"Error: Not all entries in column '{col}' are ndarrays of strings. Example values:\n{non_null.head()}"
             )
             raise ValueError(msg)
-        
+
         # Remove beginning and trailing single quotes from each string
         non_null = non_null.apply(lambda x: tuple(str(item).strip("'") for item in x))
-        
+
         # Count constraint combinations where each job has multiple constraints
         constraint_combo_counts = non_null.apply(lambda x: tuple(sorted(x))).value_counts()
         constraint_df = constraint_combo_counts.reset_index()
-        constraint_df.columns = ['constraints', 'count']
+        constraint_df.columns = ["constraints", "count"]
         # Ensure each constraints is a tuple of strings
-        constraint_df['constraints'] = constraint_df['constraints'].apply(
+        constraint_df["constraints"] = constraint_df["constraints"].apply(
             lambda x: tuple(x) if not isinstance(x, tuple) else x
-        ) 
+        )
 
         # Flatten all constraints into a single list across all jobs
         all_constraints = [constraint for arr in non_null for constraint in arr]
@@ -1106,7 +1104,7 @@ class DataVisualizer:
 
         # Build summary lines for each unique constraint combo
         constraint_text_lines = []
-        for combo, count in zip(constraint_df['constraints'], constraint_df['count'], strict=True):
+        for combo, count in zip(constraint_df["constraints"], constraint_df["count"], strict=True):
             if len(combo) > 1:
                 # Count occurrences of each constraint in the combo
                 combo_counts: dict[str, int] = {}
@@ -1114,37 +1112,36 @@ class DataVisualizer:
                     combo_counts[constraint] = combo_counts.get(constraint, 0) + 1
                 # Format as "constraint (xN)"
                 constraint_counts_str = ", ".join(f"{c} (x{cnt})" for c, cnt in sorted(combo_counts.items()))
-                constraint_text_lines.append(
-                    f"Combo: [{constraint_counts_str}]  |  Jobs: {count}"
-                )
+                constraint_text_lines.append(f"Combo: [{constraint_counts_str}]  |  Jobs: {count}")
         # Limit to top 10 combos for readability, add a note if more
         max_lines = 10
         if len(constraint_text_lines) > max_lines:
-            constraint_text = "\n".join(constraint_text_lines[:max_lines]) + \
-                f"\n... ({len(constraint_text_lines) - max_lines} more combos)"
+            constraint_text = (
+                "\n".join(constraint_text_lines[:max_lines])
+                + f"\n... ({len(constraint_text_lines) - max_lines} more combos)"
+            )
         else:
             constraint_text = "\n".join(constraint_text_lines)
 
-        plt.figure(figsize=(12,5))
+        plt.figure(figsize=(12, 5))
         ax = sns.barplot(
-            x=plot_counts.index,
-            y=plot_counts.values,
-            hue=plot_counts.index,
-            palette="viridis",
-            legend=False
+            x=plot_counts.index, y=plot_counts.values, hue=plot_counts.index, palette="viridis", legend=False
         )
 
         # Annotate bars with count values at the correct height
         tallest = plot_counts.max()
         gap = max(2.5, tallest * 0.08)
         ax.set_ylim(0, tallest + gap)
-        for i, (pct, count) in enumerate(
-            zip(constraint_flat_percents.values, plot_counts.values, strict=True)):
+        for i, (pct, count) in enumerate(zip(constraint_flat_percents.values, plot_counts.values, strict=True)):
             label_y = count + gap * 0.2
             ax.text(
-                i, label_y, f"{pct:.1f}%",
-                ha="center", va="bottom", fontsize=9,
-                bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7)
+                i,
+                label_y,
+                f"{pct:.1f}%",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+                bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7),
             )
         # Set y-axis label to indicate percentage
         ax.set_ylabel("Number of Jobs")
@@ -1155,11 +1152,15 @@ class DataVisualizer:
 
         # Add constraint summary text box
         ax.text(
-            0.98, 0.98, constraint_text,
-            ha="right", va="top", fontsize=10,
+            0.98,
+            0.98,
+            constraint_text,
+            ha="right",
+            va="top",
+            fontsize=10,
             bbox=dict(boxstyle="round,pad=0.4", fc="white", ec="gray", alpha=0.8),
             transform=ax.transAxes,
-            zorder=10
+            zorder=10,
         )
 
         if output_dir_path is not None:
@@ -1167,14 +1168,10 @@ class DataVisualizer:
         plt.show()
 
     def _generate_gpu_memory_usage_histogram_categorical_bins(
-        self,
-        jobs_df: pd.DataFrame,
-        col: str,
-        output_dir_path: Path | None = None,
-        figsize=(7, 4)
+        self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None, figsize=(7, 4)
     ):
         """Generate a bar plot for GPU memory usage categorized by GPU type.
-        
+
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
@@ -1192,7 +1189,7 @@ class DataVisualizer:
         # Convert to numeric if not already
         if not pd.api.types.is_numeric_dtype(col_data):
             col_data = pd.to_numeric(col_data, errors="coerce")
-        col_data = col_data.dropna().div(2 ** 30)  # Convert to GiB
+        col_data = col_data.dropna().div(2**30)  # Convert to GiB
 
         # Define the categorical VRAM bins (as categories, not intervals)
         vram_labels = [str(v) for v in VRAM_CATEGORIES]
@@ -1223,18 +1220,16 @@ class DataVisualizer:
             width=bar_width,
             align="center",
             color=zero_color,
-            hatch="///"
+            hatch="///",
         )
         bars.append(bar0)
         # Other bars
         for i in range(1, len(vram_labels)):
-            bars.append(ax.bar(
-                bar_positions[i],
-                bin_percents.to_numpy()[i],
-                width=bar_width,
-                align="center",
-                color=other_color
-            ))
+            bars.append(
+                ax.bar(
+                    bar_positions[i], bin_percents.to_numpy()[i], width=bar_width, align="center", color=other_color
+                )
+            )
 
         ax.set_xticks(x_ticks)
         ax.set_xticklabels(vram_labels)
@@ -1254,9 +1249,13 @@ class DataVisualizer:
         for i, v in enumerate(bin_percents.values):
             label_y = v + 0.7  # offset above bar
             ax.text(
-                bar_positions[i], label_y, f"{v:.1f}%",
-                ha="center", va="bottom", fontsize=9,
-                bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7)
+                bar_positions[i],
+                label_y,
+                f"{v:.1f}%",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+                bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7),
             )
 
         legend_handles = [
@@ -1268,7 +1267,7 @@ class DataVisualizer:
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"{col}_hist.png")
         plt.show()
-        
+
     def _generate_non_gpu_memory_histogram(
         self,
         jobs_df: pd.DataFrame,
@@ -1297,10 +1296,10 @@ class DataVisualizer:
         if not pd.api.types.is_numeric_dtype(col_data):
             col_data = pd.to_numeric(col_data, errors="coerce")
         if column_unit == "KiB":
-            col_data = col_data.dropna().div(2 ** 10)  # Convert KiB to MiB
+            col_data = col_data.dropna().div(2**10)  # Convert KiB to MiB
             output_unit = "MiB"
         elif column_unit == "B":
-            col_data = col_data.dropna().div(2 ** 30)  # Convert B to GiB
+            col_data = col_data.dropna().div(2**30)  # Convert B to GiB
             output_unit = "GiB"
         else:
             raise ValueError(f"Unsupported unit '{column_unit}'. Use 'B' for bytes or 'KiB' for kibibytes.")
@@ -1315,7 +1314,7 @@ class DataVisualizer:
         plt.ylabel("Percent of Jobs")
 
         # Prepare stat summary with units
-        stats = col_data.describe(percentiles=[.25, .5, .75])
+        stats = col_data.describe(percentiles=[0.25, 0.5, 0.75])
         stat_text = (
             f"Count: {int(stats['count'])} jobs\n"
             f"Mean: {stats['mean']:.1f} {output_unit}\n"
@@ -1328,21 +1327,25 @@ class DataVisualizer:
         )
         # Place the box in the top right, inside the axes, with a small offset
         ax.text(
-            0.98, 0.98, stat_text,
-            ha="right", va="top", fontsize=10,
+            0.98,
+            0.98,
+            stat_text,
+            ha="right",
+            va="top",
+            fontsize=10,
             bbox=dict(boxstyle="round,pad=0.4", fc="white", ec="gray", alpha=0.8),
             transform=ax.transAxes,
-            zorder=10
+            zorder=10,
         )
         plt.grid(axis="y", linestyle="--", alpha=0.5)
 
         if output_dir_path is not None:
-            plt.savefig(output_dir_path / f"{col}_hist.png", bbox_inches='tight')
+            plt.savefig(output_dir_path / f"{col}_hist.png", bbox_inches="tight")
         plt.show()
 
     def _generate_exit_code_pie_chart(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
         """Generate a pie chart for job exit codes.
-        
+
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
@@ -1368,7 +1371,7 @@ class DataVisualizer:
 
         # Prepare labels: only show label on pie if above threshold
         labels = [
-            str(label) if p >= threshold_pct else ''
+            str(label) if p >= threshold_pct else ""
             for label, p in zip(exit_code_counts.index, pct_values, strict=True)
         ]
 
@@ -1391,27 +1394,30 @@ class DataVisualizer:
         ax_legend = fig.add_subplot(gs[2])
 
         def autopct_func(p, threshold_pct=threshold_pct):
-            return f"{p:.1f}%" if p >= threshold_pct else ''
+            return f"{p:.1f}%" if p >= threshold_pct else ""
 
         wedges, *_ = ax_pie.pie(
             exit_code_counts,
             labels=labels,
             autopct=autopct_func,
             startangle=0,
-            colors=sns.color_palette("pastel")[0:len(exit_code_counts)],
+            colors=sns.color_palette("pastel")[0 : len(exit_code_counts)],
             explode=explode,
         )
-        
-        ax_pie.axis('equal')
+
+        ax_pie.axis("equal")
 
         # Hide the legend and title axes
-        ax_legend.axis('off')
-        ax_title.axis('off')
+        ax_legend.axis("off")
+        ax_title.axis("off")
 
         ax_title.text(
-            0.5, 0.5,
+            0.5,
+            0.5,
             f"Job Exit Code Distribution ({col})",
-            ha='center', va='center', fontsize=14,
+            ha="center",
+            va="center",
+            fontsize=14,
         )
         plt.grid(axis="y", linestyle="--", alpha=0.5)
         # Add a legend below the pie chart
@@ -1422,7 +1428,7 @@ class DataVisualizer:
             loc="center",
             bbox_to_anchor=(0.5, 0.5),
             fontsize=10,
-            title_fontsize=11
+            title_fontsize=11,
         )
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
@@ -1516,9 +1522,7 @@ class DataVisualizer:
 
             # GPUMemUsage: histogram of GPU memory usage (categorical bins)
             elif col in ["GPUMemUsage"]:
-                self._generate_gpu_memory_usage_histogram_categorical_bins(
-                    jobs_df, col, output_dir_path, figsize
-                )
+                self._generate_gpu_memory_usage_histogram_categorical_bins(jobs_df, col, output_dir_path, figsize)
 
             # GPUType: bar plot of GPU types arrays
             elif col in ["GPUType"]:
@@ -1531,7 +1535,11 @@ class DataVisualizer:
             # Memory: histogram of memory usage (logarithmic x-axis, percent)
             elif col in ["Memory"]:
                 self._generate_non_gpu_memory_histogram(
-                    jobs_df, col, "KiB", output_dir_path, figsize,
+                    jobs_df,
+                    col,
+                    "KiB",
+                    output_dir_path,
+                    figsize,
                 )
 
             # Status: pie chart of job statuses
@@ -1541,32 +1549,26 @@ class DataVisualizer:
             # ExitCode: pie chart of job exit codes
             elif col in ["ExitCode"]:
                 self._generate_exit_code_pie_chart(jobs_df, col, output_dir_path)
-            
+
             # QOS: pie chart of job QOS
             elif col in ["QOS"]:
                 self._generate_qos_pie_chart(jobs_df, col, output_dir_path)
-            
+
             # GPUs: pie chart of GPU counts in jobs
             elif col in ["GPUs"]:
                 self._generate_gpu_count_pie_chart(jobs_df, col, output_dir_path)
-            
+
             # Nodes: bar plot of job nodes
             elif col in ["NodeList"]:
-                self._generate_node_list_bar_plot_combine_trailing_digits(
-                    jobs_df, col, output_dir_path, figsize
-                )
+                self._generate_node_list_bar_plot_combine_trailing_digits(jobs_df, col, output_dir_path, figsize)
 
             # CPUMemUsage: plot histogram of CPU memory usage
             elif col in ["CPUMemUsage"]:
-                self._generate_non_gpu_memory_histogram(
-                    jobs_df, col, "B", output_dir_path, figsize
-                )
+                self._generate_non_gpu_memory_histogram(jobs_df, col, "B", output_dir_path, figsize)
 
             # Constraints: plot node features selected as constraints
             elif col in ["Constraints"]:
-                self._generate_constraints_bar_plot(
-                    jobs_df, col, output_dir_path
-                )
+                self._generate_constraints_bar_plot(jobs_df, col, output_dir_path)
 
             # Unrecognized column type
             else:

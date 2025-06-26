@@ -38,8 +38,15 @@ class DatabaseConnection:
 
     def fetch_query(self, query: str):
         """
-        Fetch data based on a custom query. If the query is invalid due to column names,
-        raise an exception with valid column names.
+        Fetch data based on a custom query.
+        
+        Args:            query (str): The SQL query to execute.
+
+        Raises:
+            Exception: If the query does not match the database schema or if there is no active connection
+
+        Returns:
+            pd.DataFrame: The result of the query as a pandas DataFrame.
         """
         if self.is_connected():
             try:

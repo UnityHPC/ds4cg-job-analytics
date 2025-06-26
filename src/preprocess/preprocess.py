@@ -55,8 +55,8 @@ def preprocess_data(
 ) -> pd.DataFrame:
     """
     Preprocess dataframe, filtering out unwanted rows and columns, filling missing values and converting types.
-    This function will take in a dataframe and create a new dataframe satisfying criterias,
-    original dataframe is intact.
+
+    This function will take in a dataframe to create a new dataframe satisfying given criteria.
 
     Args:
         data (pd.DataFrame): The input dataframe containing job data.
