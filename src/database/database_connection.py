@@ -4,15 +4,22 @@ import duckdb
 class DatabaseConnection:
     def __init__(self, db_url: str):
         self.db_url = db_url
-        self.connection = self.connect()
-
-    def connect(self):
-        self.connection = duckdb.connect(self.db_url)
+        self.connection = self._connect()
         print(f"Connected to {self.db_url}")
+    
+    def _connect(self) -> duckdb.DuckDBPyConnection:
+        """Establish a connection to the DuckDB database."""
+        self.connection = duckdb.connect(self.db_url)
         return self.connection
 
     def disconnect(self):
         self.connection.close()
+
+    def __del__(self):
+        """Ensure the connection is closed when the object is deleted."""
+        if self.is_connected():
+            self.disconnect()
+            print(f"Disconnected from {self.db_url}")
 
     def is_connected(self) -> bool:
         return self.connection is not None
@@ -28,7 +35,7 @@ class DatabaseConnection:
         else:
             raise Exception("Not connected")
 
-    def fetch_all(self, table_name="Jobs"):
+    def fetch_all_jobs(self, table_name="Jobs"):
         """Fetch all data from the specified table. Table name is set to Jobs but can be changed accordingly."""
         if self.is_connected():
             query = f"SELECT * FROM {table_name}"
