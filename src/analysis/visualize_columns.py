@@ -27,6 +27,9 @@ class DataVisualizer:
 
         Args:
             df (pd.DataFrame): DataFrame to visualize.
+
+        Returns:
+            None
         """
         self.df = None
         if df is not None:
