@@ -89,24 +89,24 @@ def test_connection_established(temp_file_db):
 
 
 def test_fetch_all_returns_correct_data(temp_file_db):
-    df = temp_file_db.fetch_all()
+    jobs_df = temp_file_db.fetch_all()
 
-    assert len(df) == 3
+    assert len(jobs_df) == 3
 
-    assert df.iloc[0]["JobID"] == 101
-    assert df.iloc[0]["User"] == "alice"
-    assert df.iloc[0]["GPUs"] == 1
-    assert df.iloc[0]["Status"] == "COMPLETED"
+    assert jobs_df.iloc[0]["JobID"] == 101
+    assert jobs_df.iloc[0]["User"] == "alice"
+    assert jobs_df.iloc[0]["GPUs"] == 1
+    assert jobs_df.iloc[0]["Status"] == "COMPLETED"
 
-    assert df.iloc[1]["JobID"] == 102
-    assert df.iloc[1]["User"] == "bob"
-    assert df.iloc[1]["GPUs"] == 1
-    assert df.iloc[1]["Status"] == "FAILED"
+    assert jobs_df.iloc[1]["JobID"] == 102
+    assert jobs_df.iloc[1]["User"] == "bob"
+    assert jobs_df.iloc[1]["GPUs"] == 1
+    assert jobs_df.iloc[1]["Status"] == "FAILED"
 
-    assert df.iloc[2]["JobID"] == 103
-    assert df.iloc[2]["User"] == "chris"
-    assert df.iloc[2]["GPUs"] == 1
-    assert df.iloc[2]["Status"] == "OUT_OF_MEMORY"
+    assert jobs_df.iloc[2]["JobID"] == 103
+    assert jobs_df.iloc[2]["User"] == "chris"
+    assert jobs_df.iloc[2]["GPUs"] == 1
+    assert jobs_df.iloc[2]["Status"] == "OUT_OF_MEMORY"
 
 
 def test_fetch_selected_columns_with_filter(temp_file_db):
@@ -115,12 +115,12 @@ def test_fetch_selected_columns_with_filter(temp_file_db):
         FROM Jobs
         WHERE Status = 'COMPLETED'
     """
-    df = temp_file_db.connection.execute(query).fetchdf()
+    jobs_df = temp_file_db.connection.execute(query).fetchdf()
 
-    assert len(df) == 1
-    assert list(df.columns) == ["JobID", "User"]
-    assert df.iloc[0]["JobID"] == 101
-    assert df.iloc[0]["User"] == "alice"
+    assert len(jobs_df) == 1
+    assert list(jobs_df.columns) == ["JobID", "User"]
+    assert jobs_df.iloc[0]["JobID"] == 101
+    assert jobs_df.iloc[0]["User"] == "alice"
 
 
 def test_fetch_with_filtering_multiple_conditions(temp_file_db):
@@ -129,12 +129,12 @@ def test_fetch_with_filtering_multiple_conditions(temp_file_db):
         FROM Jobs
         WHERE Status = 'COMPLETED' AND GPUs = 1
     """
-    df = temp_file_db.connection.execute(query).fetchdf()
+    jobs_df = temp_file_db.connection.execute(query).fetchdf()
 
-    assert len(df) == 1
-    assert list(df.columns) == ["JobID", "User"]
-    assert df.iloc[0]["JobID"] == 101
-    assert df.iloc[0]["User"] == "alice"
+    assert len(jobs_df) == 1
+    assert list(jobs_df.columns) == ["JobID", "User"]
+    assert jobs_df.iloc[0]["JobID"] == 101
+    assert jobs_df.iloc[0]["User"] == "alice"
 
 
 def test_fetch_all_column_names(temp_file_db):

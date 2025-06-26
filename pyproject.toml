@@ -4,7 +4,6 @@ version = "2025.1.0"
 requires-python = ">=3.11"
 readme = "README.md"
 description = "Unity Job Analytics is a tool for analyzing job data in the Unity cluster, providing insights into job performance and efficiency."
-dependencies = []
 
 [build-system]
 requires = ["setuptools>=61.0"]
@@ -30,11 +29,24 @@ select = [
 "B",
 # flake8-simplify
 "SIM",
+# PEP 8 naming conventions
+"N",
+# NumPy-specific rules
+"NPY",
+# pandas-vet
+"PD"
 ]
 ignore = [
 # Ignore use ternary operator in if statements
 "SIM108",
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# Ignore N, NPY, and PD rules in Benjamin's file
+"scripts/cpu_metrics.py" = ["N", "NPY", "PD"]
+"scripts/gpu_metrics.py" = ["N", "NPY", "PD"]
+"scripts/zero_gpu_usage_list.py" = ["N", "NPY", "PD"]
+"notebooks/SlurmGPU.ipynb" = ["N", "NPY", "PD"]
 
 [tool.ruff.lint.isort]
 # Combine multiple 'as' imports on a single line (e.g., import foo as bar, baz as qux)
@@ -61,8 +73,9 @@ exclude = [
 
 [tool.pytest.ini_options]
 # pytest configuration options
-addopts = [ "--import-mode=importlib", "-ra" ]
-pythonpath = "."
+addopts = [
+    "--import-mode=importlib", "-ra"
+]
 testpaths = ["tests"]
 
 [tool.mkdocs]
