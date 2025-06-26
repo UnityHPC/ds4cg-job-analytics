@@ -1,41 +1,7 @@
-"""
-
-# Preprocessing Criteria for Job Data
-
-## Attributes Omitted
-- **UUID**
-- **Nodes**: NodesList have more specific information
-- **EndTime**: Can be calculated from StartTime and Elapsed
-
-## Options for Including/Omitting Jobs
-- **Keeping CPU jobs:**
-    - If `GPUType` is null, the value will be filled with `["cpu"]`
-    - If `GPUs` is null or is 0, the value will be 0.
-- **Keeping jobs where the status is "Failed" or "Cancelled"**
-
-## Records Omitted If:
-- `Elapsed` is less than the minimum threshold
-- `account` is root
-- `partition` is building
-- `QOS` is updates
-
-## Null Attribute Defaults
-- `ArrayID`: set to -1
-- `Interactive`: set to `"non-interactive"`
-- `Constraints`: set to an empty numpy array
-- `GPUs`: set to 0 (when CPU jobs are kept)
-- `GPUType`: set to an numpy array ["cpu"] (when CPU jobs are kept)
-
-## Attribute Types
-- `StartTime`, `SubmitTime`: **datetime**
-- `TimeLimit`, `Elapsed`: **timedelta**
-- `Interactive`, `Status`, `ExitCode`, `QOS`, `Partition`, `Account`: **Categorical**
-"""
-
 import pandas as pd
 import numpy as np
 from ..config.constants import RAM_MAP, DEFAULT_MIN_ELAPSED_SECONDS, ATTRIBUTE_CATEGORIES
-from ..config.enum_constants import StatusEnum
+from ..config.enum_constants import StatusEnum, AdminsAccountEnum
 
 
 def get_requested_vram(constraints: list[str]) -> int:
@@ -120,13 +86,13 @@ def preprocess_data(
         & cond_gpus
         & cond_failed_cancelled_jobs
         & (data["Elapsed"] >= min_elapsed_seconds)  # filter in unit of second, not timedelta object
-        & (data["Account"] != "root")
+        & (data["Account"] != AdminsAccountEnum.ROOT)
         & (data["Partition"] != "building")
         & (data["QOS"] != "updates")
     ].copy()
 
     _fill_missing(res)
-    #! type casting for columns involving time
+    # type casting for columns involving time
     time_columns = ["StartTime", "SubmitTime"]
     for col in time_columns:
         res[col] = pd.to_datetime(res[col], errors="coerce")
@@ -135,14 +101,14 @@ def preprocess_data(
     for col in timedelta_columns:
         res[col] = pd.to_timedelta(res[col], unit="s", errors="coerce")
 
-    #!Added parameters, similar to Benjamin code
+    # Added parameters, similar to Benjamin code
     res.loc[:, "Queued"] = res["StartTime"] - res["SubmitTime"]
     res.loc[:, "requested_vram"] = res["Constraints"].apply(lambda c: get_requested_vram(c))
     res.loc[:, "allocated_vram"] = res["GPUType"].apply(lambda x: get_allocated_vram(x))
     res.loc[:, "user_jobs"] = res.groupby("User")["User"].transform("size")
     res.loc[:, "account_jobs"] = res.groupby("Account")["Account"].transform("size")
 
-    #! convert columns to categorical
+    # convert columns to categorical
 
     for col, enum_obj in ATTRIBUTE_CATEGORIES.items():
         enum_values = [e.value for e in enum_obj]

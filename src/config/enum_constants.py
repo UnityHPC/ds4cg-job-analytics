@@ -39,7 +39,7 @@ class ExitCodeEnum(Enum):
     SIGNALED = "SIGNALED"
 
 
-class AccountEnum(Enum):
+class AdminsAccountEnum(Enum):
     ROOT = "root"
 
 

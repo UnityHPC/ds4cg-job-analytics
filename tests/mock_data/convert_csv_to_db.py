@@ -2,12 +2,22 @@ import duckdb
 import pandas as pd
 
 
-# Use this script to convert csv into a duckdb database
 def convert_csv_to_db(path_to_csv: str, path_to_db: str):
+    """
+    Function to convert csv to duckDB database, following the schema provided by Unity.
+    This function is intended to be used on csv files that follow the Unity schema only.
+
+    Args:
+        path_to_csv (str): Path to the CSV file containing job data.
+        path_to_db (str): Path to the DuckDB database file where the data will be stored.
+
+    Returns:
+        None: The function creates a DuckDB database and populates it with data from the CSV
+    """
     conn = duckdb.connect(path_to_db)
     df_mock = pd.read_csv(path_to_csv)
 
-    # TODO: add comment to explain these type casting do
+    # Convert some columns in csv to correct data types as specified in the Unity schema
     for col in ["SubmitTime", "StartTime", "EndTime"]:
         df_mock[col] = pd.to_datetime(df_mock[col], format="%m/%d/%y %H:%M")
         df_mock[col] = df_mock[col].astype("datetime64[ns]")

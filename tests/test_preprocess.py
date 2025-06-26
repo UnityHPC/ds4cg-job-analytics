@@ -1,6 +1,13 @@
 from src.preprocess import preprocess_data
 import pandas as pd
-from src.config.enum_constants import InteractiveEnum, QOSEnum, StatusEnum, ExitCodeEnum, PartitionEnum, AccountEnum
+from src.config.enum_constants import (
+    InteractiveEnum,
+    QOSEnum,
+    StatusEnum,
+    ExitCodeEnum,
+    PartitionEnum,
+    AdminsAccountEnum,
+)
 
 
 def _helper_filter_irrelevants_record(input_df: pd.DataFrame, min_elapsed_seconds: int) -> pd.DataFrame:
@@ -22,7 +29,7 @@ def _helper_filter_irrelevants_record(input_df: pd.DataFrame, min_elapsed_second
 
     res = input_df[
         (input_df["Elapsed"] >= min_elapsed_seconds)
-        & (input_df["Account"] != AccountEnum.ROOT.value)
+        & (input_df["Account"] != AdminsAccountEnum.ROOT.value)
         & (input_df["Partition"] != PartitionEnum.BUILDING.value)
         & (input_df["QOS"] != QOSEnum.UPDATES.value)
     ]
@@ -95,7 +102,7 @@ def test_pre_process_data_filtered_root_account(mock_data_frame):
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
     partition_building = data["Partition"] == PartitionEnum.BUILDING.value
     qos_updates = data["QOS"] == QOSEnum.UPDATES.value
-    account_root = data["Account"] == AccountEnum.ROOT.value
+    account_root = data["Account"] == AdminsAccountEnum.ROOT.value
     assert not any(account_root)
     assert not any(qos_updates)
     assert not any(partition_building)
@@ -333,7 +340,7 @@ def test_category_account(mock_data_frame):
         & (ground_truth["Status"] != StatusEnum.FAILED.value)
         & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
     ]
-    expected = set(ground_truth_filtered["Account"].dropna().to_numpy()) | set([e.value for e in AccountEnum])
+    expected = set(ground_truth_filtered["Account"].dropna().to_numpy()) | set([e.value for e in AdminsAccountEnum])
 
     assert data["Account"].dtype == "category"
     assert expected.issubset(set(data["Account"].cat.categories))
