@@ -1,5 +1,5 @@
 """
-Functions to analyze efficiency of Jobs based on their VRAM usage. The aim is to identify potential inefficiencies
+Class to analyze efficiency of Jobs based on their VRAM usage. The aim is to identify potential inefficiencies
 in GPU usage and notify users or PIs about these issues.
 """
 
@@ -10,7 +10,9 @@ from database.DatabaseConnection import DatabaseConnection
 from config.constants import MIN_ELAPSED_SECONDS
 
 
-def load_jobs_dataframe_from_duckdb(db_path=None, table_name="Jobs", query=None, sample_size=None, random_state=None):
+def load_jobs_dataframe_from_duckdb(
+    db_path=None, table_name="Jobs", query=None, sample_size=None, random_state=None
+) -> pd.DataFrame:
     """
     Connect to the DuckDB slurm_data_small.db and return the jobs table as a pandas DataFrame.
 
@@ -63,7 +65,7 @@ class EfficiencyAnalysis:
         gpu_mem_usage_exact=None,
         gpus_min=1,
         elapsed_seconds_min=MIN_ELAPSED_SECONDS,
-    ):
+    ) -> pd.DataFrame:
         """
         Analyze jobs based on constraints, GPU allocation, and usage criteria.
 
@@ -144,7 +146,7 @@ class EfficiencyAnalysis:
         self.efficiency_df = filtered_jobs
         return self.efficiency_df
 
-    def evaluate_cpu_gpu_usage(self, hours_percentage_threshold=25, vram_efficiency_threshold=0.3):
+    def evaluate_cpu_gpu_usage(self, hours_percentage_threshold=25, vram_efficiency_threshold=0.3) -> dict:
         """
         This method evaluates the efficiency of GPU jobs based on VRAM usage and CPU-GPU balance.
 
@@ -254,7 +256,7 @@ class EfficiencyAnalysis:
 
         return self.analysis_results
 
-    def find_inefficient_users_weighted_by_hours(self, efficiency_threshold=0.3, min_jobs=5):
+    def find_inefficient_users_weighted_by_hours(self, efficiency_threshold=0.3, min_jobs=5) -> pd.DataFrame:
         """
         Identify users with low average VRAM efficiency across their jobs, weighted by the hours they were inefficient.
 
@@ -295,7 +297,7 @@ class EfficiencyAnalysis:
         inefficient_users = inefficient_users.sort_values("Weighted_Efficiency_Contribution", ascending=True)
         return inefficient_users
 
-    def find_inefficient_pis_weighted_by_hours(self, efficiency_threshold=0.3, min_jobs=5):
+    def find_inefficient_pis_weighted_by_hours(self, efficiency_threshold=0.3, min_jobs=5) -> pd.DataFrame:
         """
         Identify PIs with low average VRAM efficiency across their jobs, weighted by the hours they were inefficient.
 
@@ -337,7 +339,7 @@ class EfficiencyAnalysis:
         return inefficient_pis
 
 
-def filter_zero_vram_requested_with_gpu_allocated(df, requested_vram=0, gpus_min=1):
+def filter_zero_vram_requested_with_gpu_allocated(df, requested_vram=0, gpus_min=1) -> pd.DataFrame:
     """
     Return jobs where requested_vram is greater than or equal to a value (default 0) and GPUs >= gpus_min (default 1).
 

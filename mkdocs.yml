@@ -20,3 +20,14 @@ plugins:
               docstring_style: google       # or numpy, sphinx
               # render Parameters/Returns as a table
               docstring_section_style: list
+
+nav:
+  - Home: index.md
+  - Preprocessing: preprocessing.md
+  - Analysis:
+      - Overview: analysis.md
+  - Scripts:
+      - GPU Metrics: gpu_metrics.md
+      - CPU Metrics: cpu_metrics.md
+      - Zero GPU VRAM Usage: zero_gpu_usage.md
+

@@ -1,7 +1,18 @@
 ## Introduction
 
-This repository is a place to contain the tools developed over the course of the DS4CG 2025 summer
-internship project with Unity.
+This repository is a place to contain the tools developed over the course of the DS4CG 2025 summer internship project with Unity.
+
+## Table of Contents
+
+- [Introduction](#introduction)
+- [Contributing to this repository](#contributing-to-this-repository)
+- [Getting started on Unity](#getting-started-on-unity)
+- [Development Environment](#development-environment)
+- [Code Style & Linting](#code-style--linting)
+- [Documentation](#documentation)
+- [Testing](#testing)
+- [Support](#support)
+- [The dataset](#the-dataset)
 
 ## Contributing to this repository
 
