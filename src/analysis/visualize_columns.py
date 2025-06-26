@@ -16,6 +16,7 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Patch
 from ..config.constants import VRAM_CATEGORIES
 import textwrap
+import re
 
 
 class DataVisualizer:
@@ -79,6 +80,9 @@ class DataVisualizer:
 
         Raises:
             ValueError: If any column is not present in the DataFrame.
+
+        Returns:
+            list[str]: Validated list of column names.
         """
         if not isinstance(columns, list) or not all(isinstance(col, str) for col in columns):
             raise ValueError("Columns must be a list of strings.")
@@ -119,6 +123,9 @@ class DataVisualizer:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             output_dir_path (Path | None): The directory to save the summary file.
             summary_file_name (str): The name of the summary file.
+
+        Returns:
+            None
         """
         if output_dir_path is not None:
             # create text file to save column summary statistics
@@ -148,6 +155,7 @@ class DataVisualizer:
         output_dir_path: Path | None = None
     ):
         """Generate a bar plot for boolean columns.
+        
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
@@ -171,10 +179,14 @@ class DataVisualizer:
 
     def _plot_duration_histogram(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
         """Plot histogram of durations in minutes, hours, days.
+
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
             output_dir_path (Path | None): The directory to save the plot.
+
+        Returns:
+            None
         """
         col_data = jobs_df[col]
         # Determine unit for conversion
@@ -230,7 +242,7 @@ class DataVisualizer:
         # Helper to reduce xticks and rotate if width is small
         def choose_ticks_and_rotation(ticks, width, max_labels=3):
             # Always include first and last tick, and always have at least 4 ticks
-            if width < 0.38 and len(ticks) > max_labels:
+            if width < min_width and len(ticks) > max_labels:
                 # Always include first and last, and evenly space the rest
                 n = max(max_labels - 2, 2)
                 idxs = np.linspace(1, len(ticks) - 2, n, dtype=int)
@@ -349,6 +361,7 @@ class DataVisualizer:
         timestamp_range: tuple[pd.Timestamp, pd.Timestamp] | None = None
     ):
         """Generate a histogram of job start times, either by day or by hour.
+
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
@@ -766,6 +779,7 @@ class DataVisualizer:
 
     def _generate_gpu_count_pie_chart(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
         """Generate a pie chart for GPU counts.
+
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
@@ -892,7 +906,6 @@ class DataVisualizer:
                     f"Example values:\n{non_null.head()}"
                 )
                 raise ValueError(msg) from err
-        import re
 
         # For each job, create a tuple of sorted prefixes (with multiplicity)
         # Remove trailing digits from node names (combine nodes like gypsum-gpu010 and gypsumgpu053)
