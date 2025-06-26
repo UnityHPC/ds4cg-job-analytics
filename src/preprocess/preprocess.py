@@ -86,9 +86,9 @@ def preprocess_data(
         & cond_gpus
         & cond_failed_cancelled_jobs
         & (data["Elapsed"] >= min_elapsed_seconds)  # filter in unit of second, not timedelta object
-        & (data["Account"] != AdminsAccountEnum.ROOT)
-        & (data["Partition"] != PartitionEnum.BUILDING)
-        & (data["QOS"] != QOSEnum.UPDATES)
+        & (data["Account"] != AdminsAccountEnum.ROOT.value)
+        & (data["Partition"] != PartitionEnum.BUILDING.value)
+        & (data["QOS"] != QOSEnum.UPDATES.value)
     ].copy()
 
     _fill_missing(res)
