@@ -4,7 +4,6 @@ version = "2025.1.0"
 requires-python = ">=3.11"
 readme = "README.md"
 description = "Unity Job Analytics is a tool for analyzing job data in the Unity cluster, providing insights into job performance and efficiency."
-dependencies = []
 
 [build-system]
 requires = ["setuptools>=61.0"]
@@ -74,7 +73,9 @@ exclude = [
 
 [tool.pytest.ini_options]
 # pytest configuration options
-addopts = [ "--import-mode=importlib", "-ra" ]
+addopts = [
+    "--import-mode=importlib", "-ra"
+]
 pythonpath = "."
 testpaths = ["tests"]
 
