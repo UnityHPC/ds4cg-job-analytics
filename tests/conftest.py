@@ -1,7 +1,6 @@
 import pytest
 from src.database import DatabaseConnection
 from .mock_data.convert_csv_to_db import convert_csv_to_db
-import os
 import tempfile
 import shutil
 
