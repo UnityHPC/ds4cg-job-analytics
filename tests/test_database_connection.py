@@ -1,5 +1,5 @@
 import pytest
-from src.database.database_connection import DatabaseConnection
+from src.database.DatabaseConnection import DatabaseConnection
 import tempfile
 import os
 
@@ -115,12 +115,12 @@ def test_fetch_selected_columns_with_filter(temp_file_db):
         FROM Jobs
         WHERE Status = 'COMPLETED'
     """
-    df_mock = temp_file_db.connection.execute(query).fetchdf()
+    jobs_df = temp_file_db.connection.execute(query).fetchdf()
 
-    assert len(df_mock) == 1
-    assert list(df_mock.columns) == ["JobID", "User"]
-    assert df_mock.iloc[0]["JobID"] == 101
-    assert df_mock.iloc[0]["User"] == "alice"
+    assert len(jobs_df) == 1
+    assert list(jobs_df.columns) == ["JobID", "User"]
+    assert jobs_df.iloc[0]["JobID"] == 101
+    assert jobs_df.iloc[0]["User"] == "alice"
 
 
 def test_fetch_with_filtering_multiple_conditions(temp_file_db):
@@ -129,12 +129,12 @@ def test_fetch_with_filtering_multiple_conditions(temp_file_db):
         FROM Jobs
         WHERE Status = 'COMPLETED' AND GPUs = 1
     """
-    df_mock = temp_file_db.connection.execute(query).fetchdf()
+    jobs_df = temp_file_db.connection.execute(query).fetchdf()
 
-    assert len(df_mock) == 1
-    assert list(df_mock.columns) == ["JobID", "User"]
-    assert df_mock.iloc[0]["JobID"] == 101
-    assert df_mock.iloc[0]["User"] == "alice"
+    assert len(jobs_df) == 1
+    assert list(jobs_df.columns) == ["JobID", "User"]
+    assert jobs_df.iloc[0]["JobID"] == 101
+    assert jobs_df.iloc[0]["User"] == "alice"
 
 
 def test_fetch_all_column_names(temp_file_db):
