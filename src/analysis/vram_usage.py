@@ -6,8 +6,11 @@ in GPU usage and notify users or PIs about these issues.
 import pandas as pd
 from pathlib import Path
 from src.preprocess.preprocess import preprocess_data
-from src.database.DatabaseConnection import DatabaseConnection
+from src.database.database_connection import DatabaseConnection  # Make sure this matches the actual file/class name
 from src.config.constants import MIN_ELAPSED_SECONDS
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 def load_jobs_dataframe_from_duckdb(db_path=None, table_name="Jobs", sample_size=None, random_state=None):
@@ -22,7 +25,7 @@ def load_jobs_dataframe_from_duckdb(db_path=None, table_name="Jobs", sample_size
         pd.DataFrame: DataFrame containing the table data.
     """
     if db_path is None:
-        db_path = Path(__file__).resolve().parents[2] / "data" / "slurm_data_small.db"
+        db_path = Path(__file__).resolve().parents[2] / "data" / "slurm_data.db"
     db = DatabaseConnection(str(db_path))
 
     jobs_df = db.fetch_all(table_name=table_name)
@@ -30,7 +33,6 @@ def load_jobs_dataframe_from_duckdb(db_path=None, table_name="Jobs", sample_size
         jobs_df,
         min_elapsed_second=0,
         include_failed_cancelled_jobs=False,
-        include_CPU_only_job=False
     )
     db.disconnect()
     if sample_size is not None:
@@ -50,14 +52,14 @@ class EfficiencyAnalysis:
 
     def calculate_efficiency_metrics(
         self,
-        vram_constraint_filter=0,
+        vram_constraint_filter=None,
         allocated_vram_greater_than=0,
         gpu_mem_usage_min=None,
         gpu_mem_usage_max=None,
         gpu_mem_usage_exact=None,
         gpus_min=1,
         elapsed_seconds_min=MIN_ELAPSED_SECONDS,
-    ):
+    ) -> pd.DataFrame:
         """
         Analyze jobs based on constraints, GPU allocation, and usage criteria.
 
@@ -74,11 +76,13 @@ class EfficiencyAnalysis:
             DataFrame: Filtered jobs with efficiency metrics added
         """
         # Flexible filter for requested_vram
-        if callable(vram_constraint_filter):
-            mask = self.jobs_df["requested_vram"].apply(vram_constraint_filter)
+        if vram_constraint_filter is not None:
+            if callable(vram_constraint_filter):
+                mask = self.jobs_df["requested_vram"].apply(vram_constraint_filter)
+            else:
+                mask = self.jobs_df["requested_vram"] == vram_constraint_filter
         else:
-            mask = self.jobs_df["requested_vram"] == vram_constraint_filter
-
+            mask = pd.Series([True] * len(self.jobs_df), index=self.jobs_df.index)
         # GPU memory usage filter
         gpu_mem_mask = pd.Series([True] * len(self.jobs_df), index=self.jobs_df.index)
         if gpu_mem_usage_exact is not None:
@@ -342,8 +346,81 @@ class EfficiencyAnalysis:
             ascending=True
         )
         return inefficient_pis
+    def additional_metrics(self, jobs_df=None):
+        """
+        Add additional VRAM allocation/request metrics and categories to a jobs DataFrame.
 
+        Args:
+            jobs_df (pd.DataFrame, optional): DataFrame to compute metrics on. Defaults to self.efficiency_df.
 
+        Returns:
+            pd.DataFrame: DataFrame with additional metrics columns.
+        """
+        if jobs_df is None:
+            jobs_df = self.efficiency_df
+        metrics = jobs_df.copy()
+        metrics["gpu_memory_used_gb"] = metrics['GPUMemUsage'] / (2**30)
+        metrics['num_jobs'] = len(metrics)
+        metrics['vram_wasted'] = metrics["allocated_vram"] - metrics["gpu_memory_used_gb"]
+        metrics["request_accuracy"] = metrics["gpu_memory_used_gb"] / metrics["requested_vram"]
+        metrics = metrics[metrics['request_accuracy'].notna() &
+    np.isfinite(metrics['request_accuracy'])
+]
+
+        print("rows after filtering", len(metrics))
+        metrics["allocation_accuracy"] = metrics["gpu_memory_used_gb"] / metrics["allocated_vram"]
+        metrics["request_to_allocation_ratio"] = metrics["allocated_vram"] / metrics["requested_vram"]
+
+        metrics['allocation_efficiency_category'] = pd.cut(
+            metrics['allocation_accuracy'],
+            bins=[0, 0.2, 0.5, 0.8, 1.0],
+            labels=['Very Poor (<20%)', 'Poor (20-50%)', 'Fair (50-80%)', 'Good (80-100%)']
+        )
+        metrics['request_accuracy_category'] = pd.cut(
+            metrics['request_accuracy'],
+            bins=[0, 0.5, 0.8, 1.2, 2.0, float('inf')],
+            labels = ['<20%', '20-50%', '50-80%', '80-100%', '>100%']
+        )
+        metrics['allocation_type'] = pd.cut(
+            metrics['request_to_allocation_ratio'],
+            bins=[0, 0.8, 1.0, 1.5, 2.0, float('inf')],
+            labels=['Under-allocated (<80%)', 'Exact allocation (80-100%)',
+                    'Moderate over-allocation (100-150%)', 'High over-allocation (150-200%)',
+                    'Extreme over-allocation (>200%)']
+        )
+        metrics['request_size_category'] = pd.cut(
+            metrics['requested_vram'],
+            bins=[0, 8, 16, 32, 64, float('inf')],
+            labels=['Small (≤8GB)', 'Medium (8-16GB)', 'Large (16-32GB)',
+                    'Very Large (32-64GB)', 'Extreme (>64GB)']
+        )
+        self.efficiency_df = metrics
+        return metrics
+    def create_visualizations(self, jobs_df= None):
+        sns.set(style="whitegrid", font_scale=1.1)
+
+        fig, ax = plt.subplots(2, 1, figsize=(18, 14))
+        fig.subplots_adjust(hspace=0.4, wspace=0.3)
+        if(jobs_df is None):
+            jobs_df = self.efficiency_df
+
+        # VRAM Allocation Efficiency Distribution
+        alloc_counts = jobs_df['allocation_efficiency_category'].value_counts().sort_index()
+        sns.barplot(x=alloc_counts.index.astype(str), y=alloc_counts.values, ax=ax[0], palette="Blues_d")
+        ax[0].set_title('VRAM Allocation Efficiency Distribution')
+        ax[0].set_xlabel('Allocation Efficiency Category')
+        ax[0].set_ylabel('Number of Jobs')
+        ax[0].tick_params(axis='x', rotation=15)
+
+        # Request Accuracy Distribution
+        req_counts = jobs_df['request_accuracy_category'].value_counts().sort_index()
+        sns.barplot(x=req_counts.index.astype(str), y=req_counts.values, ax=ax[1], palette="Greens_d")
+        ax[1].set_title('Request Accuracy Distribution')
+        ax[1].set_xlabel('Request Accuracy Category')
+        ax[1].set_ylabel('Number of Jobs')
+        ax[1].tick_params(axis='x', rotation=15)
+
+        plt.show()
 def filter_zero_vram_requested_with_gpu_allocated(df, requested_vram=0, gpus_min=1):
     """
     Return jobs where requested_vram is greater than or equal to a value (default 0) and GPUs >= gpus_min (default 1).
@@ -357,3 +434,56 @@ def filter_zero_vram_requested_with_gpu_allocated(df, requested_vram=0, gpus_min
         pd.DataFrame: Filtered DataFrame with jobs matching the criteria.
     """
     return df[(df["requested_vram"] >= requested_vram) & (df["GPUs"] >= gpus_min)]
+
+def get_top_n_gpus(jobs_df, n):
+
+    gpu_types = jobs_df['GPUType'].dropna().explode()
+    # Normalize to string and lowercase for consistency
+    gpu_types = gpu_types.astype(str).str.strip().str.lower()
+    # Get top n
+    top_n = gpu_types.value_counts().head(n).index.tolist()
+    return top_n
+
+def contains_a100(gpu_array):
+    if isinstance(gpu_array, (list, np.ndarray)):
+        return any(str(gpu).strip().lower() == 'a100' for gpu in gpu_array)
+    return False
+
+
+
+def filter_a100s(jobs_df):
+    a100_jobs_df = jobs_df[jobs_df['GPUType'].apply(contains_a100)]
+    return a100_jobs_df
+
+
+
+if __name__ == "__main__":
+    # Step 1: Create the analysis object (loads all jobs)
+    efficiency = EfficiencyAnalysis()
+    top_gpus = get_top_n_gpus(efficiency.jobs_df, 3)
+    print(f"Top 3 GPUs: {top_gpus}")
+
+    for gpu_type in top_gpus:
+        print(f"\n===== Analysis for GPU: {gpu_type.upper()} =====")
+        # Filter jobs for this GPU type
+        gpu_jobs_df = efficiency.jobs_df[efficiency.jobs_df['GPUType'].apply(
+            lambda x: gpu_type in [str(g).strip().lower() for g in (x if isinstance(x, (list, np.ndarray)) else [x])]
+        )]
+        if gpu_jobs_df.empty:
+            print(f"No jobs found for GPU type: {gpu_type}")
+            continue
+        # Create a new EfficiencyAnalysis instance for this GPU type
+        gpu_efficiency = EfficiencyAnalysis()
+        gpu_efficiency.jobs_df = gpu_jobs_df
+        gpu_efficiency.calculate_efficiency_metrics()
+        results = gpu_efficiency.evaluate_cpu_gpu_usage()
+        print(f"{gpu_type.upper()} Efficiency Analysis Results:")
+        print(results)
+        print(f"Inefficient Users ({gpu_type.upper()}):")
+        print(gpu_efficiency.find_inefficient_users_weighted_by_hours())
+        print(f"Inefficient PIs ({gpu_type.upper()}):")
+        print(gpu_efficiency.find_inefficient_pis_weighted_by_hours())
+        print(f"Additional Metrics ({gpu_type.upper()}):")
+        print(gpu_efficiency.additional_metrics())
+        gpu_efficiency.create_visualizations()
+        plt.close('all')
