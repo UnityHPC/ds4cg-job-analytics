@@ -68,7 +68,7 @@ def preprocess_data(
         pd.DataFrame: The preprocessed dataframe
     """
 
-    data = input_df.drop(columns=["UUID", "EndTime", "Nodes"], axis=1, inplace=False)
+    data = input_df.drop(columns=["UUID", "EndTime", "Nodes", "Preempted"], axis=1, inplace=False)
 
     cond_gpu_type = (
         data["GPUType"].notna() | include_cpu_only_jobs

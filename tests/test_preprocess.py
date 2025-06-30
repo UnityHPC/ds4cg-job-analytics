@@ -20,6 +20,7 @@ def test_pre_process_data_filtred_columns(mock_data):
     assert "UUID" not in data.columns
     assert "EndTime" not in data.columns
     assert "Nodes" not in data.columns
+    assert "Preempted" not in data.columns
 
 
 def test_pre_process_data_filtered_gpu(mock_data):
