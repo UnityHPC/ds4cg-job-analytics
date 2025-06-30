@@ -6,8 +6,8 @@ in GPU usage and notify users or PIs about these issues.
 import pandas as pd
 from pathlib import Path
 from src.preprocess.preprocess import preprocess_data
-from database.DatabaseConnection import DatabaseConnection
-from config.constants import MIN_ELAPSED_SECONDS
+from src.database.DatabaseConnection import DatabaseConnection
+from src.config.constants import MIN_ELAPSED_SECONDS
 
 
 def load_jobs_dataframe_from_duckdb(
@@ -15,7 +15,6 @@ def load_jobs_dataframe_from_duckdb(
 ) -> pd.DataFrame:
     """
     Connect to the DuckDB slurm_data_small.db and return the jobs table as a pandas DataFrame.
-
     Args:
         db_path (str or Path, optional): Path to the DuckDB database. Defaults to 'data/slurm_data.db'.
         table_name (str, optional): Table name to query. Defaults to 'Jobs'.
@@ -23,6 +22,7 @@ def load_jobs_dataframe_from_duckdb(
     Returns:
         pd.DataFrame: DataFrame containing the table data.
     """
+
     if db_path is None:
         db_path = Path(__file__).resolve().parents[2] / "data" / "slurm_data.db"
 

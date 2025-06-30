@@ -127,8 +127,7 @@ GET_VRAM_FROM_NODE = {
 
 
 def get_requested_vram(constraints: list[str], numGPUs: int, GPUMemUsage: int) -> int:
-    """
-    Get the requested VRAM for a job based on its constraints and GPU usage.
+    """Get the requested VRAM for a job based on its constraints and GPU usage.
     This function extracts VRAM requests from the job constraints and returns the maximum requested VRAM.
 
     Args:
@@ -138,6 +137,7 @@ def get_requested_vram(constraints: list[str], numGPUs: int, GPUMemUsage: int) -
 
     Returns:
         int: Maximum requested VRAM in GB for the job, multiplied by the number of GPUs.
+        
     """
     GPUMemUsageGB = GPUMemUsage / (2**30)
     requested_vrams = []

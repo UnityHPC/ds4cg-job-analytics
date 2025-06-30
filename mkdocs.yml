@@ -23,7 +23,7 @@ plugins:
 
 nav:
   - Home: index.md
-  - Preprocessing: preprocessing.md
+  - Preprocessing: preprocess.md
   - Analysis:
       - Overview: analysis.md
   - Scripts:

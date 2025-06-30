@@ -16,7 +16,6 @@ class DataVisualizer:
     def __init__(self, df: pd.DataFrame) -> None:
         """Initialize the DataVisualizer.
 
-
         Args:
             db_path (str, optional): Path to the DuckDB database file. If provided, will connect to DB.
             table (str, optional): Table name to load from the database (used with db_path).
