@@ -4,6 +4,7 @@
 ## Attributes Omitted
 - **UUID**
 - **Nodes**: NodesList have more specific information
+- **Preempted**: Status have more valid information
 - **EndTime**: Can be calculated from StartTime and Elapsed
 
 ## Options for Including/Omitting Jobs
