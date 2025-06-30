@@ -4,7 +4,6 @@ from ..config.constants import RAM_MAP, DEFAULT_MIN_ELAPSED_SECONDS, ATTRIBUTE_C
 from ..config.enum_constants import StatusEnum, AdminsAccountEnum, PartitionEnum, QOSEnum
 
 
-# TODO: update documentation for filling null default values of constraints (which is now NULLABLE)
 def get_requested_vram(constraints: np.ndarray[str], num_gpus: int, gpu_mem_usage: int) -> int:
     """
     Get the requested VRAM for a job based on its constraints and GPU usage.
@@ -122,7 +121,7 @@ def preprocess_data(
 
     # Added parameters, similar to Benjamin code
     res.loc[:, "Queued"] = res["StartTime"] - res["SubmitTime"]
-    res.loc[:, "requested_vram"] = res.apply(
+    res.loc[:, "vram_constraints"] = res.apply(
         lambda row: get_requested_vram(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1
     )
     res.loc[:, "allocated_vram"] = res["GPUType"].apply(lambda x: get_allocated_vram(x))
