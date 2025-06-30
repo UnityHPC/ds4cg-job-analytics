@@ -13,7 +13,15 @@ from datetime import timedelta, datetime
 
 # TODO: add docstring to further clarify parameters you just added
 def load_jobs_dataframe_from_duckdb(
-    db_path=None, table_name="Jobs", sample_size=None, random_state=None, days_back=None, custom_query=""
+    db_path=None,
+    table_name="Jobs",
+    sample_size=None,
+    random_state=None,
+    days_back=None,
+    custom_query="",
+    include_failed_cancelled_jobs=False,
+    include_cpu_only_jobs=False,
+    min_elasped_seconds=0,
 ):
     """
     Connect to the DuckDB slurm_data_small.db and return the jobs table as a pandas DataFrame.
@@ -25,6 +33,12 @@ def load_jobs_dataframe_from_duckdb(
             Deafults to None. If None, will not filter by startTime.
         custom_query(str, optional): Custom SQL query to execute. Defaults to an empty string.
             If empty, will select all jobs.
+        include_failed_cancelled_jobs (bool, optional): If True, include jobs with FAILED or CANCELLED status.
+            Defaults to False.
+        include_cpu_only_jobs (bool, optional): If True, include jobs that do not use GPUs (CPU-only jobs).
+            Defaults to False.
+        min_eslaped_seconds (int, optional): Minimum elapsed time in seconds to filter jobs by elapsed time.
+            Defaults to 0.
 
     Returns:
         pd.DataFrame: DataFrame containing the table data.
@@ -42,7 +56,10 @@ def load_jobs_dataframe_from_duckdb(
     jobs_df = db.fetch_query(custom_query)
 
     processed_data = preprocess_data(
-        jobs_df, min_elapsed_seconds=0, include_failed_cancelled_jobs=False, include_cpu_only_jobs=False
+        jobs_df,
+        min_elapsed_seconds=min_elasped_seconds,
+        include_failed_cancelled_jobs=include_failed_cancelled_jobs,
+        include_cpu_only_jobs=include_cpu_only_jobs,
     )
     db.disconnect()
     if sample_size is not None:
