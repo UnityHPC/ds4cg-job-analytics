@@ -237,21 +237,6 @@ def test_pre_process_data_fill_missing_gpu_type(mock_data_frame):
     assert gpus_stat[0] == expect_gpus_null
 
 
-def test_pre_process_data_fill_missing_constraints(mock_data_frame):
-    """
-    Test that the preprocessed data fills missing Constraints with empty numpy array correctly.
-    """
-    data = preprocess_data(
-        input_df=mock_data_frame,
-        min_elapsed_seconds=100,
-        include_cpu_only_jobs=True,
-        include_failed_cancelled_jobs=True,
-    )
-    ground_truth = _helper_filter_irrelevant_records(mock_data_frame, 100)
-    expect_constraints_null = len(ground_truth[(ground_truth["Constraints"].isna())])
-    assert sum(len(x) == 0 for x in data["Constraints"]) == expect_constraints_null
-
-
 def test_category_interactive(mock_data_frame):
     """
     Test that the preprocessed data has 'Interactive' as a categorical variable and check values contained within it.

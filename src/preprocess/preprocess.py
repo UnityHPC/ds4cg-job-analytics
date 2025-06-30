@@ -5,13 +5,15 @@ from ..config.enum_constants import StatusEnum, AdminsAccountEnum, PartitionEnum
 
 
 # TODO: update documentation for filling null default values of constraints (which is now NULLABLE)
-def get_requested_vram(constraints: list[str], num_gpus: int, gpu_mem_usage: int) -> int:
+def get_requested_vram(constraints: np.ndarray[str], num_gpus: int, gpu_mem_usage: int) -> int:
     """
     Get the requested VRAM for a job based on its constraints and GPU usage.
     This function extracts VRAM requests from the job constraints and returns the maximum requested VRAM.
+    If contraints is null, the requested_vram returned will also be null.
 
     Args:
-        constraints (list[str]): List of constraints from the job, which may include VRAM requests.
+        constraints (np.ndarray[str]): List of constraints from the job, which may include VRAM requests.
+            This variable is nullable.
         num_gpus (int): Number of GPUs requested by the job.
         gpu_mem_usage (int): GPU memory usage in bytes.
 
@@ -20,6 +22,8 @@ def get_requested_vram(constraints: list[str], num_gpus: int, gpu_mem_usage: int
     """
     gpu_mem_usage_gb = gpu_mem_usage / (2**30)
     requested_vrams = []  # requested_vram per 1 gpu
+    if not isinstance(constraints, np.ndarray) and pd.isna(constraints):
+        return np.nan  # if constraints is null then requested_vram should be np.nan as well
     for constr in constraints:
         constr = constr.strip("'")
         if constr.startswith("vram"):
@@ -118,7 +122,9 @@ def preprocess_data(
 
     # Added parameters, similar to Benjamin code
     res.loc[:, "Queued"] = res["StartTime"] - res["SubmitTime"]
-    res.loc[:, "requested_vram"] = res["Constraints"].apply(lambda c: get_requested_vram(c))
+    res.loc[:, "requested_vram"] = res.apply(
+        lambda row: get_requested_vram(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1
+    )
     res.loc[:, "allocated_vram"] = res["GPUType"].apply(lambda x: get_allocated_vram(x))
     res.loc[:, "user_jobs"] = res.groupby("User")["User"].transform("size")
     res.loc[:, "account_jobs"] = res.groupby("Account")["Account"].transform("size")

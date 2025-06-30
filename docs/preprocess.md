@@ -26,6 +26,7 @@
 
 ## Nullable Attributes
 - `Constraints`: nullable for integrity in data analysis
+- `requested_vram`: nullable for integrity in data analysis. Will be nulled when Constraints is null.
 
 ## Attribute Types
 - `StartTime`, `SubmitTime`: **datetime**
