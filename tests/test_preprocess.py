@@ -256,7 +256,6 @@ def test_category_interactive(mock_data_frame):
     """
     Test that the preprocessed data has 'Interactive' as a categorical variable and check values contained within it.
     """
-
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
     ground_truth = _helper_filter_irrelevant_records(mock_data_frame, 600)
     ground_truth_filtered = ground_truth[
@@ -346,7 +345,7 @@ def test_category_account(mock_data_frame):
     assert expected.issubset(set(data["Account"].cat.categories))
 
 
-def test_pre_proess_timedelta_conversion(mock_data_frame):
+def test_pre_process_timedelta_conversion(mock_data_frame):
     """
     Test that the preprocessed data converts elapsed time to timedelta.
     """
