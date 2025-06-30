@@ -658,7 +658,7 @@ def get_top_n_gpus(jobs_df, n):
     return top_n
 
 def contains_a100(gpu_array):
-    if isinstance(gpu_array, (list, np.ndarray)):
+    if isinstance(gpu_array, list | np.ndarray):
         return any(str(gpu).strip().lower() == 'a100' for gpu in gpu_array)
     return False
 
@@ -679,9 +679,14 @@ if __name__ == "__main__":
     for gpu_type in top_gpus:
         print(f"\n===== Analysis for GPU: {gpu_type.upper()} =====")
         # Filter jobs for this GPU type
-        gpu_jobs_df = efficiency.jobs_df[efficiency.jobs_df['GPUType'].apply(
-            lambda x: gpu_type in [str(g).strip().lower() for g in (x if isinstance(x, (list, np.ndarray)) else [x])]
-        )]
+        gpu_jobs_df = efficiency.jobs_df[
+    efficiency.jobs_df['GPUType'].apply(
+        lambda x, gpu_type=gpu_type: gpu_type in [
+            str(g).strip().lower()
+            for g in (x if isinstance(x, list | np.ndarray) else [x])
+        ]
+    )
+]
         if gpu_jobs_df.empty:
             print(f"No jobs found for GPU type: {gpu_type}")
             continue
