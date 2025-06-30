@@ -21,6 +21,10 @@ def load_jobs_dataframe_from_duckdb(
     Args:
         db_path (str or Path, optional): Path to the DuckDB database. Defaults to 'data/slurm_data_small.db'.
         table_name (str, optional): Table name to query. Defaults to 'Jobs'.
+        days_back (int, optional): Number of days back to filter jobs based on StartTime.
+            Deafults to None. If None, will not filter by startTime.
+        custom_query(str, optional): Custom SQL query to execute. Defaults to an empty string.
+            If empty, will select all jobs.
 
     Returns:
         pd.DataFrame: DataFrame containing the table data.
@@ -34,7 +38,7 @@ def load_jobs_dataframe_from_duckdb(
         custom_query = f"SELECT * FROM {table_name}"
         if days_back is not None:
             cutoff = datetime.now() - timedelta(days=days_back)
-            custom_query += f" WHERE StartTime>={cutoff}"
+            custom_query += f" WHERE StartTime>='{cutoff}'"
     jobs_df = db.fetch_query(custom_query)
 
     processed_data = preprocess_data(
