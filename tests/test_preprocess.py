@@ -15,7 +15,8 @@ def test_pre_process_data_filtred_columns(mock_data):
     """
     Test that the preprocessed data does not contain irrelevant columns.
     """
-    data = preprocess_data(input_df=mock_data[0], min_elapsed_seconds=600)
+    mock_data_frame = mock_data[0]
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
     assert "UUID" not in data.columns
     assert "EndTime" not in data.columns
     assert "Nodes" not in data.columns
@@ -25,7 +26,8 @@ def test_pre_process_data_filtered_gpu(mock_data):
     """
     Test that the preprocessed data does not contain null GPUType and GPUs.
     """
-    data = preprocess_data(input_df=mock_data[0], min_elapsed_seconds=600)
+    mock_data_frame = mock_data[0]
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
     is_gpu_type_null = data["GPUType"].isna()
     is_gpu_null = data["GPUs"].isna()
     assert not any(is_gpu_type_null)
@@ -36,7 +38,8 @@ def test_pre_process_data_filtered_status(mock_data):
     """
     Test that the preprocessed data does not contain FAILED or CANCELLED jobs.
     """
-    data = preprocess_data(input_df=mock_data[0], min_elapsed_seconds=600)
+    mock_data_frame = mock_data[0]
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
     status_failed = data["Status"] == StatusEnum.FAILED.value
     status_cancelled = data["Status"] == StatusEnum.CANCELLED.value
     assert not any(status_failed)
@@ -47,7 +50,8 @@ def test_pre_process_data_filtered_min_elapses_1(mock_data):
     """
     Test that the preprocessed data does not contain jobs with elapsed time below the threshold (300 seconds).
     """
-    data = preprocess_data(input_df=mock_data[0], min_elapsed_seconds=300)
+    mock_data_frame = mock_data[0]
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=300)
     elapsed_below_threshold = data["Elapsed"] < pd.to_timedelta(
         300, unit="s"
     )  # final version of Elapsed column is timedelta so convert for comparison
@@ -58,8 +62,9 @@ def test_pre_process_data_filter_min_esplapes_2(mock_data):
     """
     Test that the preprocessed data contains only jobs with elapsed time below the threshold (700 seconds).
     """
+    mock_data_frame = mock_data[0]
     data = preprocess_data(
-        input_df=mock_data[0],
+        input_df=mock_data_frame,
         min_elapsed_seconds=700,
         include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
@@ -73,7 +78,8 @@ def test_pre_process_data_filtered_root_account(mock_data):
     """
     Test that the preprocessed data does not contain jobs with root account, partition building, or qos updates.
     """
-    data = preprocess_data(input_df=mock_data[0], min_elapsed_seconds=600)
+    mock_data_frame = mock_data[0]
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
     partition_building = data["Partition"] == PartitionEnum.BUILDING.value
     qos_updates = data["QOS"] == QOSEnum.UPDATES.value
     account_root = data["Account"] == AdminsAccountEnum.ROOT.value
@@ -86,7 +92,8 @@ def test_pre_process_data_include_cpu_job(mock_data):
     """
     Test that the preprocessed data includes CPU-only jobs when specified.
     """
-    data = preprocess_data(input_df=mock_data[0], min_elapsed_seconds=600, include_cpu_only_jobs=True)
+    mock_data_frame = mock_data[0]
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_cpu_only_jobs=True)
     ground_truth = helper_filter_irrelevant_records(mock_data[0], 600)
     expected_cpu_type = len(
         ground_truth[
@@ -110,7 +117,8 @@ def test_pre_process_data_include_failed_cancelled_job(mock_data):
     """
     Test that the preprocessed data includes FAILED and CANCELLED jobs when specified.
     """
-    data = preprocess_data(input_df=mock_data[0], min_elapsed_seconds=600, include_failed_cancelled_jobs=True)
+    mock_data_frame = mock_data[0]
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_failed_cancelled_jobs=True)
     ground_truth = helper_filter_irrelevant_records(mock_data[0], 600)
     expect_failed_status = len(
         ground_truth[
@@ -135,8 +143,9 @@ def test_pre_process_data_include_all(mock_data):
     Test that the preprocessed data includes all jobs when both CPU-only and FAILED/CANCELLED
     jobs are specified.
     """
+    mock_data_frame = mock_data[0]
     data = preprocess_data(
-        input_df=mock_data[0],
+        input_df=mock_data_frame,
         min_elapsed_seconds=600,
         include_failed_cancelled_jobs=True,
         include_cpu_only_jobs=True,
@@ -161,8 +170,9 @@ def test_pre_process_data_fill_missing_interactive(mock_data):
     """
     Test that the preprocessed data fills missing interactive job types with 'non-interactive' correctly.
     """
+    mock_data_frame = mock_data[0]
     data = preprocess_data(
-        input_df=mock_data[0],
+        input_df=mock_data_frame,
         min_elapsed_seconds=100,
         include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
@@ -179,8 +189,9 @@ def test_pre_process_data_fill_missing_array_id(mock_data):
     """
     Test that the preprocessed data fills missing ArrayID with -1 correctly.
     """
+    mock_data_frame = mock_data[0]
     data = preprocess_data(
-        input_df=mock_data[0],
+        input_df=mock_data_frame,
         min_elapsed_seconds=100,
         include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
@@ -195,8 +206,9 @@ def test_pre_process_data_fill_missing_gpu_type(mock_data):
     """
     Test that the preprocessed data fills missing GPUType with 'cpu' correctly.
     """
+    mock_data_frame = mock_data[0]
     data = preprocess_data(
-        input_df=mock_data[0],
+        input_df=mock_data_frame,
         min_elapsed_seconds=100,
         include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
@@ -215,8 +227,9 @@ def test_pre_process_data_fill_missing_constraints(mock_data):
     """
     Test that the preprocessed data fills missing Constraints with empty numpy array correctly.
     """
+    mock_data_frame = mock_data[0]
     data = preprocess_data(
-        input_df=mock_data[0],
+        input_df=mock_data_frame,
         min_elapsed_seconds=100,
         include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
@@ -230,8 +243,9 @@ def test_category_interactive(mock_data):
     """
     Test that the preprocessed data has 'Interactive' as a categorical variable and check values contained within it.
     """
+    mock_data_frame = mock_data[0]
 
-    data = preprocess_data(input_df=mock_data[0], min_elapsed_seconds=600)
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
     ground_truth = helper_filter_irrelevant_records(mock_data[0], 600)
     ground_truth_filtered = ground_truth[
         (ground_truth["GPUType"].notna())
@@ -249,7 +263,8 @@ def test_category_qos(mock_data):
     """
     Test that the preprocessed data has 'QOS' as a categorical variable and check values contained within it.
     """
-    data = preprocess_data(input_df=mock_data[0], min_elapsed_seconds=600)
+    mock_data_frame = mock_data[0]
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
     ground_truth = helper_filter_irrelevant_records(mock_data[0], 600)
     ground_truth_filtered = ground_truth[
         (ground_truth["GPUType"].notna())
@@ -267,7 +282,8 @@ def test_category_exit_code(mock_data):
     """
     Test that the preprocessed data has 'ExitCode' as a categorical variable and check values contained within it.
     """
-    data = preprocess_data(input_df=mock_data[0], min_elapsed_seconds=600)
+    mock_data_frame = mock_data[0]
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
 
     ground_truth = helper_filter_irrelevant_records(mock_data[0], 600)
     ground_truth_filtered = ground_truth[
@@ -286,7 +302,8 @@ def test_category_partition(mock_data):
     """
     Test that the preprocessed data has 'Partition' as a categorical variable and check values contained within it.
     """
-    data = preprocess_data(input_df=mock_data[0], min_elapsed_seconds=600)
+    mock_data_frame = mock_data[0]
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
 
     ground_truth = helper_filter_irrelevant_records(mock_data[0], 600)
     ground_truth_filtered = ground_truth[
@@ -305,7 +322,8 @@ def test_category_account(mock_data):
     """
     Test that the preprocessed data has 'Account' as a categorical variable and check values contained within it.
     """
-    data = preprocess_data(input_df=mock_data[0], min_elapsed_seconds=600)
+    mock_data_frame = mock_data[0]
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
 
     ground_truth = helper_filter_irrelevant_records(mock_data[0], 600)
     ground_truth_filtered = ground_truth[
@@ -324,8 +342,9 @@ def test_pre_proess_timedelta_conversion(mock_data):
     """
     Test that the preprocessed data converts elapsed time to timedelta.
     """
+    mock_data_frame = mock_data[0]
     data = preprocess_data(
-        input_df=mock_data[0],
+        input_df=mock_data_frame,
         min_elapsed_seconds=600,
         include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
