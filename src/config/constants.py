@@ -18,6 +18,7 @@ RAM_MAP = {
     "cpu": 0,
 }
 
+VARIABLE_GPUS = {"a100": [40, 80], "v100": [16, 32]}  # contains GPUs that have multiple memory variants
 
 DEFAULT_MIN_ELAPSED_SECONDS = 600
 

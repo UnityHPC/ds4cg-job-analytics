@@ -21,13 +21,17 @@
 ## Null Attribute Defaults
 - `ArrayID`: set to -1
 - `Interactive`: set to `"non-interactive"`
-- `Constraints`: set to an empty numpy array
 - `GPUs`: set to 0 (when CPU jobs are kept)
 - `GPUType`: set to an numpy array ["cpu"] (when CPU jobs are kept)
+
+## Nullable Attributes
+- `Constraints`: nullable for integrity in data analysis
 
 ## Attribute Types
 - `StartTime`, `SubmitTime`: **datetime**
 - `TimeLimit`, `Elapsed`: **timedelta**
 - `Interactive`, `Status`, `ExitCode`, `QOS`, `Partition`, `Account`: **Categorical**
+
+
 
 ::: src.preprocess.preprocess

@@ -1,21 +1,41 @@
 import pandas as pd
 import numpy as np
-from ..config.constants import RAM_MAP, DEFAULT_MIN_ELAPSED_SECONDS, ATTRIBUTE_CATEGORIES
+from ..config.constants import RAM_MAP, DEFAULT_MIN_ELAPSED_SECONDS, ATTRIBUTE_CATEGORIES, VARIABLE_GPUS
 from ..config.enum_constants import StatusEnum, AdminsAccountEnum, PartitionEnum, QOSEnum
 
 
-def get_requested_vram(constraints: list[str]) -> int:
-    requested_vrams = []
+# TODO: update documentation for filling null default values of constraints (which is now NULLABLE)
+def get_requested_vram(constraints: list[str], num_gpus: int, gpu_mem_usage: int) -> int:
+    """
+    Get the requested VRAM for a job based on its constraints and GPU usage.
+    This function extracts VRAM requests from the job constraints and returns the maximum requested VRAM.
+
+    Args:
+        constraints (list[str]): List of constraints from the job, which may include VRAM requests.
+        num_gpus (int): Number of GPUs requested by the job.
+        gpu_mem_usage (int): GPU memory usage in bytes.
+
+    Returns:
+        int: Maximum requested VRAM in GB for the job, multiplied by the number of GPUs.
+    """
+    gpu_mem_usage_gb = gpu_mem_usage / (2**30)
+    requested_vrams = []  # requested_vram per 1 gpu
     for constr in constraints:
         constr = constr.strip("'")
         if constr.startswith("vram"):
             requested_vrams.append(int(constr.replace("vram", "")))
         elif constr.startswith("gpu"):
             gpu_type = constr.split(":")[1]
-            requested_vrams.append(RAM_MAP[gpu_type])
+            if gpu_type in VARIABLE_GPUS and gpu_mem_usage_gb > RAM_MAP[gpu_type] * num_gpus:
+                # assume they want the maximum vram for this GPU type
+                requested_vrams.append(max(VARIABLE_GPUS[gpu_type]))
+            else:
+                requested_vrams.append(RAM_MAP[gpu_type])
+
     if not (len(requested_vrams)):
         return 0
-    return max(requested_vrams)
+
+    return max(requested_vrams) * num_gpus
 
 
 def get_allocated_vram(gpu_type: list[str]) -> int:
@@ -35,11 +55,6 @@ def _fill_missing(res: pd.DataFrame) -> None:
 
     res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)
     res.loc[:, "Interactive"] = res["Interactive"].fillna("non-interactive")
-
-    mask_constraints_null = res["Constraints"].isna()
-    res.loc[mask_constraints_null, "Constraints"] = res.loc[mask_constraints_null, "Constraints"].apply(
-        lambda _: np.array([])
-    )
 
     mask_gpu_type_null = res["GPUType"].isna()
     res.loc[mask_gpu_type_null, "GPUType"] = res.loc[mask_gpu_type_null, "GPUType"].apply(lambda _: np.array(["cpu"]))
