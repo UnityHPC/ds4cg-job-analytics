@@ -41,3 +41,4 @@ data/
 *.patch
 *.diff
 /docs/build
+/site
