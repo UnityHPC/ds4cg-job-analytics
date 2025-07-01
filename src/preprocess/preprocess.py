@@ -137,7 +137,7 @@ def get_requested_vram(constraints: list[str], numGPUs: int, GPUMemUsage: int) -
 
     Returns:
         int: Maximum requested VRAM in GB for the job, multiplied by the number of GPUs.
-        
+
     """
     GPUMemUsageGB = GPUMemUsage / (2**30)
     requested_vrams = []

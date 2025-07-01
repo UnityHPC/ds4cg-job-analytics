@@ -5,9 +5,9 @@ in GPU usage and notify users or PIs about these issues.
 
 import pandas as pd
 from pathlib import Path
-from src.preprocess.preprocess import preprocess_data
-from src.database.DatabaseConnection import DatabaseConnection
-from src.config.constants import MIN_ELAPSED_SECONDS
+from preprocess.preprocess import preprocess_data
+from database.DatabaseConnection import DatabaseConnection
+from config.constants import MIN_ELAPSED_SECONDS
 
 
 def load_jobs_dataframe_from_duckdb(
@@ -107,7 +107,9 @@ class EfficiencyAnalysis:
 
         # Calculate efficiency metrics
         filtered_jobs["gpu_memory_used_gb"] = filtered_jobs["GPUMemUsage"] / (2**30)
-        filtered_jobs["vram_efficiency"] = filtered_jobs["gpu_memory_used_gb"] / filtered_jobs["allocated_vram"]
+        filtered_jobs["vram_efficiency"] = (
+            filtered_jobs["gpu_memory_used_gb"] / filtered_jobs["allocated_vram"]
+        ).clip(1)
         filtered_jobs["gpu_hours"] = (filtered_jobs["Elapsed"].dt.total_seconds() * filtered_jobs["GPUs"]) / 3600
 
         # Calculate weighted_vram_efficiency per job, normalized by total gpu_hours for that specific User
