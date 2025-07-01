@@ -76,9 +76,3 @@ def test_approx_allocated_vram_mixed_nodes_exceeding_minimum():
     )
 
     assert mock_data["AllocatedVRAM"].tolist() == expected_allocated_vram
-
-
-# Run the tests
-test_approx_allocated_vram_single_node()
-test_approx_allocated_vram_mixed_nodes_below_minimum()
-test_approx_allocated_vram_mixed_nodes_exceeding_minimum()

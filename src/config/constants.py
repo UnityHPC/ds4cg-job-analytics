@@ -1,5 +1,4 @@
 from .enum_constants import InteractiveEnum, QOSEnum, StatusEnum, ExitCodeEnum, PartitionEnum, AdminsAccountEnum
-import re
 
 VRAM_VALUES = {
     "a100": 40,  # Default VRAM for a100 is 40GB, but we check usage to see which variant they want
@@ -35,20 +34,3 @@ ATTRIBUTE_CATEGORIES = {
 
 # Storing GPU names that have multiple memory sizes
 MULTIVALENT_GPUS = {"a100": [40, 80], "v100": [16, 32]}
-
-# Map to calculate specific VRAM based on node name.
-# This list is only for nodes that have multiple VRAM sizes for the same GPU type.
-# based on https://docs.unity.rc.umass.edu/documentation/cluster_specs/nodes/
-# TODO: read this from a config file or database
-GET_VRAM_FROM_NODE = {
-    "a100": lambda node: 40
-    if node.startswith("ece-gpu")
-    else 80
-    if re.match("^(gpu0(1[3-9]|2[0-4]))|(gpu042)|(umd-cscdr-gpu00[1-2])|(uri-gpu00[1-8])$", node)
-    else 0,
-    "v100": lambda node: 16
-    if re.match("^(gpu00[1-7])|(power9-gpu009)|(power9-gpu01[0-6])$", node)
-    else 32
-    if re.match("^(gpu01[1-2])|(power9-gpu00[1-8])$", node)
-    else 0,
-}

@@ -18,4 +18,3 @@ def mock_data_frame():
     finally:
         db.connection.close()
         shutil.rmtree(temp_db_dir)
-        
