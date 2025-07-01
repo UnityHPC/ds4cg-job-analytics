@@ -47,7 +47,8 @@ class DatabaseConnection:
         """
         Fetch data based on a custom query.
         
-        Args:            query (str): The SQL query to execute.
+        Args:
+            query (str): The SQL query to execute.
 
         Raises:
             Exception: If the query does not match the database schema or if there is no active connection
