@@ -88,8 +88,8 @@ def test_connection_established(temp_file_db):
     assert temp_file_db.is_connected() is True
 
 
-def test_fetch_all_returns_correct_data(temp_file_db):
-    df_mock = temp_file_db.fetch_all()
+def test_fetch_all_jobs_returns_correct_data(temp_file_db):
+    df_mock = temp_file_db.fetch_all_jobs()
 
     assert len(df_mock) == 3
 
