@@ -1,8 +1,10 @@
 from .enum_constants import InteractiveEnum, QOSEnum, StatusEnum, ExitCodeEnum, PartitionEnum, AdminsAccountEnum
 
 RAM_MAP = {
-    "a100": 80,  # have 80GB and 40GB variants, variants will be added in another PR
-    "v100": 16,  # have 32GB and 16GB variants, variants will be added in another PR
+    "a100": 40,  # have 80GB and 40GB variants, default is setted to 40GB
+    "a100-40g": 40,
+    "a100-80g": 80,
+    "v100": 16,  # have 32GB and 16GB variants, default is setted to 16GB
     "a40": 48,
     "gh200": 95,
     "rtx_8000": 48,
