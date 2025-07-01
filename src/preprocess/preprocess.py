@@ -23,7 +23,7 @@ def get_vram_from_node(gpu_type: str, node: str) -> int:
         node (str): Name of the node.
 
     Returns:
-        int: VRAM size in GiB for the given GPU type and node. 
+        int: VRAM size in GiB for the given GPU type and node.
              Returns 0 if the node does not match any of the patterns for the given GPU type.
 
     Notes:
@@ -189,7 +189,10 @@ def _fill_missing(res: pd.DataFrame) -> None:
     # fill default values for specific columns
     res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)
     res.loc[:, "Interactive"] = res["Interactive"].fillna("non-interactive")
-    res.loc[:, "Constraints"] = res["Constraints"].fillna("").apply(lambda _: np.array([]))
+    mask_constraints_null = res["Constraints"].isna()
+    res.loc[mask_constraints_null, "Constraints"] = res.loc[mask_constraints_null, "Constraints"].apply(
+        lambda _: np.array([])
+    )
     res.loc[:, "GPUType"] = res["GPUType"].fillna("").apply(lambda x: np.array(["cpu"]) if x == "" else np.array(x))
     res.loc[:, "GPUs"] = res["GPUs"].fillna(0)
 
