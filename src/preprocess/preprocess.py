@@ -68,7 +68,7 @@ def get_approx_allocated_vram(gpu_type: list[str], node_list: list[str], gpu_cou
         if gpu not in MULTIVALENT_GPUS:
             # if the GPU is not multivalent, return the VRAM value for that GPU
             return VRAM_VALUES[gpu] * gpu_count
-        
+
         # calculate VRAM for multivalent GPUs
         total_vram = 0
         if len(node_list) == 1:
@@ -81,16 +81,16 @@ def get_approx_allocated_vram(gpu_type: list[str], node_list: list[str], gpu_cou
 
         else:
             # calculate all VRAM for all nodes in the node_list
-            node_values = set() # to avoid duplicates
+            node_values = set()  # to avoid duplicates
             for node in node_list:
                 node_values.add(GET_VRAM_FROM_NODE[gpu](node))
-            
+
             if not node_values:
                 return None
-            
+
             node_values = sorted(list(node_values))
-            total_vram = node_values.pop(0) * gpu_count # use the node with the minimum VRAM value
-            # if the total VRAM is less than the GPU memory usage, use the VRAM from the GPU in the larger ndoe 
+            total_vram = node_values.pop(0) * gpu_count  # use the node with the minimum VRAM value
+            # if the total VRAM is less than the GPU memory usage, use the VRAM from the GPU in the larger ndoe
             while total_vram < (gpu_mem_usage / 2**30) and node_values:
                 total_vram = node_values.pop(0) * gpu_count
 
@@ -136,9 +136,7 @@ def _fill_missing(res: pd.DataFrame) -> None:
     res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)
     res.loc[:, "Interactive"] = res["Interactive"].fillna("non-interactive")
     res.loc[:, "Constraints"] = res["Constraints"].fillna("").apply(lambda x: np.array(list(x)))
-    res.loc[:, "GPUType"] = (
-        res["GPUType"].fillna("").apply(lambda x: np.array(["cpu"]) if x == "" else np.array(x))
-    )
+    res.loc[:, "GPUType"] = res["GPUType"].fillna("").apply(lambda x: np.array(["cpu"]) if x == "" else np.array(x))
     res.loc[:, "GPUs"] = res["GPUs"].fillna(0)
 
 

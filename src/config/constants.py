@@ -36,7 +36,8 @@ ATTRIBUTE_CATEGORIES = {
 # Storing GPU names that have multiple memory sizes
 MULTIVALENT_GPUS = {"a100": [40, 80], "v100": [16, 32]}
 
-# calculate specific VRAM based on node name. This list is only for nodes that have multiple VRAM sizes for the same GPU type.
+# Map to calculate specific VRAM based on node name.
+# This list is only for nodes that have multiple VRAM sizes for the same GPU type.
 # based on https://docs.unity.rc.umass.edu/documentation/cluster_specs/nodes/
 # TODO: read this from a config file or database
 GET_VRAM_FROM_NODE = {
