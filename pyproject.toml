@@ -79,7 +79,7 @@ addopts = [
 testpaths = ["tests"]
 
 [tool.mkdocs]
-# MkDocs configuration options (you can embed YAML heseupre)
+# MkDocs configuration options (you can embed YAML directly in pyproject.toml)
 config = """
 site_name: DS4CG Unity Job Analytics Docs
 theme.name: material
@@ -98,3 +98,10 @@ show_missing = true
 [tool.mypy]
 python_version = "3.11"
 ignore_missing_imports = true
+exclude = [
+    # Exclude Benjamin's code from type checking
+    "scripts/cpu_metrics.py",
+    "scripts/gpu_metrics.py",
+    "scripts/zero_gpu_usage_list.py",
+    "notebooks/SlurmGPU.ipynb"
+]

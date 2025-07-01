@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 from ..config.constants import RAM_MAP, DEFAULT_MIN_ELAPSED_SECONDS, ATTRIBUTE_CATEGORIES
 from ..config.enum_constants import StatusEnum, AdminsAccountEnum, PartitionEnum, QOSEnum
 
@@ -35,15 +34,8 @@ def _fill_missing(res: pd.DataFrame) -> None:
 
     res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)
     res.loc[:, "Interactive"] = res["Interactive"].fillna("non-interactive")
-
-    mask_constraints_null = res["Constraints"].isna()
-    res.loc[mask_constraints_null, "Constraints"] = res.loc[mask_constraints_null, "Constraints"].apply(
-        lambda _: np.array([])
-    )
-
-    mask_gpu_type_null = res["GPUType"].isna()
-    res.loc[mask_gpu_type_null, "GPUType"] = res.loc[mask_gpu_type_null, "GPUType"].apply(lambda _: np.array(["cpu"]))
-
+    res.loc[:, "Constraints"]= res["Constraints"].fillna("").apply(lambda x: [] if x == "" else x)
+    res.loc[:, "GPUType"] = res["GPUType"].fillna("").apply(lambda x: ["cpu"] if x == "" else x)
     res.loc[:, "GPUs"] = res["GPUs"].fillna(0)
 
 
