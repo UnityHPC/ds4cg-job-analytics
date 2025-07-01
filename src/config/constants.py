@@ -1,10 +1,10 @@
 from .enum_constants import InteractiveEnum, QOSEnum, StatusEnum, ExitCodeEnum, PartitionEnum, AdminsAccountEnum
 import re
 
-RAM_MAP = {
-    "a100": 80,
-    "a100-40g": 40,
-    "a100-80g": 80,
+VRAM_VALUES = {
+    "a100": 40,  # Default VRAM for a100 is 40GB, but we check usage to see which variant they want
+    "a100-40g": 40,  # 40GB variant of a100 that can be specified explicitly in constraints
+    "a100-80g": 80,  # 80GB variant of a100 that can be specified explicitly in constraints
     "v100": 16,
     "a40": 48,
     "gh200": 95,
@@ -33,10 +33,12 @@ ATTRIBUTE_CATEGORIES = {
     "Partition": PartitionEnum,
 }
 
-# Storing GPUs that have variable memory sizes
-VARIABLE_GPUS = {"a100": [40, 80], "v100": [16, 32]}
+# Storing GPU names that have multiple memory sizes
+MULTIVALENT_GPUS = {"a100": [40, 80], "v100": [16, 32]}
 
-# calculate specific VRAM based on node name
+# calculate specific VRAM based on node name. This list is only for nodes that have multiple VRAM sizes for the same GPU type.
+# based on https://docs.unity.rc.umass.edu/documentation/cluster_specs/nodes/
+# TODO: read this from a config file or database
 GET_VRAM_FROM_NODE = {
     "a100": lambda node: 40
     if node.startswith("ece-gpu")
