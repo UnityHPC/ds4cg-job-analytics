@@ -295,7 +295,7 @@ def preprocess_data(
     res.loc[:, "Queued"] = res["StartTime"] - res["SubmitTime"]
     res.loc[:, "vram_constraint"] = res.apply(
         lambda row: get_vram_constraints(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1
-    )
+    ).astype("Int64")
     res.loc[:, "approx_allocated_vram"] = res.apply(
         lambda row: get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]), axis=1
     )
