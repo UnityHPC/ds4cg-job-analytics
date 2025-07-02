@@ -33,7 +33,6 @@ def load_jobs_dataframe_from_duckdb(db_path=None, table_name="Jobs", sample_size
         include_failed_cancelled_jobs=False,
         include_cpu_only_jobs=False
     )
-    db.disconnect()
     if sample_size is not None:
         processed_data = processed_data.sample(n=sample_size, random_state=random_state)
     return processed_data

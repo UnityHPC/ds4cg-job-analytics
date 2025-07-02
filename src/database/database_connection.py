@@ -12,13 +12,13 @@ class DatabaseConnection:
         self.connection = duckdb.connect(self.db_url)
         return self.connection
 
-    def disconnect(self):
+    def _disconnect(self):
         self.connection.close()
 
     def __del__(self):
         """Ensure the connection is closed when the object is deleted."""
         if self.is_connected():
-            self.disconnect()
+            self._disconnect()
             print(f"Disconnected from {self.db_url}")
 
     def is_connected(self) -> bool:
