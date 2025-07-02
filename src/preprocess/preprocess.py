@@ -57,7 +57,9 @@ def get_vram_from_node(gpu_type: str, node: str) -> int:
 
 
 def get_vram_constraints(constraints: list[str], gpu_count: int, gpu_mem_usage: int) -> int | None:
-    """Get the VRAM assigned for a job based on its constraints and GPU usage.
+    """
+    Get the VRAM assigned for a job based on its constraints and GPU usage.
+    
     This function extracts VRAM requests from the job constraints and returns the maximum requested VRAM from the
     constraints. For GPU names that correspond to multiple VRAM values, take the minimum value that is not smaller
     than the amount of VRAM used by that job.
@@ -95,6 +97,7 @@ def get_vram_constraints(constraints: list[str], gpu_count: int, gpu_mem_usage: 
 def get_approx_allocated_vram(gpu_types: list[str], node_list: list[str], gpu_count: int, gpu_mem_usage: int) -> int:
     """
     Get the total allocated VRAM for a job based on its GPU type and node list.
+
     This function estimates the total VRAM allocated for a job based on the GPU types used
     and the nodes where the job ran.
 
@@ -205,6 +208,7 @@ def preprocess_data(
 ) -> pd.DataFrame:
     """
     Preprocess dataframe, filtering out unwanted rows and columns, filling missing values and converting types.
+    
     This function will take in a dataframe and create a new dataframe satisfying criterias,
     original dataframe is intact.
 

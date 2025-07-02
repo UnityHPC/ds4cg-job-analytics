@@ -13,6 +13,7 @@ from src.config.enum_constants import (
 def _helper_filter_irrelevant_records(input_df: pd.DataFrame, min_elapsed_seconds: int) -> pd.DataFrame:
     """
     Private function to help generate expected ground truth dataframe for test.
+    
     Given a ground truth dataframe, this will create a new dataframe without records meeting the following criteria:
     - QOS is updates
     - Account is root
@@ -159,8 +160,7 @@ def test_preprocess_data_include_failed_cancelled_job(mock_data_frame):
 
 def test_preprocess_data_include_all(mock_data_frame):
     """
-    Test that the preprocessed data includes all jobs when both CPU-only and FAILED/CANCELLED
-    jobs are specified.
+    Test that the preprocessed data includes all jobs when both CPU-only and FAILED/CANCELLED jobs are specified.
     """
     data = preprocess_data(
         input_df=mock_data_frame,
