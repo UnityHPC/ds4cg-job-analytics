@@ -5,6 +5,7 @@ import pandas as pd
 def convert_csv_to_db(path_to_csv: str, path_to_db: str):
     """
     Function to convert csv to duckDB database, following the schema provided by Unity.
+
     This function is intended to be used on csv files that follow the Unity schema only.
 
     Args:

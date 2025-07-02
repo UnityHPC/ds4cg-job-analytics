@@ -7,7 +7,7 @@ import pandas as pd
 from pathlib import Path
 from src.preprocess.preprocess import preprocess_data
 from src.database import DatabaseConnection
-from src.config.constants import MIN_ELAPSED_SECONDS
+from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
 from datetime import timedelta, datetime
 
 
@@ -86,7 +86,7 @@ class EfficiencyAnalysis:
         gpu_mem_usage_max=None,
         gpu_mem_usage_exact=None,
         gpus_min=1,
-        elapsed_seconds_min=MIN_ELAPSED_SECONDS,
+        elapsed_seconds_min=DEFAULT_MIN_ELAPSED_SECONDS,
     ):
         """
         Analyze jobs based on constraints, GPU allocation, and usage criteria.

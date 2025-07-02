@@ -141,8 +141,7 @@ def test_pre_process_data_include_failed_cancelled_job(mock_data):
 
 def test_pre_process_data_include_all(mock_data):
     """
-    Test that the preprocessed data includes all jobs when both CPU-only and FAILED/CANCELLED
-    jobs are specified.
+    Test that the preprocessed data includes all jobs when both CPU-only and FAILED/CANCELLED jobs are specified.
     """
     mock_data_frame = mock_data[0]
     data = preprocess_data(

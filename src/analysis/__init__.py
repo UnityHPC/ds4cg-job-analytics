@@ -1,1 +1,2 @@
+from .visualize_columns import DataVisualizer as DataVisualizer
 from .vram_usage import load_jobs_dataframe_from_duckdb as load_jobs_dataframe_from_duckdb

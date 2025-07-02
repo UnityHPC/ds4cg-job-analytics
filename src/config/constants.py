@@ -18,6 +18,7 @@ RAM_MAP = {
     "cpu": 0,
 }
 
+VRAM_CATEGORIES = [0, 8, 11, 12, 16, 23, 32, 40, 48, 80]
 
 DEFAULT_MIN_ELAPSED_SECONDS = 600
 
@@ -30,5 +31,3 @@ ATTRIBUTE_CATEGORIES = {
     "Account": AdminsAccountEnum,
     "Partition": PartitionEnum,
 }
-VRAM_CATEGORIES = [0, 8, 11, 12, 16, 23, 32, 40, 48, 80]
-MIN_ELAPSED_SECONDS = 600  # Minimum elapsed time in seconds for analysis
