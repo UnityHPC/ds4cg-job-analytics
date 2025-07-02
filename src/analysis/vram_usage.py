@@ -1,5 +1,7 @@
 """
-Functions to analyze efficiency of Jobs based on their VRAM usage. The aim is to identify potential inefficiencies
+Functions to analyze efficiency of Jobs based on their VRAM usage.
+
+The aim is to identify potential inefficiencies
 in GPU usage and notify users or PIs about these issues.
 """
 
@@ -70,6 +72,7 @@ def load_jobs_dataframe_from_duckdb(
 class EfficiencyAnalysis:
     """
     Class to encapsulate the efficiency analysis of jobs based on VRAM usage.
+
     It provides methods to load data, analyze workload efficiency, and evaluate CPU-GPU usage patterns.
     """
 

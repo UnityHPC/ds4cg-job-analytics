@@ -13,6 +13,8 @@ import pandas as pd
 
 def helper_filter_irrelevant_records(input_df: pd.DataFrame, min_elapsed_seconds: int) -> pd.DataFrame:
     """
+    Helper function to make basic filtering on a ground truth dataframe, intended to use for test only.
+
     Given a ground truth dataframe, this will create a new dataframe without records meeting the following criteria:
     - QOS is updates
     - Account is root
