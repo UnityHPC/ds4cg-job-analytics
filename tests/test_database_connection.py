@@ -89,7 +89,7 @@ def test_connection_established(temp_file_db):
 
 
 def test_fetch_all_returns_correct_data(temp_file_db):
-    mock_jobs_df = temp_file_db.fetch_all()
+    mock_jobs_df = temp_file_db.fetch_all_jobs()
 
     assert len(mock_jobs_df) == 3
 

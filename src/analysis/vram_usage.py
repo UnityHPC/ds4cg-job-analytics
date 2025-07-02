@@ -7,7 +7,7 @@ The aim is to identify potential inefficiencies in GPU usage and notify users or
 import pandas as pd
 from pathlib import Path
 from src.preprocess.preprocess import preprocess_data
-from src.database.DatabaseConnection import DatabaseConnection
+from src.database import DatabaseConnection
 from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
 
 
@@ -26,12 +26,12 @@ def load_jobs_dataframe_from_duckdb(db_path=None, table_name="Jobs", sample_size
         db_path = Path(__file__).resolve().parents[2] / "data" / "slurm_data_small.db"
     db = DatabaseConnection(str(db_path))
 
-    jobs_df = db.fetch_all(table_name=table_name)
+    jobs_df = db.fetch_all_jobs(table_name=table_name)
     processed_data = preprocess_data(
         jobs_df,
-        min_elapsed_second=0,
+        min_elapsed_seconds=0,
         include_failed_cancelled_jobs=False,
-        include_CPU_only_job=False
+        include_cpu_only_jobs=False
     )
     db.disconnect()
     if sample_size is not None:
