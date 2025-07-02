@@ -17,13 +17,12 @@ from datetime import timedelta, datetime
 def load_jobs_dataframe_from_duckdb(
     db_path=None,
     table_name="Jobs",
-    sample_size=None,
-    random_state=None,
     days_back=None,
     custom_query="",
     include_failed_cancelled_jobs=False,
     include_cpu_only_jobs=False,
     min_elasped_seconds=0,
+    **kwargs,
 ):
     """
     Connect to the DuckDB slurm_data_small.db and return the jobs table as a pandas DataFrame.
@@ -47,25 +46,69 @@ def load_jobs_dataframe_from_duckdb(
     """
     if db_path is None:
         db_path = Path(__file__).resolve().parents[2] / "data" / "slurm_data_small.db"
-    db = DatabaseConnection(str(db_path))
+    db = None
+    processed_data = None
 
-    jobs_df = None
-    if not custom_query:
-        custom_query = f"SELECT * FROM {table_name}"
-        if days_back is not None:
-            cutoff = datetime.now() - timedelta(days=days_back)
-            custom_query += f" WHERE StartTime>='{cutoff}'"
-    jobs_df = db.fetch_query(custom_query)
+    # TODO: need to allow for filtering new columns added by preprocess code as well
+    # TODO: how do users are supposed to pass in values if they want it to be in a specified range
+    # TODO: low priority, but look into filetering based on GPUType in the new updated database
+    try:
+        db = DatabaseConnection(str(db_path))
+        set_columns_names = set(db.fetch_all_column_names())
 
-    processed_data = preprocess_data(
-        jobs_df,
-        min_elapsed_seconds=min_elasped_seconds,
-        include_failed_cancelled_jobs=include_failed_cancelled_jobs,
-        include_cpu_only_jobs=include_cpu_only_jobs,
-    )
-    db.disconnect()
-    if sample_size is not None:
-        processed_data = processed_data.sample(n=sample_size, random_state=random_state)
+        jobs_df = None
+        if not custom_query:
+            custom_query = f"SELECT * FROM {table_name}"
+            conditions = [f"Elapsed >= {min_elasped_seconds}"]  # array holding different conditions
+
+            # Iterate through keyword arguments to check for invalid keyword and construct conditions
+            if len(kwargs) > 0:
+                for key, val in kwargs.items():
+                    if key not in set_columns_names:
+                        raise Exception(f"Invalid column name: {key}")
+
+                    # handle exact conditions or range condtions properly
+                    # range condtition
+                    if isinstance(val, tuple):
+                        cond_holder = []
+                        if val[0]:
+                            cond_holder.append(f"key >= {val[0]}")
+                        if val[1]:
+                            cond_holder.append(f"key <= {val[1]}")
+                        conditions.append(f"{' AND '.join(cond_holder)}")
+
+                    # membership condition
+                    elif isinstance(val, list):
+                        conditions.append(f"list_has_all({key}, {val})")
+
+                    # exact queries
+                    else:
+                        match = val
+                        if isinstance(val, str):
+                            match = f"'{val}'"
+                        conditions.append(f"{key} == {match}")
+
+            if days_back is not None:
+                cutoff = datetime.now() - timedelta(days=days_back)
+                conditions.append(f"StartTime>='{cutoff}'")
+
+            if conditions:
+                custom_query += f" WHERE {' AND '.join(conditions)}"
+            #!For debugging
+            print(custom_query, conditions)
+        jobs_df = db.fetch_query(custom_query)
+
+        processed_data = preprocess_data(
+            jobs_df,
+            min_elapsed_seconds=min_elasped_seconds,  # unnecessary but kept since default min elapsed is 600
+            include_failed_cancelled_jobs=include_failed_cancelled_jobs,
+            include_cpu_only_jobs=include_cpu_only_jobs,
+        )
+    except Exception as e:
+        processed_data = None
+        raise Exception(f"Exception at load_jobs_dataframe_from_duck_db: {e}") from e
+    finally:
+        db.disconnect()
     return processed_data
 
 

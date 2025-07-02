@@ -5,7 +5,6 @@ class DatabaseConnection:
     def __init__(self, db_url: str):
         self.db_url = db_url
         self.connection = self._connect()
-        print(f"Connected to {self.db_url}")
 
     def _connect(self) -> duckdb.DuckDBPyConnection:
         """Establish a connection to the DuckDB database."""
@@ -19,7 +18,6 @@ class DatabaseConnection:
         """Ensure the connection is closed when the object is deleted."""
         if self.is_connected():
             self.disconnect()
-            print(f"Disconnected from {self.db_url}")
 
     def is_connected(self) -> bool:
         return self.connection is not None
@@ -42,8 +40,6 @@ class DatabaseConnection:
             return self.connection.execute(query).fetchdf()
         else:
             raise Exception("Not connected")
-        query = f"SELECT * FROM {table_name}"
-        return self.connection.execute(query).df()
 
     def fetch_query(self, query: str):
         """
