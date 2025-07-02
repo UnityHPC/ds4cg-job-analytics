@@ -1,4 +1,5 @@
 import duckdb
+import os
 
 
 class DatabaseConnection:
@@ -6,7 +7,7 @@ class DatabaseConnection:
         self.db_url = db_url
         self.connection = self._connect()
         print(f"Connected to {self.db_url}")
-    
+
     def _connect(self) -> duckdb.DuckDBPyConnection:
         """Establish a connection to the DuckDB database."""
         self.connection = duckdb.connect(self.db_url)
@@ -19,7 +20,8 @@ class DatabaseConnection:
         """Ensure the connection is closed when the object is deleted."""
         if self.is_connected():
             self._disconnect()
-            print(f"Disconnected from {self.db_url}")
+            if not os.getenv("PYTEST_VERSION"):
+                print(f"Disconnected from {self.db_url}")
 
     def is_connected(self) -> bool:
         return self.connection is not None
@@ -43,7 +45,7 @@ class DatabaseConnection:
     def fetch_query(self, query: str):
         """
         Fetch data based on a custom query.
-        
+
         Args:
             query (str): The SQL query to execute.
 

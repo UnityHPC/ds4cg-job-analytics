@@ -80,7 +80,6 @@ def temp_file_db():
 
     yield mem_db
 
-    mem_db.disconnect()
     os.remove(temp_db_path)
 
 

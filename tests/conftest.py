@@ -16,4 +16,5 @@ def mock_data_frame():
     except Exception as e:
         raise Exception("Exception at mock_data_frame") from e
     finally:
+        db.connection.close()
         shutil.rmtree(temp_db_dir)
