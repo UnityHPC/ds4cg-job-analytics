@@ -293,10 +293,10 @@ def preprocess_data(
 
     # Added parameters for calculating VRAM metrics
     res.loc[:, "Queued"] = res["StartTime"] - res["SubmitTime"]
-    res.loc[:, "requested_vram"] = res.apply(
+    res.loc[:, "vram_constraint"] = res.apply(
         lambda row: get_vram_constraints(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1
     )
-    res.loc[:, "allocated_vram"] = res.apply(
+    res.loc[:, "approx_allocated_vram"] = res.apply(
         lambda row: get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]), axis=1
     )
     res.loc[:, "user_jobs"] = res.groupby("User")["User"].transform("size")

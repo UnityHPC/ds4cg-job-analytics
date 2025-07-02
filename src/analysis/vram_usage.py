@@ -49,7 +49,7 @@ class EfficiencyAnalysis:
         self.efficiency_df = None
         self.analysis_results = None
 
-    def calculate_efficiency_metrics(
+    def filter_jobs_for_analysis(
         self,
         vram_constraint_filter=0,
         allocated_vram_greater_than=0,
@@ -57,10 +57,9 @@ class EfficiencyAnalysis:
         gpu_mem_usage_max=None,
         gpu_mem_usage_exact=None,
         gpus_min=1,
-        elapsed_seconds_min=DEFAULT_MIN_ELAPSED_SECONDS,
-    ):
+        elapsed_seconds_min=DEFAULT_MIN_ELAPSED_SECONDS):
         """
-        Analyze jobs based on constraints, GPU allocation, and usage criteria.
+        Filter jobs based on VRAM constraints, GPU allocation, and usage criteria.
 
         Args:
             vram_constraint_filter (int, float, or callable): Value or function to filter requested_vram
@@ -72,7 +71,7 @@ class EfficiencyAnalysis:
             elapsed_seconds_min (int): Minimum elapsed time in seconds
 
         Returns:
-            DataFrame: Filtered jobs with efficiency metrics added
+            DataFrame: Filtered jobs DataFrame based on the specified criteria.
         """
         # Flexible filter for requested_vram
         if callable(vram_constraint_filter):
@@ -90,13 +89,28 @@ class EfficiencyAnalysis:
             if gpu_mem_usage_max is not None:
                 gpu_mem_mask &= self.jobs_df["GPUMemUsage"] <= gpu_mem_usage_max
 
-        filtered_jobs = self.jobs_df[
+        return self.jobs_df[
             mask
             & (self.jobs_df["allocated_vram"] > allocated_vram_greater_than)
             & gpu_mem_mask
             & (self.jobs_df["GPUs"] >= gpus_min)
             & (self.jobs_df["Elapsed"].dt.total_seconds()>= elapsed_seconds_min)
         ].copy()
+        
+
+    def calculate_efficiency_metrics(
+        self,
+        filtered_jobs :pd.DataFrame,
+    ):
+        """
+        Analyze jobs based on constraints, GPU allocation, and usage criteria.
+
+        Args:
+            filtered_jobs (DataFrame): DataFrame containing jobs to analyze.
+
+        Returns:
+            DataFrame: Jobs with efficiency metrics added
+        """
 
         # Calculate efficiency metrics
         filtered_jobs["gpu_memory_used_gb"] = filtered_jobs["GPUMemUsage"] / (2**30)
