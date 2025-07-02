@@ -32,34 +32,37 @@ def get_vram_from_node(gpu_type: str, node: str) -> int:
 
         TODO: Consider reading this information from a config file or database.
     """
+    vram = 0
     if gpu_type not in MULTIVALENT_GPUS:
         # if the GPU is not multivalent we do not need to check the node
-        return 0
+        vram = 0
 
-    if gpu_type == "a100":
-        if node.startswith("ece-gpu"):
-            return 40
-        elif re.match("^(gpu0(1[3-9]|2[0-4]))|(gpu042)|(umd-cscdr-gpu00[1-2])|(uri-gpu00[1-8])$", node):
-            return 80
-        else:
-            # if the node does not match any of the patterns, it is not a valid node for this GPU type
-            # so we return 0
-            return 0
-    elif gpu_type == "v100":
-        if re.match("^(gpu00[1-7])|(power9-gpu009)|(power9-gpu01[0-6])$", node):
-            return 16
-        elif re.match("^(gpu01[1-2])|(power9-gpu00[1-8])$", node):
-            return 32
-        else:
-            # if the node does not match any of the patterns, it is not a valid node for this GPU type
-            # so we return 0
-            return 0
+    else:
+        if gpu_type == "a100":
+            if node.startswith("ece-gpu"):
+                vram = 40  # A100 with 40GB
+            elif re.match("^(gpu0(1[3-9]|2[0-4]))|(gpu042)|(umd-cscdr-gpu00[1-2])|(uri-gpu00[1-8])$", node):
+                vram = 80  # A100 with 80GB
+            else:
+                # if the node does not match any of the patterns, it is not a valid node for this GPU type
+                # so we return 0
+                vram = 0
+        elif gpu_type == "v100":
+            if re.match("^(gpu00[1-7])|(power9-gpu009)|(power9-gpu01[0-6])$", node):
+                vram = 16  # V100 with 16GB
+            elif re.match("^(gpu01[1-2])|(power9-gpu00[1-8])$", node):
+                vram = 32  # V100 with 32GB
+            else:
+                # if the node does not match any of the patterns, it is not a valid node for this GPU type
+                # so we return 0
+                vram = 0
+    return vram
 
 
 def get_vram_constraints(constraints: list[str], gpu_count: int, gpu_mem_usage: int) -> int | None:
     """
     Get the VRAM assigned for a job based on its constraints and GPU usage.
-    
+
     This function extracts VRAM requests from the job constraints and returns the maximum requested VRAM from the
     constraints. For GPU names that correspond to multiple VRAM values, take the minimum value that is not smaller
     than the amount of VRAM used by that job.
@@ -94,6 +97,66 @@ def get_vram_constraints(constraints: list[str], gpu_count: int, gpu_mem_usage: 
     return max(vram_constraints) * gpu_count
 
 
+def _calculate_approx_vram_single_gpu_type(
+    gpu_types: list[str], node_list: list[str], gpu_count: int, gpu_mem_usage: int
+) -> int:
+    """
+    Calculate the approximate VRAM for a job with a single GPU type.
+
+    This helper function computes the total VRAM allocated for a job based on the GPU type,
+    the nodes where the job ran, the number of GPUs requested, and the GPU memory usage.
+
+    Args:
+        gpu_types (list[str]): List containing a single GPU type used in the job.
+        node_list (list[str]): List of nodes where the job ran.
+        gpu_count (int): Number of GPUs requested by the job.
+        gpu_mem_usage (int): GPU memory usage in bytes.
+
+    Returns:
+        int: Total allocated VRAM for the job in GiB (gibibyte).
+
+    Raises:
+        ValueError: If no valid nodes are found for a multivalent GPU type in the node list.
+    """
+    gpu = gpu_types[0]
+    if gpu not in MULTIVALENT_GPUS:
+        # if the GPU is not multivalent, return the VRAM value for that GPU
+        return VRAM_VALUES[gpu] * gpu_count
+
+    # calculate VRAM for multivalent GPUs
+    total_vram = 0
+
+    # if all GPUs are on the same node, multiply the VRAM of that node by the number of GPUs
+    if len(node_list) == 1:
+        node = node_list[0]
+        total_vram = get_vram_from_node(gpu, node) * gpu_count
+
+    # if all GPUs are on different nodes, sum the VRAM of each node
+    # and return the total VRAM
+    elif len(node_list) == gpu_count:
+        for node in node_list:
+            total_vram += get_vram_from_node(gpu, node)
+
+    # if there are multiple nodes, but not all GPUs are on different nodes
+    # we need to calculate the total VRAM based on the minimum VRAM of the nodes
+    else:
+        # calculate all VRAM for all nodes in the node_list
+        node_values = set()  # to avoid duplicates
+        for node in node_list:
+            node_values.add(get_vram_from_node(gpu, node))
+
+        if not node_values:
+            raise ValueError(f"No valid nodes found for multivalent GPU type '{gpu}' in node list: {node_list}")
+
+        sorted_node_values = sorted(list(node_values))
+        total_vram = sorted_node_values.pop(0) * gpu_count  # use the node with the minimum VRAM value
+        # if the total VRAM is less than the GPU memory usage, use the VRAM from the GPU in the larger node
+        while total_vram < (gpu_mem_usage / 2**30) and sorted_node_values:
+            total_vram = sorted_node_values.pop(0) * gpu_count
+
+    return total_vram
+
+
 def get_approx_allocated_vram(gpu_types: list[str], node_list: list[str], gpu_count: int, gpu_mem_usage: int) -> int:
     """
     Get the total allocated VRAM for a job based on its GPU type and node list.
@@ -109,43 +172,14 @@ def get_approx_allocated_vram(gpu_types: list[str], node_list: list[str], gpu_co
 
     Returns:
         int: Total allocated (estimate) VRAM for the job in GiB (gibibyte).
+
+    Raises:
+        ValueError: If no valid nodes are found for a multivalent GPU type in the node list.
     """
 
     # one type of GPU
     if len(gpu_types) == 1:
-        gpu = gpu_types[0]
-        if gpu not in MULTIVALENT_GPUS:
-            # if the GPU is not multivalent, return the VRAM value for that GPU
-            return VRAM_VALUES[gpu] * gpu_count
-
-        # calculate VRAM for multivalent GPUs
-        total_vram = 0
-
-        # if all GPUs are on the same node, multiply the VRAM of that node by the number of GPUs
-        if len(node_list) == 1:
-            node = node_list[0]
-            total_vram = get_vram_from_node(gpu, node) * gpu_count
-
-        # if all GPUs are on different nodes, sum the VRAM of each node
-        # and return the total VRAM
-        elif len(node_list) == gpu_count:
-            for node in node_list:
-                total_vram += get_vram_from_node(gpu, node)
-
-        # if there are multiple nodes, but not all GPUs are on different nodes
-        # we need to calculate the total VRAM based on the minimum VRAM of the nodes
-        else:
-            # calculate all VRAM for all nodes in the node_list
-            node_values = set()  # to avoid duplicates
-            for node in node_list:
-                node_values.add(get_vram_from_node(gpu, node))
-
-            node_values = sorted(list(node_values))
-            total_vram = node_values.pop(0) * gpu_count  # use the node with the minimum VRAM value
-            # if the total VRAM is less than the GPU memory usage, use the VRAM from the GPU in the larger node
-            while total_vram < (gpu_mem_usage / 2**30) and node_values:
-                total_vram = node_values.pop(0) * gpu_count
-
+        total_vram = _calculate_approx_vram_single_gpu_type(gpu_types, node_list, gpu_count, gpu_mem_usage)
         return total_vram
 
     # Calculate allocated VRAM when there are multiple GPU types in a job
@@ -173,7 +207,7 @@ def get_approx_allocated_vram(gpu_types: list[str], node_list: list[str], gpu_co
     total_vram = vram_values.pop(0) * gpu_count  # use the GPU with the minimum VRAM value
     # if the total VRAM is less than the GPU memory usage, use the VRAM from the next smallest GPU
     while total_vram < (gpu_mem_usage / 2**30) and vram_values:
-        total_vram = node_values.pop(0) * gpu_count
+        total_vram = vram_values.pop(0) * gpu_count
     return total_vram
 
 
@@ -193,10 +227,12 @@ def _fill_missing(res: pd.DataFrame) -> None:
     res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)
     res.loc[:, "Interactive"] = res["Interactive"].fillna("non-interactive")
     mask_constraints_null = res["Constraints"].isna()
-    res.loc[mask_constraints_null, "Constraints"] = res.loc[mask_constraints_null, "Constraints"].apply(
-        lambda _: np.array([])
+    res.loc[mask_constraints_null, "Constraints"] = res.loc[mask_constraints_null, "Constraints"].apply(lambda _: [])
+    res.loc[:, "GPUType"] = (
+        res["GPUType"]
+        .fillna("")
+        .apply(lambda x: ["cpu"] if x == "" else x.tolist() if isinstance(x, np.ndarray) else x)
     )
-    res.loc[:, "GPUType"] = res["GPUType"].fillna("").apply(lambda x: np.array(["cpu"]) if x == "" else np.array(x))
     res.loc[:, "GPUs"] = res["GPUs"].fillna(0)
 
 

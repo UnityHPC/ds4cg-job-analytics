@@ -13,7 +13,7 @@ from src.config.enum_constants import (
 def _helper_filter_irrelevant_records(input_df: pd.DataFrame, min_elapsed_seconds: int) -> pd.DataFrame:
     """
     Private function to help generate expected ground truth dataframe for test.
-    
+
     Given a ground truth dataframe, this will create a new dataframe without records meeting the following criteria:
     - QOS is updates
     - Account is root
@@ -250,6 +250,7 @@ def test_preprocess_data_fill_missing_constraints(mock_data_frame):
     )
     ground_truth = _helper_filter_irrelevant_records(mock_data_frame, 100)
     expect_constraints_null = len(ground_truth[(ground_truth["Constraints"].isna())])
+
     assert sum(len(x) == 0 for x in data["Constraints"]) == expect_constraints_null
 
 
@@ -360,6 +361,7 @@ def test_preprocess_timedelta_conversion(mock_data_frame):
     ground_truth = _helper_filter_irrelevant_records(mock_data_frame, 600)
     max_len = len(ground_truth)
     time_limit = data["TimeLimit"]
+
     assert time_limit.dtype == "timedelta64[ns]"
     assert time_limit[0].total_seconds() == ground_truth["TimeLimit"][0]
     assert time_limit[max_len - 1].total_seconds() == ground_truth["TimeLimit"][max_len - 1]
