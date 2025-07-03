@@ -7,24 +7,25 @@ The aim is to identify potential inefficiencies in GPU usage and notify users or
 import pandas as pd
 import numpy as np
 from pathlib import Path
+from collections.abc import Callable
 from src.preprocess.preprocess import preprocess_data
 from src.database import DatabaseConnection
 from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
 
 
-def load_jobs_dataframe_from_duckdb(db_path=None, table_name="Jobs", sample_size=None, random_state=None):
+def load_jobs_dataframe_from_duckdb(db_path, table_name="Jobs", sample_size=None, random_state=None):
     """
     Connect to the DuckDB slurm_data_small.db and return the jobs table as a pandas DataFrame.
 
     Args:
-        db_path (str or Path, optional): Path to the DuckDB database. Defaults to 'data/slurm_data_small.db'.
+        db_path (str or Path): Path to the DuckDB database.
         table_name (str, optional): Table name to query. Defaults to 'Jobs'.
 
     Returns:
         pd.DataFrame: DataFrame containing the table data.
     """
-    if db_path is None:
-        db_path = Path(__file__).resolve().parents[2] / "data" / "slurm_data_small.db"
+    if isinstance(db_path, Path):
+        db_path = db_path.resolve()
     db = DatabaseConnection(str(db_path))
 
     jobs_df = db.fetch_all_jobs(table_name=table_name)
@@ -46,19 +47,52 @@ class EfficiencyAnalysis:
     """
 
     def __init__(self, db_path=None, table_name="Jobs", sample_size=None, random_state=None):
-        self.jobs_df = load_jobs_dataframe_from_duckdb(db_path, table_name, sample_size, random_state)
-        self.efficiency_df = None
-        self.analysis_results = None
+        try:
+            self.jobs_df = load_jobs_dataframe_from_duckdb(db_path, table_name, sample_size, random_state)
+            self.efficiency_df = None
+            self.analysis_results = None
+        except Exception as e:
+            raise ValueError(f"Failed to load jobs DataFrame: {e}") from e
+
+    def _apply_numeric_filter(
+        self,
+        col: pd.Series,
+        filter: int | list | set | tuple | dict | Callable,
+        inclusive: bool | None
+    ):
+        """
+        Helper to apply a numeric filter to a pandas Series.
+        
+        Args:
+            col (pd.Series): The column to filter.
+            value: The filter value (scalar, list/tuple/set, dict with 'min'/'max', or callable).
+            inclusive (bool): Whether min/max are inclusive.
+        Returns:
+            pd.Series: Boolean mask.
+        """
+        mask = pd.Series([True] * len(col), index=col.index)
+        if filter is not None:
+            if callable(filter):
+                mask &= col.apply(filter)
+            elif isinstance(filter, list | set | tuple):
+                mask &= col.isin(filter)
+            elif isinstance(filter, dict):
+                if "min" in filter:
+                    mask &= col.ge(filter["min"]) if inclusive else col.gt(filter["min"])
+                if "max" in filter:
+                    mask &= col.le(filter["max"]) if inclusive else col.lt(filter["max"])
+            else:
+                mask &= col.eq(filter)
+        return mask
 
     def filter_jobs_for_analysis(
         self,
-        vram_constraint_filter=None,
-        allocated_vram_greater_than=0,
-        gpu_mem_usage_min=None,
-        gpu_mem_usage_max=None,
-        gpu_mem_usage_exact=None,
-        gpus_min=1,
-        elapsed_seconds_min=DEFAULT_MIN_ELAPSED_SECONDS):
+        vram_constraint_filter: pd.Int64Dtype | list | set | tuple | dict | Callable | None = None,
+        gpu_mem_usage_filter: int | list | set | tuple | dict | Callable | None = None,
+        allocated_vram_filter: int | list | set | tuple | dict | Callable | None = None,
+        gpu_count_filter: int | list | set | tuple | dict | Callable | None = None,
+        elapsed_seconds_min=DEFAULT_MIN_ELAPSED_SECONDS,
+    ):
         """
         Filter jobs based on VRAM constraints, GPU allocation, and usage criteria.
 
@@ -67,14 +101,19 @@ class EfficiencyAnalysis:
                 - None: no filtering on vram_constraint
                 - int or float: select rows where vram_constraint == value
                 - list/set/tuple: select rows where vram_constraint is in the list
-                - dict with 'min'/'max': select rows in the range (inclusive)
+                - dict with 'min'/'max' and required 'inclusive' (bool): select rows in the range
                 - pd.NA or <NA>: select rows where vram_constraint is Nullable Int64 (i.e., pd.NA)
                 - callable: custom filter function
-            allocated_vram_greater_than (int, float): allocated_vram greater than this value
-            gpu_mem_usage_min (int, float, optional): Minimum GPUMemUsage (inclusive)
-            gpu_mem_usage_max (int, float, optional): Maximum GPUMemUsage (inclusive)
-            gpu_mem_usage_exact (int, float, optional): If set, select only rows where GPUMemUsage == this value
-            gpus_min (int): Minimum GPUs allocated
+            gpu_mem_usage_filter:
+                - None: no filtering on GPU count
+                - int: select rows where GPUs == value
+                - list/set/tuple: select rows where GPUs is in the list
+                - dict with 'min'/'max' and required 'inclusive' (bool): select rows in the range
+                - callable: custom filter function
+            allocated_vram_filter:
+                - Same as above; if dict, must include 'inclusive' (bool)
+            gpu_count_filter:
+                - Same as above; if dict, must include 'inclusive' (bool)
             elapsed_seconds_min (int): Minimum elapsed time in seconds
 
         Returns:
@@ -83,42 +122,75 @@ class EfficiencyAnalysis:
 
         mask = pd.Series([True] * len(self.jobs_df), index=self.jobs_df.index)
 
+        # Helper to extract 'inclusive' from dict filter, must be present if dict
+        def get_inclusive(filter_val):
+            if isinstance(filter_val, dict):
+                if "inclusive" not in filter_val or not isinstance(filter_val["inclusive"], bool):
+                    raise ValueError("If a filter is a dict, it must include an 'inclusive' boolean key.")
+                return filter_val["inclusive"]
+            return None
+
+        # vram_constraint
         if vram_constraint_filter is not None:
             col = self.jobs_df["vram_constraint"]
-            # Handle pd.NA and nullable Int64
             if callable(vram_constraint_filter):
                 mask &= col.apply(vram_constraint_filter)
             elif isinstance(vram_constraint_filter, list | set | tuple):
                 mask &= col.isin(vram_constraint_filter)
             elif isinstance(vram_constraint_filter, dict):
+                inclusive = get_inclusive(vram_constraint_filter)
                 if "min" in vram_constraint_filter:
-                    mask &= col.ge(vram_constraint_filter["min"])
+                    mask &= (
+                        col.ge(vram_constraint_filter["min"])
+                        if inclusive
+                        else col.gt(vram_constraint_filter["min"])
+                    )
                 if "max" in vram_constraint_filter:
-                    mask &= col.le(vram_constraint_filter["max"])
+                    mask &= (
+                        col.le(vram_constraint_filter["max"])
+                        if inclusive
+                        else col.lt(vram_constraint_filter["max"])
+                    )
             elif vram_constraint_filter is pd.NA or (
                 isinstance(vram_constraint_filter, float) and np.isnan(vram_constraint_filter)
             ):
                 mask &= col.isna()
             else:
-                # For nullable Int64, use .eq for safe comparison
                 mask &= col.eq(vram_constraint_filter)
 
         # GPU memory usage filter
-        gpu_mem_mask = pd.Series([True] * len(self.jobs_df), index=self.jobs_df.index)
-        if gpu_mem_usage_exact is not None:
-            gpu_mem_mask &= self.jobs_df["GPUMemUsage"] == gpu_mem_usage_exact
-        else:
-            if gpu_mem_usage_min is not None:
-                gpu_mem_mask &= self.jobs_df["GPUMemUsage"] >= gpu_mem_usage_min
-            if gpu_mem_usage_max is not None:
-                gpu_mem_mask &= self.jobs_df["GPUMemUsage"] <= gpu_mem_usage_max
+        if gpu_mem_usage_filter is not None:
+            if isinstance(gpu_mem_usage_filter, dict):
+                gpu_mem_usage_inclusive = get_inclusive(gpu_mem_usage_filter)
+            else:
+                gpu_mem_usage_inclusive = None
+            mask &= self._apply_numeric_filter(
+                self.jobs_df["GPUMemUsage"], gpu_mem_usage_filter, gpu_mem_usage_inclusive
+            )
+
+        # Allocated VRAM filter
+        if allocated_vram_filter is not None:
+            if isinstance(allocated_vram_filter, dict):
+                allocated_vram_inclusive = get_inclusive(allocated_vram_filter)
+            else:
+                allocated_vram_inclusive = None
+            mask &= self._apply_numeric_filter(
+                self.jobs_df["allocated_vram"], allocated_vram_filter, allocated_vram_inclusive
+            )
+
+        # GPU count filter
+        if gpu_count_filter is not None:
+            if isinstance(gpu_count_filter, dict):
+                gpu_count_inclusive = get_inclusive(gpu_count_filter)
+            else:
+                gpu_count_inclusive = None
+            mask &= self._apply_numeric_filter(
+                self.jobs_df["GPUs"], gpu_count_filter, gpu_count_inclusive
+            )
 
         return self.jobs_df[
             mask
-            & (self.jobs_df["allocated_vram"] > allocated_vram_greater_than)
-            & gpu_mem_mask
-            & (self.jobs_df["GPUs"] >= gpus_min)
-            & (self.jobs_df["Elapsed"].dt.total_seconds()>= elapsed_seconds_min)
+            & (self.jobs_df["Elapsed"].dt.total_seconds() >= elapsed_seconds_min)
         ].copy()
         
 
