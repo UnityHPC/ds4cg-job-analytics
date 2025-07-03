@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from ..config.constants import RAM_MAP, DEFAULT_MIN_ELAPSED_SECONDS, ATTRIBUTE_CATEGORIES
 from ..config.enum_constants import StatusEnum, AdminsAccountEnum, PartitionEnum, QOSEnum
+# TODO: add proper handling for when user will use custom query, how would you handle if they drop some important columns??
 
 
 def get_requested_vram(constraints: list[str]) -> int:
