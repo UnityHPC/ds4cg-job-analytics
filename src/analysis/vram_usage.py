@@ -49,7 +49,8 @@ class EfficiencyAnalysis:
     def __init__(self, db_path=None, table_name="Jobs", sample_size=None, random_state=None):
         try:
             self.jobs_df = load_jobs_dataframe_from_duckdb(db_path, table_name, sample_size, random_state)
-            self.efficiency_df = None
+            self.jobs_w_efficiency_metrics = None
+            self.users_w_efficiency_metrics = None
             self.analysis_results = None
         except Exception as e:
             raise ValueError(f"Failed to load jobs DataFrame: {e}") from e
@@ -194,12 +195,14 @@ class EfficiencyAnalysis:
         ].copy()
         
 
-    def calculate_efficiency_metrics(
+    def calculate_job_efficiency_metrics(
         self,
         filtered_jobs :pd.DataFrame,
     ):
         """
-        Calculate efficiency metrics for the filtered jobs DataFrame.
+        Calculate jobs efficiency metrics for the filtered jobs DataFrame.
+
+        Refer to the documentation for the definition of the metrics calculated.
 
         Args:
             filtered_jobs (DataFrame): DataFrame containing jobs to analyze.
@@ -208,48 +211,122 @@ class EfficiencyAnalysis:
             DataFrame: Jobs with efficiency metrics added
         """
 
+        # rename GPUs to gpu_count for clarity
+        filtered_jobs = filtered_jobs.rename(columns={"GPUs": "gpu_count"})
 
-        # Calculate efficiency metrics
-        filtered_jobs["gpu_memory_used_gb"] = filtered_jobs["GPUMemUsage"] / (2**30)
-        filtered_jobs["vram_efficiency"] = filtered_jobs["gpu_memory_used_gb"] / filtered_jobs["allocated_vram"]
-        filtered_jobs["gpu_hours"] = (filtered_jobs["Elapsed"].dt.total_seconds() * filtered_jobs["GPUs"]) / 3600
-        
-        # Calculate weighted_vram_efficiency per job, normalized by total gpu_hours for that specific User
-        user_gpu_hours = filtered_jobs.groupby("User")["gpu_hours"].transform("sum")
-        filtered_jobs["user_weighted_vram_efficiency"] = (
-            filtered_jobs["vram_efficiency"] * 100 * filtered_jobs["gpu_hours"]
-        ) / user_gpu_hours
+        # Calculate job efficiency metrics
+        filtered_jobs.loc[:, "gpu_hours"] = (
+            filtered_jobs["Elapsed"].dt.total_seconds()
+            * filtered_jobs["gpu_count"] / 3600
+        )
+        filtered_jobs.loc[:, "used_vram_gib"] = filtered_jobs["GPUMemUsage"] / (2**30)
+        filtered_jobs.loc[:, "alloc_vram_efficiency"] = (
+            filtered_jobs["used_vram_gib"] / filtered_jobs["allocated_vram"]
+        )
+        # TODO (Arda): Clip alloc_vram_efficiency to 1
+
+        # Compute vram_constraint_efficiency, a nullable float. Set to NA if vram_constraint is NA
+        filtered_jobs.loc[:, "vram_constraint_efficiency"] = (
+            filtered_jobs["used_vram_gib"] / filtered_jobs["vram_constraint"]
+        )
+        # TODO (Arda): Decide if it should clip vram_constraint_efficiency to 1
+
+
+        # Calculate job allocated VRAM efficiency score
+        filtered_jobs["alloc_vram_efficiency_score"] = (
+            filtered_jobs["alloc_vram_efficiency"]
+            ** filtered_jobs["gpu_hours"]
+        )
+
 
         # Calculate weighted vram efficiency per job, normalized by total gpu_hours for that specific PI
-        pi_gpu_hours = filtered_jobs.groupby("Account")["gpu_hours"].transform("sum")
-        filtered_jobs["pi_weighted_vram_efficiency"] = (
-            filtered_jobs["vram_efficiency"] * 100 * filtered_jobs["gpu_hours"]
+        pi_gpu_hours = filtered_jobs.groupby("Account", observed=True)["gpu_hours"].transform("sum")
+        filtered_jobs.loc[:, "pi_weighted_vram_efficiency"] = (
+            filtered_jobs["alloc_vram_efficiency"] * filtered_jobs["gpu_hours"]
         ) / pi_gpu_hours
 
         # Categorize by efficiency
-        filtered_jobs["efficiency_category"] = pd.cut(
-            filtered_jobs["vram_efficiency"],
+        filtered_jobs.loc[:, "efficiency_category"] = pd.cut(
+            filtered_jobs["alloc_vram_efficiency"],
             bins=[0, 0.1, 0.3, 0.6, 1.0],
             labels=["Very Low (<10%)", "Low (10-30%)", "Medium (30-60%)", "High (60-100%)"],
         )
 
         # Add CPU memory analysis if available
         if "CPUMemUsage" in self.jobs_df.columns:
-            filtered_jobs["cpu_memory_gb"] = filtered_jobs["CPUMemUsage"] / (2**30)
-            filtered_jobs["cpu_gpu_ratio"] = (
+            filtered_jobs.loc[:, "cpu_memory_gb"] = filtered_jobs["CPUMemUsage"] / (2**30)
+            filtered_jobs.loc[:, "cpu_gpu_ratio"] = (
                 filtered_jobs["cpu_memory_gb"] /
-                filtered_jobs["gpu_memory_used_gb"].clip(lower=0.1)
+                filtered_jobs["used_vram_gib"].clip(lower=0.1)
             )
 
         # Duration analysis
-        filtered_jobs["duration_category"] = pd.cut(
+        filtered_jobs.loc[:, "duration_category"] = pd.cut(
             filtered_jobs["gpu_hours"],
             bins=[0, 1, 6, 24, 48, float("inf")],
             labels=["Short (<1h)", "Medium (1-6h)", "Long (6-24h)", "Under two days (24-48h)", "Over two days (>48h)"],
         )
 
-        self.efficiency_df = filtered_jobs
-        return self.efficiency_df
+        self.jobs_w_efficiency_metrics = filtered_jobs
+        return self.jobs_w_efficiency_metrics
+
+    def calculate_user_efficiency_metrics(self):
+        """
+        Calculate user efficiency metrics based on job efficiency data.
+
+        Returns:
+            pd.DataFrame: DataFrame with users and their average VRAM efficiency
+        """
+        if self.jobs_w_efficiency_metrics is None:
+            raise ValueError(
+                "Jobs DataFrame with efficiency metrics is not available. "
+                "Please run calculate_job_efficiency_metrics first."
+            )
+
+        # Compute user_gpu_hours_per_job once and reuse for both metrics
+        user_gpu_hours_per_job = (
+            self.jobs_w_efficiency_metrics
+            .groupby("User", observed=True)["gpu_hours"]
+            .transform("sum")
+        )
+
+        users_w_efficiency_metrics = (
+            self.jobs_w_efficiency_metrics
+            .groupby("User", observed=False)
+            .agg(
+                job_count=("JobID", "count"),
+                user_gpu_hours=("gpu_hours", "sum"),
+            )
+            .reset_index()
+        )
+
+        self.jobs_w_efficiency_metrics["weighted_alloc_vram_efficiency"] = (
+            self.jobs_w_efficiency_metrics["alloc_vram_efficiency"]
+            * self.jobs_w_efficiency_metrics["gpu_hours"]
+            / user_gpu_hours_per_job
+        )
+        users_w_efficiency_metrics["expected_value_alloc_vram_efficiency"] = (
+            self.jobs_w_efficiency_metrics
+            .groupby("User", observed=True)["weighted_alloc_vram_efficiency"]
+            .sum()
+            .to_numpy()
+        )
+
+        self.jobs_w_efficiency_metrics["weighted_gpu_count"] = (
+            self.jobs_w_efficiency_metrics["gpu_count"]
+            * self.jobs_w_efficiency_metrics["gpu_hours"]
+            / user_gpu_hours_per_job
+        )
+        users_w_efficiency_metrics["expected_value_gpu_count"] = (
+            self.jobs_w_efficiency_metrics.groupby("User", observed=True)["weighted_gpu_count"].sum().to_numpy()
+        )
+
+        self.jobs_w_efficiency_metrics = self.jobs_w_efficiency_metrics.drop(
+            columns=["weighted_alloc_vram_efficiency", "weighted_gpu_count"]
+        )
+
+        self.users_w_efficiency_metrics = users_w_efficiency_metrics
+        return self.users_w_efficiency_metrics
 
 
     def evaluate_cpu_gpu_usage(
@@ -273,26 +350,29 @@ class EfficiencyAnalysis:
 
         analysis = {}
 
-        # Ensure efficiency_df is available
-        if self.efficiency_df is None:
-            raise ValueError("Efficiency DataFrame is not available. Please run analyze_workload_efficiency first.")
-        
+        # Ensure jobs_w_efficiency_metrics is available
+        if self.jobs_w_efficiency_metrics is None:
+            raise ValueError(
+                "jobs_w_efficiency_metrics DataFrame is not available. "
+                "Please run analyze_workload_efficiency first."
+            )
+
         # Overall statistics
-        analysis["total_jobs"] = len(self.efficiency_df)
-        analysis["total_gpu_hours"] = self.efficiency_df["gpu_hours"].sum()
-        analysis["avg_efficiency"] = self.efficiency_df["vram_efficiency"].mean()
-        analysis["median_efficiency"] = self.efficiency_df["vram_efficiency"].median()
+        analysis["total_jobs"] = len(self.jobs_w_efficiency_metrics)
+        analysis["total_gpu_hours"] = self.jobs_w_efficiency_metrics["gpu_hours"].sum()
+        analysis["avg_efficiency"] = self.jobs_w_efficiency_metrics["alloc_vram_efficiency"].mean()
+        analysis["median_efficiency"] = self.jobs_w_efficiency_metrics["alloc_vram_efficiency"].median()
 
         # Efficiency distribution analysis
         efficiency_analysis = (
-            self.efficiency_df.groupby("efficiency_category", observed=False)
+            self.jobs_w_efficiency_metrics.groupby("efficiency_category", observed=False)
             .agg(
                 {
                     "JobID": "count",
                     "gpu_hours": "sum",
-                    "vram_efficiency": "mean",
+                    "alloc_vram_efficiency": "mean",
                     "allocated_vram": "mean",
-                    "gpu_memory_used_gb": "mean",
+                    "used_vram_gib": "mean",
                 }
             )
             .round(3)
@@ -311,10 +391,10 @@ class EfficiencyAnalysis:
         analysis["efficiency_patterns"] = efficiency_analysis
 
         # CPU-GPU balance analysis (if CPU data available)
-        if "cpu_gpu_ratio" in self.efficiency_df.columns:
+        if "cpu_gpu_ratio" in self.jobs_w_efficiency_metrics.columns:
             # Categorize workloads by CPU-GPU balance
-            self.efficiency_df["workload_type"] = pd.cut(
-                self.efficiency_df["cpu_gpu_ratio"],
+            self.jobs_w_efficiency_metrics["workload_type"] = pd.cut(
+                self.jobs_w_efficiency_metrics["cpu_gpu_ratio"],
                 bins=[0, 1, 5, 20, float("inf")],
                 labels=[
                     "GPU-intensive (CPU<GPU)",
@@ -324,20 +404,22 @@ class EfficiencyAnalysis:
                 ],
             )
 
-            balance_analysis = self.efficiency_df.groupby("workload_type", observed=False).agg(
-                {"JobID": "count", "gpu_hours": "sum", "vram_efficiency": "mean", "cpu_gpu_ratio": "mean"}
+            balance_analysis = self.jobs_w_efficiency_metrics.groupby("workload_type", observed=False).agg(
+                {"JobID": "count", "gpu_hours": "sum", "alloc_vram_efficiency": "mean", "cpu_gpu_ratio": "mean"}
             )
             analysis["cpu_gpu_balance"] = balance_analysis
 
         # Over-allocation analysis
-        high_waste_jobs = self.efficiency_df[self.efficiency_df["vram_efficiency"] <= vram_efficiency_threshold]
+        high_waste_jobs = self.jobs_w_efficiency_metrics[
+            self.jobs_w_efficiency_metrics["alloc_vram_efficiency"] <= vram_efficiency_threshold
+        ]
         analysis["high_waste_jobs"] = len(high_waste_jobs)
         analysis["high_waste_gpu_hours"] = high_waste_jobs["gpu_hours"].sum()
         analysis["high_waste_hours_share"] = analysis["high_waste_gpu_hours"] / analysis["total_gpu_hours"] * 100
 
         # Duration vs efficiency correlation
-        duration_efficiency = self.efficiency_df.groupby("duration_category", observed=False).agg(
-            {"JobID": "count", "vram_efficiency": "mean", "gpu_hours": "sum"}
+        duration_efficiency = self.jobs_w_efficiency_metrics.groupby("duration_category", observed=False).agg(
+            {"JobID": "count", "alloc_vram_efficiency": "mean", "gpu_hours": "sum"}
         )
         analysis["duration_efficiency_patterns"] = duration_efficiency
 
@@ -366,47 +448,42 @@ class EfficiencyAnalysis:
 
         return self.analysis_results
     
-    def find_inefficient_users_weighted_by_hours(self, efficiency_threshold=0.3, min_jobs=5):
+    def find_inefficient_users_by_alloc_vram_efficiency(self, efficiency_threshold=0.3, min_jobs=5):
         """
-        Identify users with low average VRAM efficiency across their jobs, weighted by the hours they were inefficient.
+        Identify users with low expected allocated VRAM efficiency across their jobs compared to others
 
         Args:
-            efficiency_threshold (float): Threshold for VRAM efficiency to consider a user as inefficient
+            efficiency_threshold (float): Maximum threshold for expected allocated VRAM efficiency
             min_jobs (int): Minimum number of jobs a user must have to be included in the analysis
 
         Returns:
             pd.DataFrame: DataFrame with users and their average VRAM efficiency
         """
-        if self.efficiency_df is None:
-            raise ValueError("Efficiency DataFrame is not available. Please run calculate_efficiency_metrics first.")
+        if self.users_w_efficiency_metrics is None:
+            raise ValueError(
+                "Users with efficiency metrics DataFrame is not available. "
+                "Please run calculate_user_efficiency_metrics first."
+            )
+
+        mask = pd.Series([True] * len(self.users_w_efficiency_metrics), index=self.users_w_efficiency_metrics.index)
+
+        col = self.users_w_efficiency_metrics["expected_value_alloc_vram_efficiency"]
+        mask &= (
+            col.le(efficiency_threshold)
+        )
+
+        col = self.users_w_efficiency_metrics["job_count"]
+        mask &= (
+            col.ge(min_jobs)
+        )
 
         inefficient_users = (
-            self.efficiency_df[self.efficiency_df["vram_efficiency"] < efficiency_threshold]
-            .groupby("User", observed=False)
-            .agg(
-            Job_Count=("JobID", "count"),
-            Avg_Allocated_VRAM=("allocated_vram", "mean"),
-            Total_GPU_Hours=("gpu_hours", "sum"),
-            Avg_GPUs=("GPUs", "mean"),
-            Avg_Weighted_VRAM_Efficiency=("user_weighted_vram_efficiency", "mean"),
-            )
-            .reset_index()
+            self.users_w_efficiency_metrics[mask]
         )
 
-        # Multiply share of total gpu hours by weighted vram efficiency to get the new metric
-        inefficient_users["Weighted_Efficiency_Contribution"] = (
-            inefficient_users["Total_GPU_Hours"]
-            * inefficient_users["Avg_Weighted_VRAM_Efficiency"]
-            / inefficient_users["Total_GPU_Hours"].sum()
-        )
-
-
-        # Only include users with at least 5 jobs
-        inefficient_users = inefficient_users[inefficient_users["Job_Count"] >= 5]
-
-        # Sort by the new metric ascending (lower is worse)
+        # Sort by the metric ascending (lower is worse)
         inefficient_users = inefficient_users.sort_values(
-            "Weighted_Efficiency_Contribution",
+            "expected_value_alloc_vram_efficiency",
             ascending=True
         )
         return inefficient_users
@@ -426,12 +503,12 @@ class EfficiencyAnalysis:
             raise ValueError("Efficiency DataFrame is not available. Please run calculate_efficiency_metrics first.")
 
         inefficient_pis = (
-            self.efficiency_df[self.efficiency_df["vram_efficiency"] < efficiency_threshold]
+            self.efficiency_df[self.efficiency_df["alloc_vram_efficiency"] < efficiency_threshold]
             .groupby("Account", observed=False)
             .agg(
                 Job_Count=("JobID", "count"),
                 Avg_Allocated_VRAM=("allocated_vram", "mean"),
-                Total_GPU_Hours=("gpu_hours", "sum"),
+                pi_group_gpu_hours=("gpu_hours", "sum"),
                 Avg_GPUs=("GPUs", "mean"),
                 Avg_Weighted_VRAM_Efficiency=("pi_weighted_vram_efficiency", "mean"),
             )
@@ -440,9 +517,9 @@ class EfficiencyAnalysis:
 
         # Multiply share of total gpu hours by weighted vram efficiency to get the new metric
         inefficient_pis["Weighted_Efficiency_Contribution"] = (
-            inefficient_pis["Total_GPU_Hours"]
+            inefficient_pis["pi_group_gpu_hours"]
             * inefficient_pis["Avg_Weighted_VRAM_Efficiency"]
-            / inefficient_pis["Total_GPU_Hours"].sum()
+            / inefficient_pis["pi_group_gpu_hours"].sum()
         )
 
         # Only include PIs with at least 5 jobs

@@ -291,11 +291,11 @@ def preprocess_data(
     for col in timedelta_columns:
         res[col] = pd.to_timedelta(res[col], unit="s", errors="coerce")
 
-    # Added parameters for calculating VRAM metrics
+    # Add parameters for calculating VRAM metrics
     res.loc[:, "Queued"] = res["StartTime"] - res["SubmitTime"]
     res.loc[:, "vram_constraint"] = res.apply(
         lambda row: get_vram_constraints(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1
-    ).astype("Int64")
+    ).astype(pd.Int64Dtype()) # Use Int64Dtype to allow for nullable integers
     res.loc[:, "allocated_vram"] = res.apply(
         lambda row: get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]), axis=1
     )
