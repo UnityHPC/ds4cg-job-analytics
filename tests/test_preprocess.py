@@ -236,6 +236,7 @@ def test_pre_process_data_fill_missing_constraints(mock_data):
     )
     ground_truth = helper_filter_irrelevant_records(mock_data[0], 100)
     expect_constraints_null = len(ground_truth[(ground_truth["Constraints"].isna())])
+
     assert sum(len(x) == 0 for x in data["Constraints"]) == expect_constraints_null
 
 
@@ -352,6 +353,7 @@ def test_pre_proess_timedelta_conversion(mock_data):
     ground_truth = helper_filter_irrelevant_records(mock_data[0], 600)
     max_len = len(ground_truth)
     time_limit = data["TimeLimit"]
+
     assert time_limit.dtype == "timedelta64[ns]"
     assert time_limit[0].total_seconds() == ground_truth["TimeLimit"][0]
     assert time_limit[max_len - 1].total_seconds() == ground_truth["TimeLimit"][max_len - 1]

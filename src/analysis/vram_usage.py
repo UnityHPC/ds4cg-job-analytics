@@ -1,11 +1,11 @@
 """
 Functions to analyze efficiency of Jobs based on their VRAM usage.
 
-The aim is to identify potential inefficiencies
-in GPU usage and notify users or PIs about these issues.
+The aim is to identify potential inefficiencies in GPU usage and notify users or PIs about these issues.
 """
 
 import pandas as pd
+import numpy as np
 from pathlib import Path
 from src.preprocess.preprocess import preprocess_data
 from src.database import DatabaseConnection
@@ -70,7 +70,7 @@ def load_jobs_dataframe_from_duckdb(
 
 class EfficiencyAnalysis:
     """
-    Class to encapsulate the efficiency analysis of jobs based on VRAM usage.
+    Class to encapsulate the efficiency analysis of jobs based on various metrics.
 
     It provides methods to load data, analyze workload efficiency, and evaluate CPU-GPU usage patterns.
     """
@@ -80,9 +80,9 @@ class EfficiencyAnalysis:
         self.efficiency_df = None
         self.analysis_results = None
 
-    def calculate_efficiency_metrics(
+    def filter_jobs_for_analysis(
         self,
-        vram_constraint_filter=0,
+        vram_constraint_filter=None,
         allocated_vram_greater_than=0,
         gpu_mem_usage_min=None,
         gpu_mem_usage_max=None,
@@ -91,10 +91,16 @@ class EfficiencyAnalysis:
         elapsed_seconds_min=DEFAULT_MIN_ELAPSED_SECONDS,
     ):
         """
-        Analyze jobs based on constraints, GPU allocation, and usage criteria.
+        Filter jobs based on VRAM constraints, GPU allocation, and usage criteria.
 
         Args:
-            vram_constraint_filter (int, float, or callable): Value or function to filter requested_vram
+            vram_constraint_filter:
+                - None: no filtering on vram_constraint
+                - int or float: select rows where vram_constraint == value
+                - list/set/tuple: select rows where vram_constraint is in the list
+                - dict with 'min'/'max': select rows in the range (inclusive)
+                - pd.NA or <NA>: select rows where vram_constraint is Nullable Int64 (i.e., pd.NA)
+                - callable: custom filter function
             allocated_vram_greater_than (int, float): allocated_vram greater than this value
             gpu_mem_usage_min (int, float, optional): Minimum GPUMemUsage (inclusive)
             gpu_mem_usage_max (int, float, optional): Maximum GPUMemUsage (inclusive)
@@ -103,13 +109,30 @@ class EfficiencyAnalysis:
             elapsed_seconds_min (int): Minimum elapsed time in seconds
 
         Returns:
-            DataFrame: Filtered jobs with efficiency metrics added
+            DataFrame: Filtered jobs DataFrame based on the specified criteria.
         """
-        # Flexible filter for requested_vram
-        if callable(vram_constraint_filter):
-            mask = self.jobs_df["requested_vram"].apply(vram_constraint_filter)
-        else:
-            mask = self.jobs_df["requested_vram"] == vram_constraint_filter
+
+        mask = pd.Series([True] * len(self.jobs_df), index=self.jobs_df.index)
+
+        if vram_constraint_filter is not None:
+            col = self.jobs_df["vram_constraint"]
+            # Handle pd.NA and nullable Int64
+            if callable(vram_constraint_filter):
+                mask &= col.apply(vram_constraint_filter)
+            elif isinstance(vram_constraint_filter, list | set | tuple):
+                mask &= col.isin(vram_constraint_filter)
+            elif isinstance(vram_constraint_filter, dict):
+                if "min" in vram_constraint_filter:
+                    mask &= col.ge(vram_constraint_filter["min"])
+                if "max" in vram_constraint_filter:
+                    mask &= col.le(vram_constraint_filter["max"])
+            elif vram_constraint_filter is pd.NA or (
+                isinstance(vram_constraint_filter, float) and np.isnan(vram_constraint_filter)
+            ):
+                mask &= col.isna()
+            else:
+                # For nullable Int64, use .eq for safe comparison
+                mask &= col.eq(vram_constraint_filter)
 
         # GPU memory usage filter
         gpu_mem_mask = pd.Series([True] * len(self.jobs_df), index=self.jobs_df.index)
@@ -121,13 +144,27 @@ class EfficiencyAnalysis:
             if gpu_mem_usage_max is not None:
                 gpu_mem_mask &= self.jobs_df["GPUMemUsage"] <= gpu_mem_usage_max
 
-        filtered_jobs = self.jobs_df[
+        return self.jobs_df[
             mask
             & (self.jobs_df["allocated_vram"] > allocated_vram_greater_than)
             & gpu_mem_mask
             & (self.jobs_df["GPUs"] >= gpus_min)
             & (self.jobs_df["Elapsed"].dt.total_seconds() >= elapsed_seconds_min)
         ].copy()
+
+    def calculate_efficiency_metrics(
+        self,
+        filtered_jobs: pd.DataFrame,
+    ):
+        """
+        Analyze jobs based on constraints, GPU allocation, and usage criteria.
+
+        Args:
+            filtered_jobs (DataFrame): DataFrame containing jobs to analyze.
+
+        Returns:
+            DataFrame: Jobs with efficiency metrics added
+        """
 
         # Calculate efficiency metrics
         filtered_jobs["gpu_memory_used_gb"] = filtered_jobs["GPUMemUsage"] / (2**30)
