@@ -7,8 +7,10 @@ from ..config.constants import (
     DEFAULT_MIN_ELAPSED_SECONDS,
     ATTRIBUTE_CATEGORIES,
     MULTIVALENT_GPUS,
+    COLUMNS_IN_FILTERING,
 )
 from ..config.enum_constants import StatusEnum, AdminsAccountEnum, PartitionEnum, QOSEnum
+import warnings
 
 
 def get_vram_from_node(gpu_type: str, node: str) -> int:
@@ -257,29 +259,35 @@ def preprocess_data(
     Returns:
         pd.DataFrame: The preprocessed dataframe
     """
+    # drop columns and avoid errors in case any of them is not in the dataframe
+    data = input_df.drop(columns=["UUID", "EndTime", "Nodes", "Preempted"], axis=1, inplace=False, errors="ignore")
+    col_list = set(data.columns.to_list())
+    for col in COLUMNS_IN_FILTERING:
+        if col not in col_list:
+            warnings.warn(
+                f"Column {col} not exist in dataframe, this may result in unexpected outcome when filtering",
+                UserWarning,
+                stacklevel=2,
+            )
+    mask = pd.Series([True] * len(data))
+    if "GPUType" in data.columns:
+        mask &= data["GPUType"].notna() | include_cpu_only_jobs
+    if "GPUs" in data.columns:
+        mask &= data["GPUs"].notna() | include_cpu_only_jobs
+    if "Status" in data.columns:
+        mask &= (
+            (data["Status"] != StatusEnum.FAILED.value) & (data["Status"] != StatusEnum.CANCELLED.value)
+        ) | include_failed_cancelled_jobs
+    if "Elapsed" in data.columns:
+        mask &= data["Elapsed"] >= min_elapsed_seconds
+    if "Account" in data.columns:
+        mask &= data["Account"] != AdminsAccountEnum.ROOT.value
+    if "Partition" in data.columns:
+        mask &= data["Partition"] != PartitionEnum.BUILDING.value
+    if "QOS" in data.columns:
+        mask &= data["QOS"] != QOSEnum.UPDATES.value
 
-    data = input_df.drop(columns=["UUID", "EndTime", "Nodes", "Preempted"], axis=1, inplace=False)
-
-    cond_gpu_type = (
-        data["GPUType"].notna() | include_cpu_only_jobs
-    )  # filter out GPUType is null, except when include_CPU_only_job is True
-    cond_gpus = (
-        data["GPUs"].notna() | include_cpu_only_jobs
-    )  # filter out GPUs is null, except when include_CPU_only_job is True
-    cond_failed_cancelled_jobs = (
-        ((data["Status"] != StatusEnum.FAILED.value) & (data["Status"] != StatusEnum.CANCELLED.value))
-        | include_failed_cancelled_jobs
-    )  # filter out failed or cancelled jobs, except when include_fail_cancel_jobs is True
-
-    res = data[
-        cond_gpu_type
-        & cond_gpus
-        & cond_failed_cancelled_jobs
-        & (data["Elapsed"] >= min_elapsed_seconds)  # filter in unit of second, not timedelta object
-        & (data["Account"] != AdminsAccountEnum.ROOT.value)
-        & (data["Partition"] != PartitionEnum.BUILDING.value)
-        & (data["QOS"] != QOSEnum.UPDATES.value)
-    ].copy()
+    res = data[mask].copy()
 
     _fill_missing(res)
     # type casting for columns involving time
@@ -299,8 +307,6 @@ def preprocess_data(
     res.loc[:, "approx_allocated_vram"] = res.apply(
         lambda row: get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]), axis=1
     )
-    res.loc[:, "user_jobs"] = res.groupby("User")["User"].transform("size")
-    res.loc[:, "account_jobs"] = res.groupby("Account")["Account"].transform("size")
 
     # convert columns to categorical
 

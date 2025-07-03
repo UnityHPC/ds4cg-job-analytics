@@ -13,19 +13,81 @@ from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
 from datetime import timedelta, datetime
 
 
+# gpu_meme_usage. {min: 90, max: 1000, exclude: True}
+# TODO: ask for advice on this prolem:
+"""
+Want to include failed job but excluded cancelled jobs
+-> load_fom_db(query="EZCLUDE CANCELLED")
+-> apply_filters(incude_failed_cancelled_jobs = True)
+Quite misleading in parameters name but not sure if this is good practice
+"""
+
+
 def apply_filters_to_jobs_dataframe(
     include_failed_cancelled_jobs=False,
     include_cpu_only_jobs=False,
     min_elasped_seconds=0,
+    gpu_mem_usage_filter=None,
+    vram_constraint_filter=None,
+    gpus_min=1,
+    allocated_vram_greater_than=0,
 ):
     # This function will call preprocess and then also do a bunch of filtering alike the calculate_efficiency_metrics()
+    data_df = preprocess_data(
+        include_cpu_only_jobs=include_cpu_only_jobs,
+        include_failed_cancelled_jobs=include_failed_cancelled_jobs,
+        min_elapsed_seconds=min_elasped_seconds,
+    )
 
-    pass
+    # GPU Memory usage filter
+    if gpu_mem_usage_filter is not None:
+        gpu_mem_mask = pd.Series([True] * len(data_df), index=data_df.index)
+        col: pd.Series = data_df["GPUMemUsage"]
+        val = gpu_mem_usage_filter
+        # exact match
+        if isinstance(val, float | int):
+            gpu_mem_mask &= col == val
+        # match in range
+        elif isinstance(val, dict):
+            if "min" in val:
+                gpu_mem_mask &= col.ge(val["min"])
+            if "max" in val:
+                gpu_mem_mask &= col.le(val["max"])
+            if "exclude" in val and val["exclude"] is True:  # allow options to exclude therange that user puts in
+                gpu_mem_mask = ~gpu_mem_mask
+
+    # vram_constraints filter
+    if vram_constraint_filter is not None:
+        vram_mask = pd.Series([True] * len(data_df), index=data_df.index)
+        col = data_df["vram_constraint"]
+        val = vram_constraint_filter
+
+        if callable(val):
+            vram_mask &= col.apply(val)
+        elif isinstance(val, list | set | tuple):
+            vram_mask &= col.isin(val)
+        elif isinstance(val, dict):
+            if "min" in val:
+                vram_mask &= col.ge(val["min"])
+            if "max" in val:
+                vram_mask &= col.le(val["max"])
+            if "exclude" in val and val["exclude"] is True:
+                vram_mask = ~vram_mask
+        elif val is pd.NA or (isinstance(val, float) and np.isnan(val)):
+            vram_mask &= col.isna()
+        else:
+            # For nullable Int64, use .eq for safe comparison
+            vram_mask &= col.eq(val)
+
+    return data_df[
+        vram_mask
+        & (data_df["allocated_vram"] > allocated_vram_greater_than)
+        & gpu_mem_mask
+        & (data_df["GPUs"] >= gpus_min)
+    ].copy()
 
 
 # TODO: check todo in function validate in class EfficiencyAnalysis and in preprocess
-# TODO: break this functions into 2 functions: 1 for loading directly from duckdb using custom query, another as a wrapper for the preprocess() and filtered by dates_back
-# TODO: delete logic of handling kwargs, it is very complicated to implement and unecessary. If user want custom query, they can use the first helper
 def load_jobs_dataframe_from_duckdb(
     db_path=None,
     table_name="Jobs",
@@ -59,7 +121,6 @@ def load_jobs_dataframe_from_duckdb(
                 cutoff = datetime.now() - timedelta(days=days_back)
                 custom_query += f" WHERE StartTime >= '{cutoff}'"
         jobs_df = db.fetch_query(custom_query)
-
     except Exception as e:
         raise Exception(f"Exception at load_jobs_dataframe_from_duck_db: {e}") from e
     finally:
@@ -151,6 +212,10 @@ class EfficiencyAnalysis:
             & (self.jobs_df["GPUs"] >= gpus_min)
             & (self.jobs_df["Elapsed"].dt.total_seconds() >= elapsed_seconds_min)
         ].copy()
+
+    def _validate_columns(self):
+        # TODO: implement this to check for if important columns used in 2 helper functions above exist in the dataframe for filtering
+        pass
 
     def calculate_efficiency_metrics(
         self,
