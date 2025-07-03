@@ -199,7 +199,7 @@ class EfficiencyAnalysis:
         filtered_jobs :pd.DataFrame,
     ):
         """
-        Analyze jobs based on constraints, GPU allocation, and usage criteria.
+        Calculate efficiency metrics for the filtered jobs DataFrame.
 
         Args:
             filtered_jobs (DataFrame): DataFrame containing jobs to analyze.
@@ -207,6 +207,7 @@ class EfficiencyAnalysis:
         Returns:
             DataFrame: Jobs with efficiency metrics added
         """
+
 
         # Calculate efficiency metrics
         filtered_jobs["gpu_memory_used_gb"] = filtered_jobs["GPUMemUsage"] / (2**30)
@@ -257,7 +258,7 @@ class EfficiencyAnalysis:
             vram_efficiency_threshold=0.3
         ):
         """
-        This method evaluates the efficiency of GPU jobs based on VRAM usage and CPU-GPU balance.
+        Evaluates the efficiency of GPU jobs based on VRAM usage and CPU-GPU balance.
 
         Args:
             hours_percentage_threshold (float): Threshold for high waste GPU hours as a percentage of total GPU hours

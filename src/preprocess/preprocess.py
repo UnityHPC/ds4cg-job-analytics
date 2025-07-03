@@ -282,7 +282,7 @@ def preprocess_data(
     ].copy()
 
     _fill_missing(res)
-    # type casting for columns involving time
+    # Type casting for columns involving time
     time_columns = ["StartTime", "SubmitTime"]
     for col in time_columns:
         res[col] = pd.to_datetime(res[col], errors="coerce")
@@ -302,7 +302,7 @@ def preprocess_data(
     res.loc[:, "user_jobs"] = res.groupby("User")["User"].transform("size")
     res.loc[:, "account_jobs"] = res.groupby("Account")["Account"].transform("size")
 
-    # convert columns to categorical
+    # Convert columns to categorical
 
     for col, enum_obj in ATTRIBUTE_CATEGORIES.items():
         enum_values = [e.value for e in enum_obj]
