@@ -82,7 +82,7 @@ pythonpath = "."
 testpaths = ["tests"]
 
 [tool.mkdocs]
-# MkDocs configuration options (you can embed YAML heseupre)
+# MkDocs configuration options (you can embed YAML directly in pyproject.toml)
 config = """
 site_name: DS4CG Unity Job Analytics Docs
 theme.name: material
