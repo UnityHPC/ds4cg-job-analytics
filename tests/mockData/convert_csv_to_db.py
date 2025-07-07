@@ -6,14 +6,14 @@ import pandas as pd
 def connect(path_to_csv: str, path_to_db: str):
     # Connect to DuckDB (creates file if it doesn't exist)
     conn = duckdb.connect(path_to_db)
-    df = pd.read_csv(path_to_csv)
+    jobs_df = pd.read_csv(path_to_csv)
     for col in ["SubmitTime", "StartTime", "EndTime"]:
-        df[col] = pd.to_datetime(df[col], format="%m/%d/%y %H:%M")
-        df[col] = df[col].astype("datetime64[ns]")
+        jobs_df[col] = pd.to_datetime(jobs_df[col], format="%m/%d/%y %H:%M")
+        jobs_df[col] = jobs_df[col].astype("datetime64[ns]")
 
     for col in ["CPUMemUsage", "GPUComputeUsage", "CPUMemUsage", "CPUComputeUsage"]:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-        df[col] = df[col].astype("float64")
+        jobs_df[col] = pd.to_numeric(jobs_df[col], errors="coerce")
+        jobs_df[col] = jobs_df[col].astype("float64")
 
     # csv_path = os.path.abspath("mock1.csv")
     # Create table directly from CSV with automatic schema detection
@@ -54,7 +54,7 @@ def connect(path_to_csv: str, path_to_db: str):
             CPUComputeUsage FLOAT
         );"""
     )
-    conn.register("df_view", df)
+    conn.register("df_view", jobs_df)
     conn.execute("INSERT INTO Jobs SELECT * FROM df_view")
     conn.close()
 

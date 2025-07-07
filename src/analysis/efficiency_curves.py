@@ -2,7 +2,17 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-def plot_efficiency_curves(data: pd.DataFrame, efficiency_column: str, gpu_hours_column: str, thresholds: np.ndarray, group_by: str = None, filter_by: str = None, filter_value: str = None, title: str = None):
+
+def plot_efficiency_curves(
+    data: pd.DataFrame,
+    efficiency_column: str,
+    gpu_hours_column: str,
+    thresholds: np.ndarray,
+    group_by: str = "",
+    filter_by: str = "",
+    filter_value: str = "",
+    title: str = "",
+):
     """
     Plot efficiency curves for jobs and GPU hours below efficiency thresholds.
 
@@ -22,7 +32,7 @@ def plot_efficiency_curves(data: pd.DataFrame, efficiency_column: str, gpu_hours
     if filter_by and filter_value:
         data = data[data[filter_by] == filter_value]
 
-    groups = [None] if group_by is None else data[group_by].unique()
+    groups = [None] if group_by == "" else data[group_by].unique()
 
     fig, axes = plt.subplots(len(groups), 1, figsize=(10, 5 * len(groups)), sharex=True)
     if len(groups) == 1:
@@ -40,7 +50,7 @@ def plot_efficiency_curves(data: pd.DataFrame, efficiency_column: str, gpu_hours
         current_ax.plot(thresholds, gpu_hour_percentages, label="GPU Hours", marker="o")
         current_ax.axvline(x=50, color="gray", linestyle="--", alpha=0.5, label="50% Efficiency")
 
-        metric_title = "Job Count" if group_by is None else f"{group}"
+        metric_title = group_by if group_by else "Job Count"
         current_ax.set_title(f"Efficiency Curve - {metric_title}")
         current_ax.set_xlabel("Efficiency Threshold (%)")
         current_ax.set_ylabel("Percentage Below Threshold (%)")
@@ -52,7 +62,10 @@ def plot_efficiency_curves(data: pd.DataFrame, efficiency_column: str, gpu_hours
     plt.tight_layout()
     return fig, axes
 
-def _calculate_efficiency_curves(data: pd.DataFrame, efficiency_column: str, gpu_hours_column: str, thresholds: np.ndarray):
+
+def _calculate_efficiency_curves(
+    data: pd.DataFrame, efficiency_column: str, gpu_hours_column: str, thresholds: np.ndarray
+):
     """
     Calculate the percentage of jobs and GPU hours below each efficiency threshold.
 

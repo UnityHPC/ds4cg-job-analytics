@@ -1,9 +1,5 @@
 import pytest
-<<<<<<< HEAD
-from database.DatabaseConnection import DatabaseConnection
-=======
 from src.database.database_connection import DatabaseConnection
->>>>>>> fix/vram-calculations
 import tempfile
 import os
 
