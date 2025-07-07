@@ -40,4 +40,18 @@ MULTIVALENT_GPUS = {"a100": [40, 80], "v100": [16, 32]}
 
 # Storing columns that are used for filtering in preprocess code
 # This is used to check if all these columns exist in the dataframe for proper warning and handling
-COLUMNS_IN_FILTERING = {"GPUType", "GPUs", "Status", "Elapsed", "Account", "Partition", "QOS"}
+COLUMNS_IN_PREPROCESS = {
+    "GPUType",
+    "GPUs",
+    "Status",
+    "Elapsed",
+    "Account",
+    "Partition",
+    "QOS",
+    "Constraints",
+    "StartTime",
+    "SubmitTime",
+    "NodeList",
+}
+# can add any columns below that we want to raise error anytime it is not there
+ENFORCE_COLUMNS = {"GPUType", "Constraints", "StartTime", "SubmitTime", "NodeList"}

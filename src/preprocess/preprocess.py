@@ -7,7 +7,8 @@ from ..config.constants import (
     DEFAULT_MIN_ELAPSED_SECONDS,
     ATTRIBUTE_CATEGORIES,
     MULTIVALENT_GPUS,
-    COLUMNS_IN_FILTERING,
+    COLUMNS_IN_PREPROCESS,
+    ENFORCE_COLUMNS,
 )
 from ..config.enum_constants import StatusEnum, AdminsAccountEnum, PartitionEnum, QOSEnum
 import warnings
@@ -226,17 +227,20 @@ def _fill_missing(res: pd.DataFrame) -> None:
 
     # all Nan value are np.nan
     # fill default values for specific columns
-    res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)
-    res.loc[:, "Interactive"] = res["Interactive"].fillna("non-interactive")
-    res.loc[:, "Constraints"] = (
-        res["Constraints"].fillna("").apply(lambda x: [] if isinstance(x, str) and x == "" else x)
-    )
-    res.loc[:, "GPUType"] = (
-        res["GPUType"]
-        .fillna("")
-        .apply(lambda x: ["cpu"] if isinstance(x, str) and x == "" else x.tolist() if isinstance(x, np.ndarray) else x)
-    )
-    res.loc[:, "GPUs"] = res["GPUs"].fillna(0)
+
+    fill_map = {
+        "ArrayID": lambda s: s.fillna(-1),
+        "Interactive": lambda s: s.fillna("non-interactive"),
+        "Constraints": lambda s: s.fillna("").apply(lambda x: [] if isinstance(x, str) and x == "" else x),
+        "GPUType": lambda s: s.fillna("").apply(
+            lambda x: ["cpu"] if isinstance(x, str) and x == "" else x.tolist() if isinstance(x, np.ndarray) else x
+        ),
+        "GPUs": lambda s: s.fillna(0),
+    }
+
+    for col, fill_func in fill_map.items():
+        if col in res.columns:
+            res.loc[:, col] = fill_func(res[col])
 
 
 def preprocess_data(
@@ -261,32 +265,36 @@ def preprocess_data(
     """
     # drop columns and avoid errors in case any of them is not in the dataframe
     data = input_df.drop(columns=["UUID", "EndTime", "Nodes", "Preempted"], axis=1, inplace=False, errors="ignore")
+
+    # filtering records
     col_list = set(data.columns.to_list())
-    for col in COLUMNS_IN_FILTERING:
-        if col not in col_list:
+    for col in COLUMNS_IN_PREPROCESS:
+        if col not in col_list and col in ENFORCE_COLUMNS:
+            raise KeyError(f"Column {col} does not exist in dataframe")
+        elif col not in col_list:
             warnings.warn(
                 f"Column {col} not exist in dataframe, this may result in unexpected outcome when filtering",
                 UserWarning,
                 stacklevel=2,
             )
+
     mask = pd.Series([True] * len(data))
-    if "GPUType" in data.columns:
+    if "GPUType" in col_list:
         mask &= data["GPUType"].notna() | include_cpu_only_jobs
-    if "GPUs" in data.columns:
+    if "GPUs" in col_list:
         mask &= data["GPUs"].notna() | include_cpu_only_jobs
-    if "Status" in data.columns:
+    if "Status" in col_list:
         mask &= (
             (data["Status"] != StatusEnum.FAILED.value) & (data["Status"] != StatusEnum.CANCELLED.value)
         ) | include_failed_cancelled_jobs
-    if "Elapsed" in data.columns:
+    if "Elapsed" in col_list:
         mask &= data["Elapsed"] >= min_elapsed_seconds
-    if "Account" in data.columns:
+    if "Account" in col_list:
         mask &= data["Account"] != AdminsAccountEnum.ROOT.value
-    if "Partition" in data.columns:
+    if "Partition" in col_list:
         mask &= data["Partition"] != PartitionEnum.BUILDING.value
-    if "QOS" in data.columns:
+    if "QOS" in col_list:
         mask &= data["QOS"] != QOSEnum.UPDATES.value
-
     res = data[mask].copy()
 
     _fill_missing(res)
@@ -311,8 +319,11 @@ def preprocess_data(
     # convert columns to categorical
 
     for col, enum_obj in ATTRIBUTE_CATEGORIES.items():
-        enum_values = [e.value for e in enum_obj]
-        unique_values = res[col].unique().tolist()
-        all_categories = list(set(enum_values) | set(unique_values))
-        res[col] = pd.Categorical(res[col], categories=all_categories, ordered=False)
+        try:
+            enum_values = [e.value for e in enum_obj]
+            unique_values = res[col].unique().tolist()
+            all_categories = list(set(enum_values) | set(unique_values))
+            res[col] = pd.Categorical(res[col], categories=all_categories, ordered=False)
+        except KeyError:
+            continue
     return res
