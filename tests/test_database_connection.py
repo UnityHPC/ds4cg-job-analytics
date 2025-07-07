@@ -84,7 +84,6 @@ def temp_file_db():
 
     yield mem_db
 
-    mem_db.disconnect()
     os.remove(temp_db_path)
 
 
@@ -92,25 +91,25 @@ def test_connection_established(temp_file_db):
     assert temp_file_db.is_connected() is True
 
 
-def test_fetch_all_jobs_returns_correct_data(temp_file_db):
-    df_mock = temp_file_db.fetch_all_jobs()
+def test_fetch_all_returns_correct_data(temp_file_db):
+    mock_jobs_df = temp_file_db.fetch_all_jobs()
 
-    assert len(df_mock) == 3
+    assert len(mock_jobs_df) == 3
 
-    assert df_mock.iloc[0]["JobID"] == 101
-    assert df_mock.iloc[0]["User"] == "alice"
-    assert df_mock.iloc[0]["GPUs"] == 1
-    assert df_mock.iloc[0]["Status"] == "COMPLETED"
+    assert mock_jobs_df.iloc[0]["JobID"] == 101
+    assert mock_jobs_df.iloc[0]["User"] == "alice"
+    assert mock_jobs_df.iloc[0]["GPUs"] == 1
+    assert mock_jobs_df.iloc[0]["Status"] == "COMPLETED"
 
-    assert df_mock.iloc[1]["JobID"] == 102
-    assert df_mock.iloc[1]["User"] == "bob"
-    assert df_mock.iloc[1]["GPUs"] == 1
-    assert df_mock.iloc[1]["Status"] == "FAILED"
+    assert mock_jobs_df.iloc[1]["JobID"] == 102
+    assert mock_jobs_df.iloc[1]["User"] == "bob"
+    assert mock_jobs_df.iloc[1]["GPUs"] == 1
+    assert mock_jobs_df.iloc[1]["Status"] == "FAILED"
 
-    assert df_mock.iloc[2]["JobID"] == 103
-    assert df_mock.iloc[2]["User"] == "chris"
-    assert df_mock.iloc[2]["GPUs"] == 1
-    assert df_mock.iloc[2]["Status"] == "OUT_OF_MEMORY"
+    assert mock_jobs_df.iloc[2]["JobID"] == 103
+    assert mock_jobs_df.iloc[2]["User"] == "chris"
+    assert mock_jobs_df.iloc[2]["GPUs"] == 1
+    assert mock_jobs_df.iloc[2]["Status"] == "OUT_OF_MEMORY"
 
 
 def test_fetch_selected_columns_with_filter(temp_file_db):
@@ -119,12 +118,12 @@ def test_fetch_selected_columns_with_filter(temp_file_db):
         FROM Jobs
         WHERE Status = 'COMPLETED'
     """
-    df_mock = temp_file_db.connection.execute(query).fetchdf()
+    mock_jobs_df = temp_file_db.connection.execute(query).fetchdf()
 
-    assert len(df_mock) == 1
-    assert list(df_mock.columns) == ["JobID", "User"]
-    assert df_mock.iloc[0]["JobID"] == 101
-    assert df_mock.iloc[0]["User"] == "alice"
+    assert len(mock_jobs_df) == 1
+    assert list(mock_jobs_df.columns) == ["JobID", "User"]
+    assert mock_jobs_df.iloc[0]["JobID"] == 101
+    assert mock_jobs_df.iloc[0]["User"] == "alice"
 
 
 def test_fetch_with_filtering_multiple_conditions(temp_file_db):
@@ -133,12 +132,12 @@ def test_fetch_with_filtering_multiple_conditions(temp_file_db):
         FROM Jobs
         WHERE Status = 'COMPLETED' AND GPUs = 1
     """
-    df_mock = temp_file_db.connection.execute(query).fetchdf()
+    mock_jobs_df = temp_file_db.connection.execute(query).fetchdf()
 
-    assert len(df_mock) == 1
-    assert list(df_mock.columns) == ["JobID", "User"]
-    assert df_mock.iloc[0]["JobID"] == 101
-    assert df_mock.iloc[0]["User"] == "alice"
+    assert len(mock_jobs_df) == 1
+    assert list(mock_jobs_df.columns) == ["JobID", "User"]
+    assert mock_jobs_df.iloc[0]["JobID"] == 101
+    assert mock_jobs_df.iloc[0]["User"] == "alice"
 
 
 def test_fetch_all_column_names(temp_file_db):
