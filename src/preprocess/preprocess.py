@@ -232,7 +232,9 @@ def _fill_missing(res: pd.DataFrame) -> None:
     res.loc[:, "GPUType"] = (
         res["GPUType"]
         .fillna("")
-        .apply(lambda x: ["cpu"] if x == "" else x.tolist() if isinstance(x, np.ndarray) else x)
+        .apply(
+            lambda x: ["cpu"] if (isinstance(x, str) and x == "") else x.tolist() if isinstance(x, np.ndarray) else x
+        )
     )
     res.loc[:, "GPUs"] = res["GPUs"].fillna(0)
 
@@ -295,10 +297,7 @@ def preprocess_data(
     res.loc[:, "Queued"] = res["StartTime"] - res["SubmitTime"]
     res.loc[:, "vram_constraint"] = res.apply(
         lambda row: _get_vram_constraint(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1
-    )
-    print(res["vram_constraint"])
-    print(res["vram_constraint"].fillna(pd.NA))
-
+    ).astype(pd.Int64Dtype())
     res.loc[:, "allocated_vram"] = res.apply(
         lambda row: _get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
         axis=1,
