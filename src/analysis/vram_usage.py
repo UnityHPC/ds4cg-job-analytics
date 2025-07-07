@@ -234,11 +234,12 @@ class EfficiencyAnalysis:
 
         # Calculate job allocated VRAM efficiency score
         # This is a log-transformed score that penalizes low efficiency and longer job_hours
-        # TODO (Arda): Decide implementation of alloc_vram_efficiency_score
+        # TODO (Arda): Update the implementation of alloc_vram_efficiency_score
+        # Set the score to -inf where alloc_vram_efficiency is zero to avoid divide by zero/log of zero
+        alloc_vram_eff = filtered_jobs["alloc_vram_efficiency"]
         filtered_jobs["alloc_vram_efficiency_score"] = (
-            np.log(filtered_jobs["alloc_vram_efficiency"])
-            * filtered_jobs["job_hours"]
-        )
+            np.log(alloc_vram_eff.where(alloc_vram_eff > 0)) * filtered_jobs["job_hours"]
+        ).where(alloc_vram_eff > 0, -np.inf)
 
         # Calculate weighted vram efficiency per job, normalized by total job_hours for that specific PI
         pi_gpu_hours = filtered_jobs.groupby("Account", observed=True)["job_hours"].transform("sum")
