@@ -60,10 +60,44 @@ If you need to reset your environment, you can delete the `duckdb` folder and re
 
 ## Code Style & Linting
 
+### Ruff
+
 This repository uses [Ruff](https://docs.astral.sh/ruff/) for linting and formatting. All code must pass Ruff checks before being committed. To run Ruff:
 
     ruff check .
     ruff format .
+
+If using VS Code, you can install the [Ruff](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff) extension for an integrated experience. 
+
+Ruff automatically checks your code when you open or edit Python or Jupyter Notebook files. You can use the extension to:
+
+- View diagnostics: Linting issues are highlighted and can be viewed in the Problems panel (Ctrl+Shift+M).
+- Fix issues: Use Quick Fix options for individual issues.
+- Run the `Ruff: Fix all auto-fixable problems` command to address multiple violations. By default, unsafe fixes require explicit configuration in your Ruff file.
+- Format code: Use the `Format Document` command or configure formatting on save.
+
+### Mypy
+
+This repository uses [Mypy](https://mypy-lang.org/) for static Typing in Python. All code should pass Mypy checks. To run it in terminal:
+
+    mypy --config-file pyproject.toml .
+
+If using VS Code, you can install the [Mypy Type Checker](https://marketplace.visualstudio.com/items?itemName=ms-python.mypy-type-checker) extension for an integrated experience. To adjust the extension settings similar to:
+
+    "mypy-type-checker.args": [
+    "--config-file=pyproject.toml"
+    ]
+    "mypy-type-checker.cwd": "${workspaceFolder}/ds4cg-job-analytics"
+    "mypy-type-checker.preferDaemon": true
+    "mypy-type-checker.reportingScope": "workspace"
+
+To manage Mypy with this extension, you can use the following commands:
+
+- `Mypy: Recheck Workspace`: Re-run Mypy on the workspace.
+
+- `Mypy: Restart Daemon and Recheck Workspace`: Restart the Mypy daemon and recheck.
+
+### Docstrings
 
 All Python code should use [**Google-style docstrings**](https://google.github.io/styleguide/pyguide.html#381-docstrings). Example template:
 

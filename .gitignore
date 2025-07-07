@@ -4,7 +4,6 @@
 /venv
 /duckdb
 
-
 # Compiled Python files
 *.py[ocd]
 __pycache__
@@ -34,6 +33,7 @@ Thumbs.db
 *.bak
 *.backup
 *.csv
+!tests/**/*.csv
 data/
 
 # Other common ignore rules
@@ -41,3 +41,4 @@ data/
 *.patch
 *.diff
 /docs/build
+/site

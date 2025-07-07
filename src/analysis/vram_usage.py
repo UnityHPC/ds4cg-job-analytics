@@ -58,7 +58,7 @@ class EfficiencyAnalysis:
 
     def calculate_efficiency_metrics(
         self,
-        vram_constraint_filter=0,
+        vram_constraint_filter=None,
         allocated_vram_greater_than=0,
         gpu_mem_usage_min=None,
         gpu_mem_usage_max=None,
@@ -82,9 +82,10 @@ class EfficiencyAnalysis:
             DataFrame: Filtered jobs with efficiency metrics added
         """
         # Flexible filter for requested_vram
+        mask = pd.Series([True] * len(self.jobs_df), index=self.jobs_df.index)
         if callable(vram_constraint_filter):
             mask = self.jobs_df["requested_vram"].apply(vram_constraint_filter)
-        else:
+        elif vram_constraint_filter is not None:
             mask = self.jobs_df["requested_vram"] == vram_constraint_filter
 
         # GPU memory usage filter
