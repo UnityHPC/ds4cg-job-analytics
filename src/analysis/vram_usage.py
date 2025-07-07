@@ -322,7 +322,6 @@ class EfficiencyAnalysis:
         self.users_w_efficiency_metrics = users_w_efficiency_metrics
         return self.users_w_efficiency_metrics
 
-
     def evaluate_cpu_gpu_usage(
             self,
             hours_percentage_threshold=25,
@@ -442,7 +441,7 @@ class EfficiencyAnalysis:
 
         return self.analysis_results
     
-    def find_inefficient_users_by_alloc_vram_efficiency(self, efficiency_threshold=0.3, min_jobs=5):
+    def find_inefficient_users_by_alloc_vram_efficiency(self, efficiency_threshold: float = 0.3, min_jobs: int = 5):
         """
         Identify users with low expected allocated VRAM efficiency across their jobs compared to others
 
@@ -481,8 +480,8 @@ class EfficiencyAnalysis:
             ascending=True
         )
         return inefficient_users
-    
-    def find_inefficient_users_by_vram_hours(self, vram_hours_threshold=200, min_jobs=5):
+
+    def find_inefficient_users_by_vram_hours(self, vram_hours_threshold: float = 200, min_jobs: int = 5):
         """
         Identify users with high VRAM-hours across their jobs compared to others.
 
@@ -588,62 +587,36 @@ class EfficiencyAnalysis:
         self.pi_accounts_w_efficiency_metrics = pi_efficiency_metrics
         return self.pi_accounts_w_efficiency_metrics
 
-    def find_inefficient_pis_weighted_by_hours(self, efficiency_threshold=0.3, min_jobs=5):
-        """
-        Identify PIs with low average VRAM efficiency across their jobs, weighted by the hours they were inefficient.
-
-        Args:
-            efficiency_threshold (float): Threshold for VRAM efficiency to consider a PI as inefficient
-            min_jobs (int): Minimum number of jobs a PI must have to be included in the analysis
-
-        Returns:
-            pd.DataFrame: DataFrame with PIs and their average VRAM efficiency
-        """
-        if self.efficiency_df is None:
-            raise ValueError("Efficiency DataFrame is not available. Please run calculate_efficiency_metrics first.")
-
-        inefficient_pis = (
-            self.efficiency_df[self.efficiency_df["alloc_vram_efficiency"] < efficiency_threshold]
-            .groupby("Account", observed=False)
-            .agg(
-                Job_Count=("JobID", "count"),
-                Avg_Allocated_VRAM=("allocated_vram", "mean"),
-                pi_group_gpu_hours=("job_hours", "sum"),
-                Avg_GPUs=("GPUs", "mean"),
-                Avg_Weighted_VRAM_Efficiency=("pi_weighted_vram_efficiency", "mean"),
+    def find_inefficient_pis_by_vram_hours(self, vram_hours_threshold: float = 200, min_jobs: int = 5):
+        if self.pi_accounts_w_efficiency_metrics is None:
+            raise ValueError(
+                "PI accounts with efficiency metrics DataFrame is not available. "
+                "Please run calculate_pi_account_efficiency_metrics first."
             )
-            .reset_index()
+
+        mask = pd.Series(
+            [True] * len(self.pi_accounts_w_efficiency_metrics),
+            index=self.pi_accounts_w_efficiency_metrics.index
         )
 
-        # Multiply share of total gpu hours by weighted vram efficiency to get the new metric
-        inefficient_pis["Weighted_Efficiency_Contribution"] = (
-            inefficient_pis["pi_group_gpu_hours"]
-            * inefficient_pis["Avg_Weighted_VRAM_Efficiency"]
-            / inefficient_pis["pi_group_gpu_hours"].sum()
+        col = self.pi_accounts_w_efficiency_metrics["pi_acc_vram_hours"]
+        mask &= (
+            col.ge(vram_hours_threshold)
         )
 
-        # Only include PIs with at least 5 jobs
-        inefficient_pis = inefficient_pis[inefficient_pis["Job_Count"] >= min_jobs]
-
-        # Sort by the new metric ascending (lower is worse)
-        inefficient_pis = inefficient_pis.sort_values(
-            "Weighted_Efficiency_Contribution",
-            ascending=True
+        col = self.pi_accounts_w_efficiency_metrics["job_count"]
+        mask &= (
+            col.ge(min_jobs)
         )
-        return 
-    
 
+        inefficient_pi_accounts = (
+            self.pi_accounts_w_efficiency_metrics[mask]
+        )
 
-def filter_zero_vram_requested_with_gpu_allocated(df, requested_vram=0, gpus_min=1):
-    """
-    Return jobs where requested_vram is greater than or equal to a value (default 0) and GPUs >= gpus_min (default 1).
+        # Sort by the metric descending (higher is worse)
+        inefficient_pi_accounts = inefficient_pi_accounts.sort_values(
+            "pi_acc_vram_hours",
+            ascending=False
+        )
+        return inefficient_pi_accounts
 
-    Args:
-        df (pd.DataFrame): The jobs DataFrame.
-        requested_vram (int, float): Value to filter requested_vram
-        gpus_min (int): Minimum GPUs allocated
-
-    Returns:
-        pd.DataFrame: Filtered DataFrame with jobs matching the criteria.
-    """
-    return df[(df["requested_vram"] >= requested_vram) & (df["GPUs"] >= gpus_min)]
