@@ -365,3 +365,20 @@ def test_preprocess_timedelta_conversion(mock_data_frame):
     assert time_limit.dtype == "timedelta64[ns]"
     assert time_limit[0].total_seconds() == ground_truth["TimeLimit"][0]
     assert time_limit[max_len - 1].total_seconds() == ground_truth["TimeLimit"][max_len - 1]
+
+
+def test_preprocess_gpu_type(mock_data_frame):
+    """
+    Test that the GPUType column is correctly filled and transformed during preprocessing.
+    """
+
+    data = preprocess_data(
+        input_df=mock_data_frame,
+        include_cpu_only_jobs=True,
+    )
+
+    # Check that GPUType is filled with 'cpu' for CPU-only jobs
+    assert all(row == ["cpu"] for row in data.loc[data["GPUType"].isna(), "GPUType"])
+
+    # Check that numpy arrays in GPUType are converted to lists
+    assert all(isinstance(row, list) for row in data["GPUType"] if not pd.isna(row))
