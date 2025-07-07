@@ -236,7 +236,7 @@ class EfficiencyAnalysis:
         # This is a log-transformed score that penalizes low efficiency and longer job_hours
         # TODO (Arda): Decide implementation of alloc_vram_efficiency_score
         filtered_jobs["alloc_vram_efficiency_score"] = (
-            np.log1p(filtered_jobs["alloc_vram_efficiency"])
+            np.log(filtered_jobs["alloc_vram_efficiency"])
             * filtered_jobs["job_hours"]
         )
 
@@ -580,7 +580,7 @@ class EfficiencyAnalysis:
             .sum()
             .to_numpy()
         )
-        
+
         self.users_w_efficiency_metrics = self.users_w_efficiency_metrics.drop(
             columns=["weighted_ev_alloc_vram_efficiency"]
         )
