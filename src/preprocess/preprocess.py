@@ -78,6 +78,8 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int, gpu_mem_usage: 
 
     """
     vram_constraints = []
+    if not isinstance(constraints, list) and pd.isna(constraints):
+        return None
     for constr in constraints:
         constr = constr.strip("'")
         if constr.startswith("vram"):
@@ -226,9 +228,8 @@ def _fill_missing(res: pd.DataFrame) -> None:
     # fill default values for specific columns
     res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)
     res.loc[:, "Interactive"] = res["Interactive"].fillna("non-interactive")
-    res.loc[:, "Constraints"] = (
-        res["Constraints"].fillna("").apply(lambda x: [] if isinstance(x, str) and x == "" else x)
-    )
+    # TODO: convert all of constraints to list, do not fill null values
+    res.loc[:, "Constraints"] = res["Constraints"].apply(lambda x: x.tolist() if isinstance(x, np.ndarray) else x)
     res.loc[:, "GPUType"] = (
         res["GPUType"]
         .fillna("")
