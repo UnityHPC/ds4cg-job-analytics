@@ -18,5 +18,4 @@ def mock_data_frame():
         raise Exception("Exception at mock_data_frame") from e
     finally:
         if db is not None and db.is_connected():
-            db.connection.close()
             shutil.rmtree(temp_db_dir)
