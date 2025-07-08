@@ -262,10 +262,20 @@ def preprocess_data(
 
     Returns:
         pd.DataFrame: The preprocessed dataframe
+
+    TODO: delete the comment line below when merging
+    TODO: Elapsed is not important here but will be essential when passed to EfficiencyAnalysis class, where should it be handled?
+
+    Handling missing columns logic:
+        - columns in ENFORCE_COLUMNS are columns that are necessary in basic calculation happening in preprocess
+        - For any columns in ENFORCE_COLUMNS that do not exist, a KeyError will be raised.
+        - For any columns in COLUMNS_IN_PREPROCESS but not in ENFORCE_COLUMNS, a warning will be raised.
+        - In _fill_missing, records filtering, and type conversion logic actions will happen only if those columns exist in the dataset
     """
     # drop columns and avoid errors in case any of them is not in the dataframe
     data = input_df.drop(columns=["UUID", "EndTime", "Nodes", "Preempted"], axis=1, inplace=False, errors="ignore")
 
+    # TODO: if this is approved, refactor the code below
     # filtering records
     col_list = set(data.columns.to_list())
     for col in COLUMNS_IN_PREPROCESS:
@@ -279,10 +289,10 @@ def preprocess_data(
             )
 
     mask = pd.Series([True] * len(data))
-    if "GPUType" in col_list:
-        mask &= data["GPUType"].notna() | include_cpu_only_jobs
-    if "GPUs" in col_list:
-        mask &= data["GPUs"].notna() | include_cpu_only_jobs
+    mask &= data["GPUType"].notna() | include_cpu_only_jobs
+    mask &= data["GPUs"].notna() | include_cpu_only_jobs
+
+    # for filtering columns which may or may not appear in the dataset
     if "Status" in col_list:
         mask &= (
             (data["Status"] != StatusEnum.FAILED.value) & (data["Status"] != StatusEnum.CANCELLED.value)
@@ -305,7 +315,10 @@ def preprocess_data(
 
     timedelta_columns = ["TimeLimit", "Elapsed"]
     for col in timedelta_columns:
-        res[col] = pd.to_timedelta(res[col], unit="s", errors="coerce")
+        try:
+            res[col] = pd.to_timedelta(res[col], unit="s", errors="coerce")
+        except KeyError:
+            continue
 
     # Added parameters for calculating VRAM metrics
     res.loc[:, "Queued"] = res["StartTime"] - res["SubmitTime"]
@@ -317,7 +330,6 @@ def preprocess_data(
     )
 
     # convert columns to categorical
-
     for col, enum_obj in ATTRIBUTE_CATEGORIES.items():
         try:
             enum_values = [e.value for e in enum_obj]

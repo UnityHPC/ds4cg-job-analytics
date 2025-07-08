@@ -23,77 +23,123 @@ Quite misleading in parameters name but not sure if this is good practice
 """
 
 
-def apply_filters_to_jobs_dataframe(
-    include_failed_cancelled_jobs=False,
-    include_cpu_only_jobs=False,
-    min_elasped_seconds=0,
-    gpu_mem_usage_filter=None,
-    vram_constraint_filter=None,
-    gpus_min=1,
-    allocated_vram_greater_than=0,
-):
-    # This function will call preprocess and then also do a bunch of filtering alike the calculate_efficiency_metrics()
-    data_df = preprocess_data(
-        include_cpu_only_jobs=include_cpu_only_jobs,
-        include_failed_cancelled_jobs=include_failed_cancelled_jobs,
-        min_elapsed_seconds=min_elasped_seconds,
-    )
+# def apply_filters_to_jobs_dataframe(
+#     include_failed_cancelled_jobs=False,
+#     include_cpu_only_jobs=False,
+#     min_elasped_seconds=0,
+#     gpu_mem_usage_filter=None,
+#     vram_constraint_filter=None,
+#     gpus_min=1,
+#     allocated_vram_greater_than=0,
+# ):
+#     # This function will call preprocess and then also do a bunch of filtering alike the calculate_efficiency_metrics()
+#     data_df = preprocess_data(
+#         include_cpu_only_jobs=include_cpu_only_jobs,
+#         include_failed_cancelled_jobs=include_failed_cancelled_jobs,
+#         min_elapsed_seconds=min_elasped_seconds,
+#     )
 
-    # GPU Memory usage filter
-    if gpu_mem_usage_filter is not None:
-        gpu_mem_mask = pd.Series([True] * len(data_df), index=data_df.index)
-        col: pd.Series = data_df["GPUMemUsage"]
-        val = gpu_mem_usage_filter
-        # exact match
-        if isinstance(val, float | int):
-            gpu_mem_mask &= col == val
-        # match in range
-        elif isinstance(val, dict):
-            if "min" in val:
-                gpu_mem_mask &= col.ge(val["min"])
-            if "max" in val:
-                gpu_mem_mask &= col.le(val["max"])
-            if "exclude" in val and val["exclude"] is True:  # allow options to exclude therange that user puts in
-                gpu_mem_mask = ~gpu_mem_mask
+#     # GPU Memory usage filter
+#     if gpu_mem_usage_filter is not None:
+#         gpu_mem_mask = pd.Series([True] * len(data_df), index=data_df.index)
+#         col: pd.Series = data_df["GPUMemUsage"]
+#         val = gpu_mem_usage_filter
+#         # exact match
+#         if isinstance(val, float | int):
+#             gpu_mem_mask &= col == val
+#         # match in range
+#         elif isinstance(val, dict):
+#             if "min" in val:
+#                 gpu_mem_mask &= col.ge(val["min"])
+#             if "max" in val:
+#                 gpu_mem_mask &= col.le(val["max"])
+#             if "exclude" in val and val["exclude"] is True:  # allow options to exclude therange that user puts in
+#                 gpu_mem_mask = ~gpu_mem_mask
 
-    # vram_constraints filter
-    if vram_constraint_filter is not None:
-        vram_mask = pd.Series([True] * len(data_df), index=data_df.index)
-        col = data_df["vram_constraint"]
-        val = vram_constraint_filter
+#     # vram_constraints filter
+#     if vram_constraint_filter is not None:
+#         vram_mask = pd.Series([True] * len(data_df), index=data_df.index)
+#         col = data_df["vram_constraint"]
+#         val = vram_constraint_filter
 
-        if callable(val):
-            vram_mask &= col.apply(val)
-        elif isinstance(val, list | set | tuple):
-            vram_mask &= col.isin(val)
-        elif isinstance(val, dict):
-            if "min" in val:
-                vram_mask &= col.ge(val["min"])
-            if "max" in val:
-                vram_mask &= col.le(val["max"])
-            if "exclude" in val and val["exclude"] is True:
-                vram_mask = ~vram_mask
-        elif val is pd.NA or (isinstance(val, float) and np.isnan(val)):
-            vram_mask &= col.isna()
-        else:
-            # For nullable Int64, use .eq for safe comparison
-            vram_mask &= col.eq(val)
+#         if callable(val):
+#             vram_mask &= col.apply(val)
+#         elif isinstance(val, list | set | tuple):
+#             vram_mask &= col.isin(val)
+#         elif isinstance(val, dict):
+#             if "min" in val:
+#                 vram_mask &= col.ge(val["min"])
+#             if "max" in val:
+#                 vram_mask &= col.le(val["max"])
+#             if "exclude" in val and val["exclude"] is True:
+#                 vram_mask = ~vram_mask
+#         elif val is pd.NA or (isinstance(val, float) and np.isnan(val)):
+#             vram_mask &= col.isna()
+#         else:
+#             # For nullable Int64, use .eq for safe comparison
+#             vram_mask &= col.eq(val)
 
-    return data_df[
-        vram_mask
-        & (data_df["allocated_vram"] > allocated_vram_greater_than)
-        & gpu_mem_mask
-        & (data_df["GPUs"] >= gpus_min)
-    ].copy()
+#     return data_df[
+#         vram_mask
+#         & (data_df["allocated_vram"] > allocated_vram_greater_than)
+#         & gpu_mem_mask
+#         & (data_df["GPUs"] >= gpus_min)
+#     ].copy()
 
 
-# TODO: check todo in function validate in class EfficiencyAnalysis and in preprocess
+# # TODO: check todo in function validate in class EfficiencyAnalysis and in preprocess
+# def load_jobs_dataframe_from_duckdb(
+#     db_path=None,
+#     table_name="Jobs",
+#     days_back=60,
+#     custom_query="",
+# ) -> pd.DataFrame:
+#     """
+#     Connect to the DuckDB slurm_data_small.db and return the jobs table as a pandas DataFrame.
+
+#     Args:
+#         db_path (str or Path, optional): Path to the DuckDB database. Defaults to 'data/slurm_data_small.db'.
+#         table_name (str, optional): Table name to query. Defaults to 'Jobs'.
+#         days_back (int, optional): Number of days back to filter jobs based on StartTime.
+#             Deafults to None. If None, will not filter by startTime.
+#         custom_query(str, optional): Custom SQL query to execute. Defaults to an empty string.
+#             If empty, will select all jobs.
+#     Returns:
+#         pd.DataFrame: DataFrame containing the table data.
+#     """
+#     if db_path is None:
+#         db_path = Path(__file__).resolve().parents[2] / "data" / "slurm_data_small.db"
+#     db = None
+
+#     try:
+#         db = DatabaseConnection(str(db_path))
+
+#         jobs_df = None
+#         if not custom_query:
+#             custom_query = f"SELECT * FROM {table_name}"
+#             if days_back is not None:
+#                 cutoff = datetime.now() - timedelta(days=days_back)
+#                 custom_query += f" WHERE StartTime >= '{cutoff}'"
+#         jobs_df = db.fetch_query(custom_query)
+#     except Exception as e:
+#         raise Exception(f"Exception at load_jobs_dataframe_from_duck_db: {e}") from e
+#     finally:
+#         if db is not None:
+#             db.disconnect()
+#     return jobs_df
+
+
 def load_jobs_dataframe_from_duckdb(
     db_path=None,
     table_name="Jobs",
-    days_back=60,
+    sample_size=None,
+    random_state=None,
+    days_back=None,
     custom_query="",
-) -> pd.DataFrame:
+    include_failed_cancelled_jobs=False,
+    include_cpu_only_jobs=False,
+    min_elasped_seconds=0,
+):
     """
     Connect to the DuckDB slurm_data_small.db and return the jobs table as a pandas DataFrame.
 
@@ -104,16 +150,23 @@ def load_jobs_dataframe_from_duckdb(
             Deafults to None. If None, will not filter by startTime.
         custom_query(str, optional): Custom SQL query to execute. Defaults to an empty string.
             If empty, will select all jobs.
+        include_failed_cancelled_jobs (bool, optional): If True, include jobs with FAILED or CANCELLED status.
+            Defaults to False.
+        include_cpu_only_jobs (bool, optional): If True, include jobs that do not use GPUs (CPU-only jobs).
+            Defaults to False.
+        min_eslaped_seconds (int, optional): Minimum elapsed time in seconds to filter jobs by elapsed time.
+            Defaults to 0.
+
     Returns:
         pd.DataFrame: DataFrame containing the table data.
     """
     if db_path is None:
         db_path = Path(__file__).resolve().parents[2] / "data" / "slurm_data_small.db"
+
     db = None
 
     try:
         db = DatabaseConnection(str(db_path))
-
         jobs_df = None
         if not custom_query:
             custom_query = f"SELECT * FROM {table_name}"
@@ -121,12 +174,25 @@ def load_jobs_dataframe_from_duckdb(
                 cutoff = datetime.now() - timedelta(days=days_back)
                 custom_query += f" WHERE StartTime >= '{cutoff}'"
         jobs_df = db.fetch_query(custom_query)
+
     except Exception as e:
         raise Exception(f"Exception at load_jobs_dataframe_from_duck_db: {e}") from e
+
     finally:
         if db is not None:
             db.disconnect()
-    return jobs_df
+
+    processed_data = preprocess_data(
+        jobs_df,
+        min_elapsed_seconds=min_elasped_seconds,
+        include_failed_cancelled_jobs=include_failed_cancelled_jobs,
+        include_cpu_only_jobs=include_cpu_only_jobs,
+    )
+
+    if sample_size is not None:
+        processed_data = processed_data.sample(n=sample_size, random_state=random_state)
+
+    return processed_data
 
 
 class EfficiencyAnalysis:

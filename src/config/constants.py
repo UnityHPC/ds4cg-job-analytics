@@ -52,6 +52,8 @@ COLUMNS_IN_PREPROCESS = {
     "StartTime",
     "SubmitTime",
     "NodeList",
+    "GPUMemUsage",
 }
+
 # can add any columns below that we want to raise error anytime it is not there
-ENFORCE_COLUMNS = {"GPUType", "Constraints", "StartTime", "SubmitTime", "NodeList"}
+ENFORCE_COLUMNS = {"GPUType", "Constraints", "StartTime", "SubmitTime", "NodeList", "GPUs", "GPUMemUsage"}
