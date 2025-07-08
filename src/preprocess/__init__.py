@@ -1,2 +1,3 @@
 from .preprocess import preprocess_data as preprocess_data
-from .preprocess import get_requested_vram as get_requested_vram
+from .preprocess import _get_approx_allocated_vram as _get_approx_allocated_vram
+from .preprocess import _get_vram_constraint as _get_vram_constraint

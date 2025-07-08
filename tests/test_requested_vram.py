@@ -1,4 +1,4 @@
-from src.preprocess import get_requested_vram
+from src.preprocess import _get_vram_constraint
 import pytest
 import numpy as np
 import pandas as pd
@@ -41,12 +41,12 @@ def mock_constraints():
 
 def test_get_vram_constraints(mock_constraints):
     """
-    Test the get_requested_vram function with mock constraints data.
+    Test the _get_vram_constraint function with mock constraints data.
     This test checks if the function correctly calculates the requested VRAM based on the constraints,
         number of GPUs, GPU memory usage, and check if it handles null values correctly.
     """
     data: pd.DataFrame = mock_constraints
-    res = data.apply(lambda row: get_requested_vram(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1)
+    res = data.apply(lambda row: _get_vram_constraint(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1)
     # expected values of vram_constraints, each entry is max requested_vram * GPUs_num (default of GPUs_num is 1)
     expect_vram_constraints = [
         23,
