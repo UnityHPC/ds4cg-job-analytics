@@ -5,3 +5,4 @@ fire
 tabulate
 matplotlib
 seaborn
+jupyterlab

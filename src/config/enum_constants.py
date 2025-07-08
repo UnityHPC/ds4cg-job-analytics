@@ -1,6 +1,5 @@
 """
-This file contains declaration of some enum class.
-This is mainly used for access constants values of categorical types.
+This file contains declaration of some enum class such as constants values of categorical types.
 """
 
 from enum import Enum

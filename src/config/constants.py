@@ -1,10 +1,10 @@
 from .enum_constants import InteractiveEnum, QOSEnum, StatusEnum, ExitCodeEnum, PartitionEnum, AdminsAccountEnum
 
-RAM_MAP = {
-    "a100": 40,  # have 80GB and 40GB variants, default is setted to 40GB
-    "a100-40g": 40,
-    "a100-80g": 80,
-    "v100": 16,  # have 32GB and 16GB variants, default is setted to 16GB
+VRAM_VALUES = {
+    "a100": 40,  # Default VRAM for a100 is 40GB, but we check usage to see which variant they want
+    "a100-40g": 40,  # 40GB variant of a100 that can be specified explicitly in constraints
+    "a100-80g": 80,  # 80GB variant of a100 that can be specified explicitly in constraints
+    "v100": 16,
     "a40": 48,
     "gh200": 95,
     "rtx_8000": 48,
@@ -20,7 +20,7 @@ RAM_MAP = {
     "cpu": 0,
 }
 
-VARIABLE_GPUS = {"a100": [40, 80], "v100": [16, 32]}  # contains GPUs that have multiple memory variants
+VRAM_CATEGORIES = [0, 8, 11, 12, 16, 23, 32, 40, 48, 80]
 
 DEFAULT_MIN_ELAPSED_SECONDS = 600
 
@@ -33,3 +33,6 @@ ATTRIBUTE_CATEGORIES = {
     "Account": AdminsAccountEnum,
     "Partition": PartitionEnum,
 }
+
+# Storing GPU names that have multiple memory sizes
+MULTIVALENT_GPUS = {"a100": [40, 80], "v100": [16, 32]}
