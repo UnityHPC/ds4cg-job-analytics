@@ -34,9 +34,9 @@ ATTRIBUTE_CATEGORIES = {
     "Partition": PartitionEnum,
 }
 
-# Storing GPU names that have multiple vram options
-# This is used to determine which GPU variant a job is using based on the VRAM usage
+# Storing GPU names that have multiple memory sizes
 MULTIVALENT_GPUS = {"a100": [40, 80], "v100": [16, 32]}
+
 
 # Storing columns that are used for filtering in preprocess code
 # This is used to check if all these columns exist in the dataframe for proper warning and handling

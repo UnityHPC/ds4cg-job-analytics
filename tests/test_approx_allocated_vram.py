@@ -1,5 +1,5 @@
 import pandas as pd
-from src.preprocess.preprocess import get_approx_allocated_vram
+from src.preprocess.preprocess import _get_approx_allocated_vram
 
 
 # Test for single node VRAM allocation
@@ -25,7 +25,7 @@ def test_approx_allocated_vram_single_node():
     expected_allocated_vram = [40, 16, 64, 320, 11, 96]
 
     mock_data["AllocatedVRAM"] = mock_data.apply(
-        lambda row: get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
+        lambda row: _get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
         axis=1,
     )
 
@@ -48,7 +48,7 @@ def test_approx_allocated_vram_mixed_nodes_below_minimum():
     expected_allocated_vram = [120]  # Minimum VRAM (40 GB per GPU) * 3 GPUs
 
     mock_data["AllocatedVRAM"] = mock_data.apply(
-        lambda row: get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
+        lambda row: _get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
         axis=1,
     )
 
@@ -71,7 +71,7 @@ def test_approx_allocated_vram_mixed_nodes_exceeding_minimum():
     expected_allocated_vram = [240]  # Higher VRAM (80 GB per GPU) * 3 GPUs
 
     mock_data["AllocatedVRAM"] = mock_data.apply(
-        lambda row: get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
+        lambda row: _get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
         axis=1,
     )
 
