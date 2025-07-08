@@ -229,13 +229,13 @@ def _fill_missing(res: pd.DataFrame) -> None:
     # fill default values for specific columns
 
     fill_map = {
-        "ArrayID": lambda s: s.fillna(-1),
-        "Interactive": lambda s: s.fillna("non-interactive"),
-        "Constraints": lambda s: s.fillna("").apply(lambda x: [] if isinstance(x, str) and x == "" else x),
-        "GPUType": lambda s: s.fillna("").apply(
+        "ArrayID": lambda col: col.fillna(-1),
+        "Interactive": lambda col: col.fillna("non-interactive"),
+        "Constraints": lambda col: col.fillna("").apply(lambda x: [] if isinstance(x, str) and x == "" else x),
+        "GPUType": lambda col: col.fillna("").apply(
             lambda x: ["cpu"] if isinstance(x, str) and x == "" else x.tolist() if isinstance(x, np.ndarray) else x
         ),
-        "GPUs": lambda s: s.fillna(0),
+        "GPUs": lambda col: col.fillna(0),
     }
 
     for col, fill_func in fill_map.items():
@@ -289,24 +289,31 @@ def preprocess_data(
             )
 
     mask = pd.Series([True] * len(data))
+
+    # for filtering columns that must exist in the dataset
     mask &= data["GPUType"].notna() | include_cpu_only_jobs
     mask &= data["GPUs"].notna() | include_cpu_only_jobs
+
     # for filtering columns which may or may not appear in the dataset
-    if "Status" in col_list:
-        mask &= (
-            (data["Status"] != StatusEnum.FAILED.value) & (data["Status"] != StatusEnum.CANCELLED.value)
-        ) | include_failed_cancelled_jobs
-    if "Elapsed" in col_list:
-        mask &= data["Elapsed"] >= min_elapsed_seconds
-    if "Account" in col_list:
-        mask &= data["Account"] != AdminsAccountEnum.ROOT.value
-    if "Partition" in col_list:
-        mask &= data["Partition"] != PartitionEnum.BUILDING.value
-    if "QOS" in col_list:
-        mask &= data["QOS"] != QOSEnum.UPDATES.value
+    filter_conditions = [
+        (
+            "Status",
+            lambda df: ((df["Status"] != StatusEnum.FAILED.value) & (df["Status"] != StatusEnum.CANCELLED.value))
+            | include_failed_cancelled_jobs,
+        ),
+        ("Elapsed", lambda df: df["Elapsed"] >= min_elapsed_seconds),
+        ("Account", lambda df: df["Account"] != AdminsAccountEnum.ROOT.value),
+        ("Partition", lambda df: df["Partition"] != PartitionEnum.BUILDING.value),
+        ("QOS", lambda df: df["QOS"] != QOSEnum.UPDATES.value),
+    ]
+
+    for col, cond in filter_conditions:
+        if col in data:
+            mask &= cond(data)
     res = data[mask].copy()
 
     _fill_missing(res)
+
     # type casting for columns involving time
     time_columns = ["StartTime", "SubmitTime"]
     for col in time_columns:
