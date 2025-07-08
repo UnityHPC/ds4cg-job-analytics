@@ -359,11 +359,11 @@ def test_pre_proess_timedelta_conversion(mock_data):
     assert time_limit[max_len - 1].total_seconds() == ground_truth["TimeLimit"][max_len - 1]
 
 
-def test_preprocess_gpu_type(mock_data_frame):
+def test_preprocess_gpu_type(mock_data):
     """
     Test that the GPUType column is correctly filled and transformed during preprocessing.
     """
-
+    mock_data_frame = mock_data[0]
     data = preprocess_data(
         input_df=mock_data_frame,
         include_cpu_only_jobs=True,
