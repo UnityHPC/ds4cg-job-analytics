@@ -56,8 +56,8 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # Ignore some rules in Benjamin's file
 
-"scripts/*" = ["N", "NPY", "PD", "D100"]
-"notebooks/SlurmGPU.ipynb" = ["N", "NPY", "PD", "D100"]
+"scripts/*" = ["N", "NPY", "PD", "D100", "TD"]
+"notebooks/SlurmGPU.ipynb" = ["N", "NPY", "PD", "D100", "TD"]
 
 [tool.ruff.lint.isort]
 # Combine multiple 'as' imports on a single line (e.g., import foo as bar, baz as qux)
