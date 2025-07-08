@@ -30,7 +30,7 @@ def _get_vram_from_node(gpu_type: str, node: str) -> int:
         This logic is based on the cluster specifications documented at:
         https://docs.unity.rc.umass.edu/documentation/cluster_specs/nodes/
 
-        TODO: Consider reading this information from a config file or database.
+        TODO (Ayush): Consider reading this information from a config file or database.
     """
     vram = 0
     if gpu_type not in MULTIVALENT_GPUS:
@@ -194,7 +194,7 @@ def _get_approx_allocated_vram(gpu_types: list[str], node_list: list[str], gpu_c
         return total_vram
 
     # estimate VRAM for multiple GPUs where exact number isn't known
-    # TODO: update this based on the updated GPU types which specify exact number of GPUs
+    # TODO (Ayush): update this based on the updated GPU types which specify exact number of GPUs
     allocated_vrams = []
     for gpu in gpu_types:
         if gpu in MULTIVALENT_GPUS:
