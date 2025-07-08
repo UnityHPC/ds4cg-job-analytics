@@ -291,7 +291,6 @@ def preprocess_data(
     mask = pd.Series([True] * len(data))
     mask &= data["GPUType"].notna() | include_cpu_only_jobs
     mask &= data["GPUs"].notna() | include_cpu_only_jobs
-
     # for filtering columns which may or may not appear in the dataset
     if "Status" in col_list:
         mask &= (
