@@ -366,3 +366,7 @@ def test_preprocess_gpu_type(mock_data_frame):
 
     # Check that numpy arrays in GPUType are converted to lists
     assert all(isinstance(row, list) for row in data["GPUType"] if not pd.isna(row))
+
+
+def test_preprocess_empty_data_frame(mock_data_frame):
+    _data = preprocess_data(input_df=mock_data_frame.head(0))
