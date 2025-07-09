@@ -7,7 +7,7 @@ from ..config.constants import (
     DEFAULT_MIN_ELAPSED_SECONDS,
     ATTRIBUTE_CATEGORIES,
     MULTIVALENT_GPUS,
-    COLUMNS_IN_PREPROCESS,
+    ESSENTIAL_COLUMNS,
     ENFORCE_COLUMNS,
 )
 from ..config.enum_constants import StatusEnum, AdminsAccountEnum, PartitionEnum, QOSEnum
@@ -262,21 +262,20 @@ def preprocess_data(
     Returns:
         pd.DataFrame: The preprocessed dataframe
 
-    TODO: delete the comment line below when merging
-    TODO: Elapsed is not important here but will be essential when passed to EfficiencyAnalysis class, how to?
-
     Handling missing columns logic:
-        - columns in ENFORCE_COLUMNS are columns that are necessary in basic calculation happening in preprocess
+        - columns in ENFORCE_COLUMNS are columns that are must-have for basic metrics calculation.
+        - columns in ESSENTIAL_COLUMNS are columns that are involved in preprocessing logics.
         - For any columns in ENFORCE_COLUMNS that do not exist, a KeyError will be raised.
-        - For any columns in COLUMNS_IN_PREPROCESS but not in ENFORCE_COLUMNS, a warning will be raised.
-        - In _fill_missing, records filtering, and type conversion logic will happen only if those columns exist
+        - For any columns in ESSENTIAL_COLUMNS but not in ENFORCE_COLUMNS, a warning will be raised.
+        - _fill_missing, records filtering, and type conversion logic will happen only if columns involved exist
+
     """
     # drop columns and avoid errors in case any of them is not in the dataframe
     data = input_df.drop(columns=["UUID", "EndTime", "Nodes", "Preempted"], axis=1, inplace=False, errors="ignore")
 
     # filtering records
     col_set = set(data.columns.to_list())
-    for col in COLUMNS_IN_PREPROCESS:
+    for col in ESSENTIAL_COLUMNS:
         if col not in col_set and col in ENFORCE_COLUMNS:
             raise KeyError(f"Column {col} does not exist in dataframe")
         elif col not in col_set:

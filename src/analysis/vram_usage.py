@@ -176,10 +176,6 @@ class EfficiencyAnalysis:
             & (self.jobs_df["Elapsed"].dt.total_seconds() >= elapsed_seconds_min)
         ].copy()
 
-    def _validate_columns(self):
-        # TODO: implement this to check for if important columns used in 2 helper functions above exist in the dataframe for filtering
-        pass
-
     def calculate_efficiency_metrics(
         self,
         filtered_jobs: pd.DataFrame,

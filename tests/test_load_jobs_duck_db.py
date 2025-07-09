@@ -3,7 +3,7 @@ import pandas
 from src.analysis import load_jobs_dataframe_from_duckdb
 from .conftest import helper_filter_irrelevant_records
 from src.config.enum_constants import StatusEnum
-from src.config.constants import ENFORCE_COLUMNS, COLUMNS_IN_PREPROCESS
+from src.config.constants import ENFORCE_COLUMNS, ESSENTIAL_COLUMNS
 from datetime import datetime, timedelta
 
 
@@ -14,7 +14,6 @@ This test version assume that load_jobs_dataframe_from_duckdb will always ignore
 """
 
 
-# TODO: update these tests when there are new updates on other branches on the load_jobs_dataframe_from_duckdb()
 def test_load_jobs_correct_types(mock_data):
     res = load_jobs_dataframe_from_duckdb(db_path=mock_data[1])
     assert isinstance(res, pandas.DataFrame)
@@ -120,7 +119,7 @@ def test_load_jobs_filter_day_back_include_all(mock_data):
 def test_load_jobs_custom_query(mock_data, recwarn):
     mock_csv, db_path = mock_data
     query = (
-        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage FROM Jobs "
+        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage, Elapsed FROM Jobs "
         "WHERE Status != 'CANCELLED' AND Status !='FAILED' AND ArrayID is not NULL AND Interactive is not NULL"
     )
     res = load_jobs_dataframe_from_duckdb(db_path=db_path, custom_query=query, include_cpu_only_jobs=True)
@@ -141,7 +140,7 @@ def test_load_jobs_custom_query_days_back_1(mock_data, recwarn):
     """
     mock_csv, db_path = mock_data
     query = (
-        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage FROM Jobs "
+        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage, Elapsed FROM Jobs "
         "WHERE Status != 'CANCELLED' AND Status !='FAILED' AND ArrayID is not NULL AND Interactive is not NULL"
     )
     res = load_jobs_dataframe_from_duckdb(
@@ -169,7 +168,7 @@ def test_load_jobs_custom_query_days_back_2(mock_data, recwarn):
     mock_csv, db_path = mock_data
     cutoff = datetime.now() - timedelta(days=150)
     query = (
-        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage FROM Jobs "
+        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage, Elapsed FROM Jobs "
         "WHERE Status != 'CANCELLED' AND Status !='FAILED' AND ArrayID is not NULL AND Interactive is not NULL "
         f"AND StartTime >= '{cutoff}'"
     )
@@ -190,7 +189,7 @@ def test_load_jobs_custom_query_days_back_2(mock_data, recwarn):
         "filtering by dates_back. dates_back condition in custom_query will be used."
     )
 
-    assert len(recwarn) == 6
+    assert len(recwarn) == 5
     assert str(recwarn[0].message) == expect_warning_msg
     assert len(res) == len(filtered_data)
     for id in res["JobID"]:
@@ -220,11 +219,11 @@ def test_preprocess_warning_raised(mock_data, recwarn):
     These columns are not the one in ENFORCE_COLUMNS so warnings, not errors, are expected to be raised
     """
     mock_csv, db_path = mock_data
-    for col in COLUMNS_IN_PREPROCESS:
+    for col in ESSENTIAL_COLUMNS:
         if col in ENFORCE_COLUMNS:
             continue
         col_names = ENFORCE_COLUMNS.copy()
-        remain_cols = COLUMNS_IN_PREPROCESS.copy()
+        remain_cols = ESSENTIAL_COLUMNS.copy()
         remain_cols.remove(col)
         col_names = col_names.union(remain_cols)
         col_str = ", ".join(list(col_names))
