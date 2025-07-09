@@ -214,7 +214,11 @@ def test_preprocess_key_errors_raised(mock_data, recwarn):
 
 
 def test_preprocess_warning_raised(mock_data, recwarn):
-    """ """
+    """
+    Test handling the dataframe loads from database when missing one of the columns
+
+    These columns are not the one in ENFORCE_COLUMNS so warnings, not errors, are expected to be raised
+    """
     mock_csv, db_path = mock_data
     for col in COLUMNS_IN_PREPROCESS:
         if col in ENFORCE_COLUMNS:
