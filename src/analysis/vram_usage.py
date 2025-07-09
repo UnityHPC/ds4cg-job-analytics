@@ -80,9 +80,6 @@ def load_jobs_dataframe_from_duckdb(
     except Exception as e:
         raise Exception(f"Exception at load_jobs_dataframe_from_duck_db: {e}") from e
 
-    finally:
-        if db is not None:
-            db._disconnect()
     processed_data = preprocess_data(
         jobs_df,
         min_elapsed_seconds=min_elasped_seconds,

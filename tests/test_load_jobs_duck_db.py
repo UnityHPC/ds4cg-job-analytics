@@ -35,86 +35,81 @@ def test_load_jobs_no_filter(mock_data):
     assert expect_num_records == len(res)
 
 
-# def test_load_jobs_filter_day_back_1(mock_data):
-#     """
-#     Test for filtering by days_back
-#     """
-#     mock_csv, db_path = mock_data
-#     temp = helper_filter_irrelevant_records(mock_csv, 0)
-#     res = load_jobs_dataframe_from_duckdb(db_path=db_path, days_back=90)
-#     cutoff = datetime.now() - timedelta(days=90)
-#     print(cutoff)
-#     print(type(cutoff))
-#     print(type(temp["StartTime"][0]))
-#     print(temp["StartTime"][0] >= cutoff)
-
-#     ground_truth_csv = temp[
-#         (temp["Status"] != StatusEnum.CANCELLED.value)
-#         & (temp["Status"] != StatusEnum.FAILED.value)
-#         & (temp["GPUType"].notna())
-#         & (temp["GPUs"].notna())
-#         & (temp["StartTime"] >= cutoff)
-#     ]
-#     expect_job_ids = ground_truth_csv["JobID"].to_numpy()
-#     assert len(ground_truth_csv) == len(res)
-#     for id in res["JobID"]:
-#         assert id in expect_job_ids
+def test_load_jobs_filter_day_back_1(mock_data):
+    """
+    Test for filtering by days_back
+    """
+    mock_csv, db_path = mock_data
+    temp = helper_filter_irrelevant_records(mock_csv, 0)
+    res = load_jobs_dataframe_from_duckdb(db_path=db_path, days_back=90)
+    cutoff = datetime.now() - timedelta(days=90)
+    ground_truth_csv = temp[
+        (temp["Status"] != StatusEnum.CANCELLED.value)
+        & (temp["Status"] != StatusEnum.FAILED.value)
+        & (temp["GPUType"].notna())
+        & (temp["GPUs"].notna())
+        & (temp["StartTime"] >= cutoff)
+    ]
+    expect_job_ids = ground_truth_csv["JobID"].to_numpy()
+    assert len(ground_truth_csv) == len(res)
+    for id in res["JobID"]:
+        assert id in expect_job_ids
 
 
-# def test_load_jobs_filter_day_back_2(mock_data):
-#     """
-#     Test for filtering by days_back
-#     """
-#     mock_csv, db_path = mock_data
-#     temp = helper_filter_irrelevant_records(mock_csv, 0)
-#     res = load_jobs_dataframe_from_duckdb(db_path=db_path, days_back=15)
-#     cutoff = datetime.now() - timedelta(days=15)
-#     ground_truth_csv = temp[
-#         (temp["Status"] != StatusEnum.CANCELLED.value)
-#         & (temp["Status"] != StatusEnum.FAILED.value)
-#         & (temp["GPUType"].notna())
-#         & (temp["GPUs"].notna())
-#         & (temp["StartTime"] >= cutoff)
-#     ]
-#     expect_job_ids = ground_truth_csv["JobID"].to_numpy()
-#     assert len(ground_truth_csv) == len(res)
-#     for id in res["JobID"]:
-#         assert id in expect_job_ids
+def test_load_jobs_filter_day_back_2(mock_data):
+    """
+    Test for filtering by days_back
+    """
+    mock_csv, db_path = mock_data
+    temp = helper_filter_irrelevant_records(mock_csv, 0)
+    res = load_jobs_dataframe_from_duckdb(db_path=db_path, days_back=15)
+    cutoff = datetime.now() - timedelta(days=15)
+    ground_truth_csv = temp[
+        (temp["Status"] != StatusEnum.CANCELLED.value)
+        & (temp["Status"] != StatusEnum.FAILED.value)
+        & (temp["GPUType"].notna())
+        & (temp["GPUs"].notna())
+        & (temp["StartTime"] >= cutoff)
+    ]
+    expect_job_ids = ground_truth_csv["JobID"].to_numpy()
+    assert len(ground_truth_csv) == len(res)
+    for id in res["JobID"]:
+        assert id in expect_job_ids
 
 
-# def test_load_jobs_filter_min_elapsed(mock_data):
-#     """
-#     Test for filtering by days back and minimum elapsed time.
-#     """
-#     mock_csv, db_path = mock_data
-#     temp = helper_filter_irrelevant_records(mock_csv, 13000)
-#     res = load_jobs_dataframe_from_duckdb(db_path=db_path, min_elasped_seconds=13000, days_back=90)
-#     cutoff = datetime.now() - timedelta(days=90)
-#     ground_truth_csv = temp[
-#         (temp["Status"] != StatusEnum.CANCELLED.value)
-#         & (temp["Status"] != StatusEnum.FAILED.value)
-#         & (temp["GPUType"].notna())
-#         & (temp["GPUs"].notna())
-#         & (temp["StartTime"] >= cutoff)
-#     ]
-#     expect_job_ids = ground_truth_csv["JobID"].to_numpy()
-#     assert len(ground_truth_csv) == len(res)
-#     for id in res["JobID"]:
-#         assert id in expect_job_ids
+def test_load_jobs_filter_min_elapsed(mock_data):
+    """
+    Test for filtering by days back and minimum elapsed time.
+    """
+    mock_csv, db_path = mock_data
+    temp = helper_filter_irrelevant_records(mock_csv, 13000)
+    res = load_jobs_dataframe_from_duckdb(db_path=db_path, min_elasped_seconds=13000, days_back=90)
+    cutoff = datetime.now() - timedelta(days=90)
+    ground_truth_csv = temp[
+        (temp["Status"] != StatusEnum.CANCELLED.value)
+        & (temp["Status"] != StatusEnum.FAILED.value)
+        & (temp["GPUType"].notna())
+        & (temp["GPUs"].notna())
+        & (temp["StartTime"] >= cutoff)
+    ]
+    expect_job_ids = ground_truth_csv["JobID"].to_numpy()
+    assert len(ground_truth_csv) == len(res)
+    for id in res["JobID"]:
+        assert id in expect_job_ids
 
 
-# def test_load_jobs_filter_day_back_include_all(mock_data):
-#     """
-#     Test for filtering by days_back, including CPU only jobs and FAILED/ CANCELLED jobs
-#     """
-#     mock_csv, db_path = mock_data
-#     temp = helper_filter_irrelevant_records(mock_csv, 0)
-#     res = load_jobs_dataframe_from_duckdb(
-#         db_path=db_path, days_back=90, include_cpu_only_jobs=True, include_failed_cancelled_jobs=True
-#     )
-#     cutoff = datetime.now() - timedelta(days=90)
-#     ground_truth_csv = temp[temp["StartTime"] >= cutoff]
-#     expect_job_ids = ground_truth_csv["JobID"].to_numpy()
-#     assert len(ground_truth_csv) == len(res)
-#     for id in res["JobID"]:
-#         assert id in expect_job_ids
+def test_load_jobs_filter_day_back_include_all(mock_data):
+    """
+    Test for filtering by days_back, including CPU only jobs and FAILED/ CANCELLED jobs
+    """
+    mock_csv, db_path = mock_data
+    temp = helper_filter_irrelevant_records(mock_csv, 0)
+    res = load_jobs_dataframe_from_duckdb(
+        db_path=db_path, days_back=90, include_cpu_only_jobs=True, include_failed_cancelled_jobs=True
+    )
+    cutoff = datetime.now() - timedelta(days=90)
+    ground_truth_csv = temp[temp["StartTime"] >= cutoff]
+    expect_job_ids = ground_truth_csv["JobID"].to_numpy()
+    assert len(ground_truth_csv) == len(res)
+    for id in res["JobID"]:
+        assert id in expect_job_ids

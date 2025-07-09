@@ -93,10 +93,8 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int, gpu_mem_usage: 
                 vram_constraints.append(max(MULTIVALENT_GPUS[gpu_type]))
             else:
                 vram_constraints.append(VRAM_VALUES[gpu_type])
-
     if not (len(vram_constraints)):
         return None  # if nothing is requested, return None
-
     return max(vram_constraints) * gpu_count
 
 
@@ -264,18 +262,17 @@ def preprocess_data(
         pd.DataFrame: The preprocessed dataframe
 
     TODO: delete the comment line below when merging
-    TODO: Elapsed is not important here but will be essential when passed to EfficiencyAnalysis class, where should it be handled?
+    TODO: Elapsed is not important here but will be essential when passed to EfficiencyAnalysis class, how to?
 
     Handling missing columns logic:
         - columns in ENFORCE_COLUMNS are columns that are necessary in basic calculation happening in preprocess
         - For any columns in ENFORCE_COLUMNS that do not exist, a KeyError will be raised.
         - For any columns in COLUMNS_IN_PREPROCESS but not in ENFORCE_COLUMNS, a warning will be raised.
-        - In _fill_missing, records filtering, and type conversion logic actions will happen only if those columns exist in the dataset
+        - In _fill_missing, records filtering, and type conversion logic will happen only if those columns exist
     """
     # drop columns and avoid errors in case any of them is not in the dataframe
     data = input_df.drop(columns=["UUID", "EndTime", "Nodes", "Preempted"], axis=1, inplace=False, errors="ignore")
 
-    # TODO: if this is approved, refactor the code below
     # filtering records
     col_list = set(data.columns.to_list())
     for col in COLUMNS_IN_PREPROCESS:
@@ -328,15 +325,27 @@ def preprocess_data(
 
     # Added parameters for calculating VRAM metrics
     res.loc[:, "Queued"] = res["StartTime"] - res["SubmitTime"]
-    res.loc[:, "vram_constraint"] = res.apply(
+
+    # vram_constraints calculation
+    vram_series = res.apply(
         lambda row: _get_vram_constraint(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1
-    ).astype(pd.Int64Dtype())
-    res.loc[:, "allocated_vram"] = res.apply(
+    )
+    # add this if else block to handle type of vram_series properly
+    # when dataframe is empty, vram_series is the whole epty dataframe
+    if len(vram_series):
+        res.loc[:, "vram_constraint"] = vram_series.astype(pd.Int64Dtype())
+    else:
+        res.loc[:, "vram_constraint"] = pd.Series(dtype=pd.Int64Dtype())
+
+    # allocated_vram calculation
+    allocated_series = res.apply(
         lambda row: _get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
         axis=1,
     )
-    res.loc[:, "user_jobs"] = res.groupby("User")["User"].transform("size")
-    res.loc[:, "account_jobs"] = res.groupby("Account")["Account"].transform("size")
+    if len(allocated_series):
+        res.loc[:, "allocated_vram"] = allocated_series.astype("int64")
+    else:
+        res.loc[:, "allocated_vram"] = pd.Series(dtype="int64")
 
     # convert columns to categorical
     for col, enum_obj in ATTRIBUTE_CATEGORIES.items():
