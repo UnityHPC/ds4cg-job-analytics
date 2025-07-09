@@ -57,7 +57,7 @@ class EfficiencyAnalysis:
 
     def filter_jobs_for_analysis(
         self,
-        vram_constraint_filter: pd.Int64Dtype | list | set | tuple | dict | None = None,
+        vram_constraint_filter: int | list | set | tuple | dict | pd._libs.missing.NAType | None = None,
         gpu_mem_usage_filter: int | list | set | tuple | dict | None = None,
         allocated_vram_filter: int | list | set | tuple | dict | None = None,
         gpu_count_filter: int | list | set | tuple | dict | None = None,
@@ -70,18 +70,17 @@ class EfficiencyAnalysis:
             vram_constraint_filter: 
                 - None: no filtering on vram_constraint
                 - int or float: select rows where vram_constraint == value
-                - list/set/tuple: select rows where vram_constraint is in the list
+                - list/set/tuple: select rows where vram_constraint is in the values provided
                 - dict with 'min'/'max' and required 'inclusive' (bool): select rows in the range
                 - pd.NA or <NA>: select rows where vram_constraint is Nullable Int64 (i.e., pd.NA)
             gpu_mem_usage_filter: the unit is bytes to match the GPUMemUsage column
                 - None: no filtering on GPUMemUsage
                 - int: select rows where GPUMemUsage == value
-                - list/set/tuple: select rows where GPUMemUsage is in the list
                 - dict with 'min'/'max' and required 'inclusive' (bool): select rows in the range
             allocated_vram_filter:
-                - Same as above; if dict, must include 'inclusive' (bool)
+                - Same as above; if list/set/tuple: select rows where allocated_vram is in the values provided
             gpu_count_filter:
-                - Same as above; if dict, must include 'inclusive' (bool)
+                - Same as above; if list/set/tuple: select rows where gpu_count is in the values provided
             elapsed_seconds_min (int): Minimum elapsed time in seconds
 
         Returns:
@@ -112,8 +111,9 @@ class EfficiencyAnalysis:
 
         def apply_numeric_filter(
         col: pd.Series,
-        filter: int | list | set | tuple | dict,
-        inclusive: bool | None
+        filter: int | list | set | tuple | dict | pd._libs.missing.NAType,
+        inclusive: bool | None,
+        filter_name: str | None = None,
         ):
             """
             Helper to apply a numeric filter to a pandas Series.
@@ -130,7 +130,19 @@ class EfficiencyAnalysis:
             """
             mask = pd.Series([True] * len(col), index=col.index)
             if filter is not None:
-                if isinstance(filter, list | set | tuple):
+                if filter is pd.NA or (
+                    isinstance(filter, float) and np.isnan(filter)
+                ):
+                    if filter_name not in ["vram_constraint_filter"]:
+                        raise ValueError(
+                            f"{filter_name} cannot be pd.NA or <NA>."
+                        )
+                    mask &= col.isna()
+                elif isinstance(filter, list | set | tuple):
+                    if filter_name in ["gpu_mem_usage_filter"]:
+                        raise ValueError(
+                            f"{filter_name} cannot be a list, set, or tuple."
+                        )
                     if not all(is_numeric_type(val) for val in filter):
                         raise ValueError("All filter values must be integers or floats.")
                     mask &= col.isin(filter)
@@ -144,52 +156,34 @@ class EfficiencyAnalysis:
                     if "max" in filter:
                         mask &= col.le(filter["max"]) if inclusive else col.lt(filter["max"])
                 else:
+                    # Only allow numeric types
                     if is_numeric_type(filter):
-                        # Only allow numeric types
-                        mask &= col.eq(filter)
+                        if isinstance(filter, np.number):
+                            # Convert numpy number to native Python type
+                            filter = filter.item()
+                            mask &= col.eq(filter)
                     else:
                         raise ValueError(
-                            "Filter must be a numeric value if not a list, set, tuple, dict, or None."
+                            "Filter must be a numeric value if not one of the other types."
                         )
             return mask
 
         # vram_constraint
         if vram_constraint_filter is not None:
-            col = self.jobs_df["vram_constraint"]
-            if vram_constraint_filter is pd.NA or (
-                isinstance(vram_constraint_filter, float) and np.isnan(vram_constraint_filter)
-            ):
-                mask &= col.isna()
-            elif isinstance(vram_constraint_filter, list | set | tuple):
-                # Check all values are int or float
-                if not all(is_numeric_type(val) for val in vram_constraint_filter):
-                    raise ValueError("All values in vram_constraint_filter must be integers or floats.")
-                mask &= col.isin(vram_constraint_filter)
-            elif isinstance(vram_constraint_filter, dict):
-                # Check min/max values are int or float if present using pandas type checks
-                for key in ("min", "max"):
-                    if key in vram_constraint_filter and is_numeric_type(vram_constraint_filter[key]) is False:
-                            raise ValueError(f"vram_constraint_filter['{key}'] must be an integer or float.")
-                inclusive = get_inclusive(vram_constraint_filter)
-                if "min" in vram_constraint_filter:
-                    mask &= (
-                        col.ge(vram_constraint_filter["min"]) if inclusive
-                        else col.gt(vram_constraint_filter["min"])
-                    )
-                if "max" in vram_constraint_filter:
-                    mask &= (
-                        col.le(vram_constraint_filter["max"]) if inclusive
-                        else col.lt(vram_constraint_filter["max"])
-                    )
+            if isinstance(vram_constraint_filter, dict):
+                vram_constraint_inclusive = get_inclusive(vram_constraint_filter)
             else:
-                # Only allow numeric types (int, float, np.integer, np.floating, pd.Int64Dtype, pd.Float64Dtype)
-                if is_numeric_type(vram_constraint_filter):
-                    mask &= col.eq(vram_constraint_filter)
-                else:
-                    raise ValueError(
-                        "vram_constraint_filter must be a numeric value if not a list, set, tuple, "
-                        "dict, or pd.NA."
-                    )
+                vram_constraint_inclusive = None
+            try:
+                # Apply the numeric filter to the vram_constraint column
+                mask &= apply_numeric_filter(
+                    self.jobs_df["vram_constraint"],
+                    vram_constraint_filter,
+                    vram_constraint_inclusive,
+                    'vram_constraint_filter'
+                )
+            except ValueError as e:
+                raise ValueError("Invalid vram_constraint_filter.") from e
 
         # GPU memory usage filter
         if gpu_mem_usage_filter is not None:
@@ -200,7 +194,7 @@ class EfficiencyAnalysis:
             try:
                 # Apply the numeric filter to the GPUMemUsage column
                 mask &= apply_numeric_filter(
-                    self.jobs_df["GPUMemUsage"], gpu_mem_usage_filter, gpu_mem_usage_inclusive
+                    self.jobs_df["GPUMemUsage"], gpu_mem_usage_filter, gpu_mem_usage_inclusive, 'gpu_mem_usage_filter'
                 )
             except ValueError as e:
                 raise ValueError("Invalid GPU memory usage filter.") from e
