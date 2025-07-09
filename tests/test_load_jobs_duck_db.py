@@ -62,8 +62,8 @@ def test_load_jobs_filter_day_back_2(mock_data):
     """
     mock_csv, db_path = mock_data
     temp = helper_filter_irrelevant_records(mock_csv, 0)
-    res = load_jobs_dataframe_from_duckdb(db_path=db_path, days_back=15)
-    cutoff = datetime.now() - timedelta(days=15)
+    res = load_jobs_dataframe_from_duckdb(db_path=db_path, days_back=150)
+    cutoff = datetime.now() - timedelta(days=150)
     ground_truth_csv = temp[
         (temp["Status"] != StatusEnum.CANCELLED.value)
         & (temp["Status"] != StatusEnum.FAILED.value)
@@ -113,3 +113,76 @@ def test_load_jobs_filter_day_back_include_all(mock_data):
     assert len(ground_truth_csv) == len(res)
     for id in res["JobID"]:
         assert id in expect_job_ids
+
+
+def test_load_jobs_custom_query(mock_data, recwarn):
+    mock_csv, db_path = mock_data
+    query = (
+        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage FROM Jobs "
+        "WHERE Status != 'CANCELLED' AND Status !='FAILED' AND ArrayID is not NULL AND Interactive is not NULL"
+    )
+    res = load_jobs_dataframe_from_duckdb(db_path=db_path, custom_query=query, include_cpu_only_jobs=True)
+    filtered_data = mock_csv[
+        (mock_csv["Status"] != "CANCELLED") & (mock_csv["Status"] != "FAILED") & (mock_csv["ArrayID"].notna())
+    ].copy()
+    assert len(res) == len(filtered_data)
+    expect_ids = filtered_data["JobID"].to_list()
+    for id in res["JobID"]:
+        assert id in expect_ids
+
+
+def test_load_jobs_custom_query_days_back_1(mock_data, recwarn):
+    mock_csv, db_path = mock_data
+    query = (
+        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage FROM Jobs "
+        "WHERE Status != 'CANCELLED' AND Status !='FAILED' AND ArrayID is not NULL AND Interactive is not NULL"
+    )
+    res = load_jobs_dataframe_from_duckdb(
+        db_path=db_path, custom_query=query, include_cpu_only_jobs=True, days_back=150
+    )
+    cutoff = datetime.now() - timedelta(days=150)
+    filtered_data = mock_csv[
+        (mock_csv["Status"] != "CANCELLED")
+        & (mock_csv["Status"] != "FAILED")
+        & (mock_csv["ArrayID"].notna())
+        & (mock_csv["StartTime"] >= cutoff)
+    ].copy()
+    assert len(res) == len(filtered_data)
+    expect_ids = filtered_data["JobID"].to_list()
+    for id in res["JobID"]:
+        assert id in expect_ids
+
+
+def test_load_jobs_custom_query_days_back_2(mock_data, recwarn):
+    """
+    Test if the dates back condtion already appears in the sql query so days_back parameters won't be used
+    """
+    mock_csv, db_path = mock_data
+    cutoff = datetime.now() - timedelta(days=150)
+    query = (
+        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage FROM Jobs "
+        "WHERE Status != 'CANCELLED' AND Status !='FAILED' AND ArrayID is not NULL AND Interactive is not NULL "
+        f"AND StartTime >= '{cutoff}'"
+    )
+
+    res = load_jobs_dataframe_from_duckdb(
+        db_path=db_path, custom_query=query, include_cpu_only_jobs=True, days_back=100
+    )
+
+    filtered_data = mock_csv[
+        (mock_csv["Status"] != "CANCELLED")
+        & (mock_csv["Status"] != "FAILED")
+        & (mock_csv["ArrayID"].notna())
+        & (mock_csv["StartTime"] >= cutoff)
+    ].copy()
+    expect_ids = filtered_data["JobID"].to_list()
+    expect_warning_msg = (
+        "Parameter days_back = 100 is passed but custom_query already contained conditions for "
+        "filtering by dates_back. dates_back condition in custom_query will be used."
+    )
+
+    assert len(recwarn) == 6
+    assert str(recwarn[0].message) == expect_warning_msg
+    assert len(res) == len(filtered_data)
+    for id in res["JobID"]:
+        assert id in expect_ids

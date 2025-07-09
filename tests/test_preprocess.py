@@ -374,3 +374,6 @@ def test_preprocess_gpu_type(mock_data):
 
     # Check that numpy arrays in GPUType are converted to lists
     assert all(isinstance(row, list) for row in data["GPUType"] if not pd.isna(row))
+
+
+# TODO: add test for missing columns handling and calculating approx_vram, vram-constraint

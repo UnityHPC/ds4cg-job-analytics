@@ -12,16 +12,10 @@ from src.preprocess.preprocess import preprocess_data
 from src.database import DatabaseConnection
 from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
 from datetime import timedelta, datetime
+import warnings
 
 
 # gpu_meme_usage. {min: 90, max: 1000, exclude: True}
-# TODO: ask for advice on this prolem:
-"""
-Want to include failed job but excluded cancelled jobs
--> load_fom_db(query="EZCLUDE CANCELLED")
--> apply_filters(incude_failed_cancelled_jobs = True)
-Quite misleading in parameters name but not sure if this is good practice
-"""
 
 
 def load_jobs_dataframe_from_duckdb(
@@ -75,6 +69,13 @@ def load_jobs_dataframe_from_duckdb(
                 custom_query += f" WHERE StartTime >= '{cutoff}'"
             else:
                 custom_query += f" AND StartTime >= '{cutoff}'"
+        elif days_back is not None and _contain_dates_back_condition(custom_query):
+            warnings.warn(
+                f"Parameter days_back = {days_back} is passed but custom_query already contained conditions for "
+                "filtering by dates_back. dates_back condition in custom_query will be used.",
+                UserWarning,
+                stacklevel=2,
+            )
         jobs_df = db.fetch_query(custom_query)
 
     except Exception as e:
