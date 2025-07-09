@@ -229,7 +229,7 @@ def _fill_missing(res: pd.DataFrame) -> None:
     res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)
     res.loc[:, "Interactive"] = res["Interactive"].fillna("non-interactive")
     # TODO: convert all of constraints to list, do not fill null values
-    res.loc[:, "Constraints"] = res["Constraints"].apply(lambda x: x.tolist() if isinstance(x, np.ndarray) else x)
+    res.loc[:, "Constraints"] = res["Constraints"].apply(lambda x: x.tolist() if isinstance(x, np.ndarray) else [])
     res.loc[:, "GPUType"] = (
         res["GPUType"]
         .fillna("")
@@ -296,18 +296,28 @@ def preprocess_data(
 
     # Added parameters for calculating VRAM metrics
     res.loc[:, "Queued"] = res["StartTime"] - res["SubmitTime"]
-    res.loc[:, "vram_constraint"] = res.apply(
+
+    # vram_constraint_calculation
+    vram_constraints_series = res.apply(
         lambda row: _get_vram_constraint(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1
-    ).astype(pd.Int64Dtype())
-    res.loc[:, "allocated_vram"] = res.apply(
+    )
+    # when dataframe is empty, vram_constraints_series is the whole epty dataframe
+    if len(vram_constraints_series):
+        res.loc[:, "vram_constraint"] = vram_constraints_series.astype(pd.Int64Dtype())
+    else:
+        res.loc[:, "vram_constraint"] = pd.Series(dtype=pd.Int64Dtype())
+
+    # allocated_vram calculation
+    vram_allocated_series = res.apply(
         lambda row: _get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
         axis=1,
     )
-    res.loc[:, "user_jobs"] = res.groupby("User")["User"].transform("size")
-    res.loc[:, "account_jobs"] = res.groupby("Account")["Account"].transform("size")
+    if len(vram_allocated_series):
+        res.loc[:, "allocated_vram"] = vram_allocated_series.astype("int64")
+    else:
+        res.loc[:, "allocated_vram"] = pd.Series(dtype="int64")
 
     # convert columns to categorical
-
     for col, enum_obj in ATTRIBUTE_CATEGORIES.items():
         enum_values = [e.value for e in enum_obj]
         unique_values = res[col].unique().tolist()
