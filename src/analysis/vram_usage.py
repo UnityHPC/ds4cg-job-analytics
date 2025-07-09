@@ -67,6 +67,7 @@ class EfficiencyAnalysis:
             col (pd.Series): The column to filter.
             value: The filter value (scalar, list/tuple/set, dict with 'min'/'max', or callable).
             inclusive (bool): Whether min/max are inclusive.
+
         Returns:
             pd.Series: Boolean mask.
         """
@@ -325,6 +326,20 @@ class EfficiencyAnalysis:
                 "jobs_w_efficiency_metrics DataFrame is not available. Please run analyze_workload_efficiency first."
             )
 
+        # Efficiency metrics
+        self.jobs_w_efficiency_metrics["efficiency_category"] = pd.cut(
+            self.jobs_w_efficiency_metrics["alloc_vram_efficiency"],
+            bins=[0, 0.1, 0.3, 0.6, 1.0],
+            labels=["Very Low (<10%)", "Low (10-30%)", "Medium (30-60%)", "High (60-100%)"],
+        )
+
+        # Duration categories
+        self.jobs_w_efficiency_metrics["duration_category"] = pd.cut(
+            self.jobs_w_efficiency_metrics["job_hours"],
+            bins=[0, 1, 6, 24, float("inf")],
+            labels=["Short (<1h)", "Medium (1-6h)", "Long (6-24h)", "Very Long (>24h)"],
+        )
+
         # Overall statistics
         analysis["total_jobs"] = len(self.jobs_w_efficiency_metrics)
         analysis["total_gpu_hours"] = self.jobs_w_efficiency_metrics["job_hours"].sum()
@@ -353,7 +368,7 @@ class EfficiencyAnalysis:
             "Avg_Allocated_GB",
             "Avg_Used_GB",
         ]
-        efficiency_analysis["Share of tota GPU Hours"] = (
+        efficiency_analysis["Share of total GPU Hours"] = (
             efficiency_analysis["job_hours"] / analysis["total_gpu_hours"] * 100
         ).round(1)
         analysis["efficiency_patterns"] = efficiency_analysis
@@ -580,6 +595,84 @@ class EfficiencyAnalysis:
 
         # Sort by the new metric ascending (lower is worse)
         inefficient_pis = inefficient_pis.sort_values("Weighted_Efficiency_Contribution", ascending=True)
+        return
+
+    def plot_vram_efficiency(self, users, start_date=None, end_date=None):
+        """
+        Plot VRAM efficiency over time for specific users within a date range.
+
+        Parameters:
+        - users (list): List of user names to plot.
+        - start_date (str): Start date in 'YYYY-MM-DD' format (optional).
+        - end_date (str): End date in 'YYYY-MM-DD' format (optional).
+        """
+        import matplotlib.pyplot as plt
+        import pandas as pd
+
+        # Filter data by date range if provided
+        data = self.jobs_w_efficiency_metrics.copy()
+        if start_date:
+            data = data[data["StartTime"] >= pd.to_datetime(start_date)]
+        if end_date:
+            data = data[data["StartTime"] <= pd.to_datetime(end_date)]
+
+        # Ensure 'Month' column is added to the DataFrame
+        data["Month"] = pd.to_datetime(data["StartTime"]).dt.to_period("M")
+
+        plt.figure(figsize=(10, 6))
+
+        for user in users:
+            # Filter data for the specific user
+            user_data = data[data["User"] == user]
+
+            # Calculate monthly efficiency
+            monthly_efficiency = []
+            monthly_hours = []
+            monthly_job_counts = []
+            for month, month_data in user_data.groupby("Month"):
+                user_gpu_hours = month_data["job_hours"].sum()
+                total_gpu_hours = data[data["Month"] == month]["job_hours"].sum()
+
+                efficiency = (month_data["alloc_vram_efficiency"] * user_gpu_hours / total_gpu_hours).mean()
+                monthly_efficiency.append((month, efficiency))
+
+                monthly_hours.append(user_gpu_hours)
+                monthly_job_counts.append(month_data["JobID"].count())
+
+            monthly_efficiency = pd.DataFrame(monthly_efficiency, columns=["Month", "Efficiency"])
+            monthly_efficiency["Month"] = monthly_efficiency["Month"].astype(str)
+
+            # Plot the efficiency for the user
+            plt.plot(monthly_efficiency["Month"], monthly_efficiency["Efficiency"], marker="o", label=user)
+
+            # Annotate the plot with monthly hours and job counts
+            for i, (_month, hours, job_count) in enumerate(
+                zip(monthly_efficiency["Month"], monthly_hours, monthly_job_counts, strict=False)
+            ):
+                plt.text(
+                    i,
+                    monthly_efficiency.loc[i, "Efficiency"],
+                    f"{hours:.1f} hrs",
+                    fontsize=9,
+                    ha="center",
+                    va="bottom",
+                )
+                plt.text(
+                    i,
+                    monthly_efficiency.loc[i, "Efficiency"] - 0.05,
+                    f"{job_count} jobs",
+                    fontsize=9,
+                    ha="center",
+                    va="top",
+                )
+
+        plt.title("Weighted VRAM Efficiency Over Time")
+        plt.xlabel("Month")
+        plt.ylabel("Average VRAM Efficiency")
+        plt.xticks(rotation=45)
+        plt.legend(title="Users")
+        plt.tight_layout()
+        plt.show()
         return
 
 

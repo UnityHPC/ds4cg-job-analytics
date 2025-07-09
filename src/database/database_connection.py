@@ -10,10 +10,10 @@ class DatabaseConnection:
 
     def _connect(self) -> duckdb.DuckDBPyConnection:
         """Establish a connection to the DuckDB database."""
-        self.connection = duckdb.connect(self.db_url)
+        self.connection = duckdb.connect(self.db_url, read_only=True)
         return self.connection
 
-    def _disconnect(self):
+    def disconnect(self):
         self.connection.close()
 
     def __del__(self):
