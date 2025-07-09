@@ -1,7 +1,9 @@
+import pytest
 import pandas
 from src.analysis import load_jobs_dataframe_from_duckdb
 from .conftest import helper_filter_irrelevant_records
 from src.config.enum_constants import StatusEnum
+from src.config.constants import ENFORCE_COLUMNS, COLUMNS_IN_PREPROCESS
 from datetime import datetime, timedelta
 
 
@@ -132,6 +134,11 @@ def test_load_jobs_custom_query(mock_data, recwarn):
 
 
 def test_load_jobs_custom_query_days_back_1(mock_data, recwarn):
+    """
+    Test in case custom query does not contain dates_back and dates_back parameter is given
+
+    Expect result will be filtered correctly by dates_back.
+    """
     mock_csv, db_path = mock_data
     query = (
         "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage FROM Jobs "
@@ -155,7 +162,9 @@ def test_load_jobs_custom_query_days_back_1(mock_data, recwarn):
 
 def test_load_jobs_custom_query_days_back_2(mock_data, recwarn):
     """
-    Test if the dates back condtion already appears in the sql query so days_back parameters won't be used
+    Test in case custom_query already contains dates_back condtion and date_back parameter is given
+
+    Expect the result will be filtered by dates_back condition in the query only and warning is correctly raised
     """
     mock_csv, db_path = mock_data
     cutoff = datetime.now() - timedelta(days=150)
@@ -186,3 +195,39 @@ def test_load_jobs_custom_query_days_back_2(mock_data, recwarn):
     assert len(res) == len(filtered_data)
     for id in res["JobID"]:
         assert id in expect_ids
+
+
+def test_preprocess_key_errors_raised(mock_data, recwarn):
+    """
+    Test handling the dataframe loads from database when missing one of the ENFORCE_COLUMNS in constants.py
+
+    Expect to raise KeyError for any of these columns if they are missing in the dataframe
+    """
+    mock_csv, db_path = mock_data
+    for col in ENFORCE_COLUMNS:
+        col_names = list(ENFORCE_COLUMNS)
+        col_names.remove(col)
+        col_str = ", ".join(col_names)
+        query = f"SELECT {col_str} FROM Jobs"
+        with pytest.raises(KeyError):
+            _res = load_jobs_dataframe_from_duckdb(db_path=db_path, custom_query=query)
+
+
+def test_preprocess_warning_raised(mock_data, recwarn):
+    """ """
+    mock_csv, db_path = mock_data
+    for col in COLUMNS_IN_PREPROCESS:
+        if col in ENFORCE_COLUMNS:
+            continue
+        col_names = ENFORCE_COLUMNS.copy()
+        remain_cols = COLUMNS_IN_PREPROCESS.copy()
+        remain_cols.remove(col)
+        col_names = col_names.union(remain_cols)
+        col_str = ", ".join(list(col_names))
+        query = f"SELECT {col_str} FROM Jobs"
+
+        expect_warning_msg = (
+            f"Column {col} not exist in dataframe, this may result in unexpected outcome when filtering."
+        )
+        with pytest.warns(UserWarning, match=expect_warning_msg):
+            _res = load_jobs_dataframe_from_duckdb(db_path=db_path, custom_query=query)

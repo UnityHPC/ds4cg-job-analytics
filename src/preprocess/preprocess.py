@@ -241,6 +241,7 @@ def _fill_missing(res: pd.DataFrame) -> None:
             res.loc[:, col] = fill_func(res[col])
 
 
+# TODO: alllow an option to also filter out QOS with custom values
 def preprocess_data(
     input_df: pd.DataFrame,
     min_elapsed_seconds: int = DEFAULT_MIN_ELAPSED_SECONDS,
@@ -274,13 +275,13 @@ def preprocess_data(
     data = input_df.drop(columns=["UUID", "EndTime", "Nodes", "Preempted"], axis=1, inplace=False, errors="ignore")
 
     # filtering records
-    col_list = set(data.columns.to_list())
+    col_set = set(data.columns.to_list())
     for col in COLUMNS_IN_PREPROCESS:
-        if col not in col_list and col in ENFORCE_COLUMNS:
+        if col not in col_set and col in ENFORCE_COLUMNS:
             raise KeyError(f"Column {col} does not exist in dataframe")
-        elif col not in col_list:
+        elif col not in col_set:
             warnings.warn(
-                f"Column {col} not exist in dataframe, this may result in unexpected outcome when filtering",
+                f"Column {col} not exist in dataframe, this may result in unexpected outcome when filtering.",
                 UserWarning,
                 stacklevel=2,
             )
