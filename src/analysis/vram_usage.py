@@ -7,7 +7,6 @@ The aim is to identify potential inefficiencies in GPU usage and notify users or
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from collections.abc import Callable
 from src.preprocess.preprocess import preprocess_data
 from src.database import DatabaseConnection
 from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
@@ -15,7 +14,7 @@ from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
 
 def load_jobs_dataframe_from_duckdb(db_path, table_name="Jobs", sample_size=None, random_state=None):
     """
-    Connect to the DuckDB slurm_data_small.db and return the jobs table as a pandas DataFrame.
+    Connect to the DuckDB database and return the relevant table as a pandas DataFrame.
 
     Args:
         db_path (str or Path): Path to the DuckDB database.
@@ -56,43 +55,12 @@ class EfficiencyAnalysis:
         except Exception as e:
             raise ValueError(f"Failed to load jobs DataFrame: {e}") from e
 
-    def _apply_numeric_filter(
-        self,
-        col: pd.Series,
-        filter: int | list | set | tuple | dict | Callable,
-        inclusive: bool | None
-    ):
-        """
-        Helper to apply a numeric filter to a pandas Series.
-        
-        Args:
-            col (pd.Series): The column to filter.
-            value: The filter value (scalar, list/tuple/set, dict with 'min'/'max', or callable).
-            inclusive (bool): Whether min/max are inclusive.
-        Returns:
-            pd.Series: Boolean mask.
-        """
-        mask = pd.Series([True] * len(col), index=col.index)
-        if filter is not None:
-            if callable(filter):
-                mask &= col.apply(filter)
-            elif isinstance(filter, list | set | tuple):
-                mask &= col.isin(filter)
-            elif isinstance(filter, dict):
-                if "min" in filter:
-                    mask &= col.ge(filter["min"]) if inclusive else col.gt(filter["min"])
-                if "max" in filter:
-                    mask &= col.le(filter["max"]) if inclusive else col.lt(filter["max"])
-            else:
-                mask &= col.eq(filter)
-        return mask
-
     def filter_jobs_for_analysis(
         self,
-        vram_constraint_filter: pd.Int64Dtype | list | set | tuple | dict | Callable | None = None,
-        gpu_mem_usage_filter: int | list | set | tuple | dict | Callable | None = None,
-        allocated_vram_filter: int | list | set | tuple | dict | Callable | None = None,
-        gpu_count_filter: int | list | set | tuple | dict | Callable | None = None,
+        vram_constraint_filter: pd.Int64Dtype | list | set | tuple | dict | None = None,
+        gpu_mem_usage_filter: int | list | set | tuple | dict | None = None,
+        allocated_vram_filter: int | list | set | tuple | dict | None = None,
+        gpu_count_filter: int | list | set | tuple | dict | None = None,
         elapsed_seconds_min=DEFAULT_MIN_ELAPSED_SECONDS,
     ):
         """
@@ -105,13 +73,11 @@ class EfficiencyAnalysis:
                 - list/set/tuple: select rows where vram_constraint is in the list
                 - dict with 'min'/'max' and required 'inclusive' (bool): select rows in the range
                 - pd.NA or <NA>: select rows where vram_constraint is Nullable Int64 (i.e., pd.NA)
-                - callable: custom filter function
-            gpu_mem_usage_filter:
-                - None: no filtering on GPU count
-                - int: select rows where GPUs == value
-                - list/set/tuple: select rows where GPUs is in the list
+            gpu_mem_usage_filter: the unit is bytes to match the GPUMemUsage column
+                - None: no filtering on GPUMemUsage
+                - int: select rows where GPUMemUsage == value
+                - list/set/tuple: select rows where GPUMemUsage is in the list
                 - dict with 'min'/'max' and required 'inclusive' (bool): select rows in the range
-                - callable: custom filter function
             allocated_vram_filter:
                 - Same as above; if dict, must include 'inclusive' (bool)
             gpu_count_filter:
@@ -120,6 +86,9 @@ class EfficiencyAnalysis:
 
         Returns:
             DataFrame: Filtered jobs DataFrame based on the specified criteria.
+
+        Raises:
+            ValueError: If the filter is invalid.
         """
 
         mask = pd.Series([True] * len(self.jobs_df), index=self.jobs_df.index)
@@ -132,33 +101,95 @@ class EfficiencyAnalysis:
                 return filter_val["inclusive"]
             return None
 
+        def is_numeric_type(val):
+            """
+            Check if the value is a numeric type (int, float, np.integer, np.floating, pd.Int64Dtype, pd.Float64Dtype).
+            """
+            return (
+                pd.api.types.is_integer_dtype(type(val)) or
+                pd.api.types.is_float_dtype(type(val))
+            )
+
+        def apply_numeric_filter(
+        col: pd.Series,
+        filter: int | list | set | tuple | dict,
+        inclusive: bool | None
+        ):
+            """
+            Helper to apply a numeric filter to a pandas Series.
+            
+            Args:
+                col (pd.Series): The column to filter.
+                value: The filter value (scalar, list/tuple/set, dict with 'min'/'max', or callable).
+                inclusive (bool): Whether min/max are inclusive.
+            Returns:
+                pd.Series: Boolean mask.
+
+            Raises:
+                ValueError: If the filter is invalid.
+            """
+            mask = pd.Series([True] * len(col), index=col.index)
+            if filter is not None:
+                if isinstance(filter, list | set | tuple):
+                    if not all(is_numeric_type(val) for val in filter):
+                        raise ValueError("All filter values must be integers or floats.")
+                    mask &= col.isin(filter)
+                elif isinstance(filter, dict):
+                    # Check min/max values are int or float if present using pandas type checks
+                    for key in ("min", "max"):
+                        if key in filter and is_numeric_type(filter[key]) is False:
+                            raise ValueError(f"['{key}'] must be an integer or float.")
+                    if "min" in filter:
+                        mask &= col.ge(filter["min"]) if inclusive else col.gt(filter["min"])
+                    if "max" in filter:
+                        mask &= col.le(filter["max"]) if inclusive else col.lt(filter["max"])
+                else:
+                    if is_numeric_type(filter):
+                        # Only allow numeric types
+                        mask &= col.eq(filter)
+                    else:
+                        raise ValueError(
+                            "Filter must be a numeric value if not a list, set, tuple, dict, or None."
+                        )
+            return mask
+
         # vram_constraint
         if vram_constraint_filter is not None:
             col = self.jobs_df["vram_constraint"]
-            if callable(vram_constraint_filter):
-                mask &= col.apply(vram_constraint_filter)
+            if vram_constraint_filter is pd.NA or (
+                isinstance(vram_constraint_filter, float) and np.isnan(vram_constraint_filter)
+            ):
+                mask &= col.isna()
             elif isinstance(vram_constraint_filter, list | set | tuple):
+                # Check all values are int or float
+                if not all(is_numeric_type(val) for val in vram_constraint_filter):
+                    raise ValueError("All values in vram_constraint_filter must be integers or floats.")
                 mask &= col.isin(vram_constraint_filter)
             elif isinstance(vram_constraint_filter, dict):
+                # Check min/max values are int or float if present using pandas type checks
+                for key in ("min", "max"):
+                    if key in vram_constraint_filter and is_numeric_type(vram_constraint_filter[key]) is False:
+                            raise ValueError(f"vram_constraint_filter['{key}'] must be an integer or float.")
                 inclusive = get_inclusive(vram_constraint_filter)
                 if "min" in vram_constraint_filter:
                     mask &= (
-                        col.ge(vram_constraint_filter["min"])
-                        if inclusive
+                        col.ge(vram_constraint_filter["min"]) if inclusive
                         else col.gt(vram_constraint_filter["min"])
                     )
                 if "max" in vram_constraint_filter:
                     mask &= (
-                        col.le(vram_constraint_filter["max"])
-                        if inclusive
+                        col.le(vram_constraint_filter["max"]) if inclusive
                         else col.lt(vram_constraint_filter["max"])
                     )
-            elif vram_constraint_filter is pd.NA or (
-                isinstance(vram_constraint_filter, float) and np.isnan(vram_constraint_filter)
-            ):
-                mask &= col.isna()
             else:
-                mask &= col.eq(vram_constraint_filter)
+                # Only allow numeric types (int, float, np.integer, np.floating, pd.Int64Dtype, pd.Float64Dtype)
+                if is_numeric_type(vram_constraint_filter):
+                    mask &= col.eq(vram_constraint_filter)
+                else:
+                    raise ValueError(
+                        "vram_constraint_filter must be a numeric value if not a list, set, tuple, "
+                        "dict, or pd.NA."
+                    )
 
         # GPU memory usage filter
         if gpu_mem_usage_filter is not None:
@@ -166,9 +197,13 @@ class EfficiencyAnalysis:
                 gpu_mem_usage_inclusive = get_inclusive(gpu_mem_usage_filter)
             else:
                 gpu_mem_usage_inclusive = None
-            mask &= self._apply_numeric_filter(
-                self.jobs_df["GPUMemUsage"], gpu_mem_usage_filter, gpu_mem_usage_inclusive
-            )
+            try:
+                # Apply the numeric filter to the GPUMemUsage column
+                mask &= apply_numeric_filter(
+                    self.jobs_df["GPUMemUsage"], gpu_mem_usage_filter, gpu_mem_usage_inclusive
+                )
+            except ValueError as e:
+                raise ValueError("Invalid GPU memory usage filter.") from e
 
         # Allocated VRAM filter
         if allocated_vram_filter is not None:
@@ -176,9 +211,13 @@ class EfficiencyAnalysis:
                 allocated_vram_inclusive = get_inclusive(allocated_vram_filter)
             else:
                 allocated_vram_inclusive = None
-            mask &= self._apply_numeric_filter(
-                self.jobs_df["allocated_vram"], allocated_vram_filter, allocated_vram_inclusive
-            )
+            try:
+                # Apply the numeric filter to the allocated_vram column
+                mask &= apply_numeric_filter(
+                    self.jobs_df["allocated_vram"], allocated_vram_filter, allocated_vram_inclusive
+                )
+            except ValueError as e:
+                raise ValueError("Invalid allocated VRAM filter.") from e
 
         # GPU count filter
         if gpu_count_filter is not None:
@@ -186,9 +225,16 @@ class EfficiencyAnalysis:
                 gpu_count_inclusive = get_inclusive(gpu_count_filter)
             else:
                 gpu_count_inclusive = None
-            mask &= self._apply_numeric_filter(
-                self.jobs_df["GPUs"], gpu_count_filter, gpu_count_inclusive
-            )
+            try:
+                mask &= apply_numeric_filter(
+                    self.jobs_df["GPUs"], gpu_count_filter, gpu_count_inclusive
+                )
+            except ValueError as e:
+                raise ValueError("Invalid GPU count filter.") from e
+
+        # Filter by elapsed time
+        if not is_numeric_type(elapsed_seconds_min) or elapsed_seconds_min < 0:
+            raise ValueError("elapsed_seconds_min must be a positive integer or float representing seconds.")
 
         return self.jobs_df[
             mask
