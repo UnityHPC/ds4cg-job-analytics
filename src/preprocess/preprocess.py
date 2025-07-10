@@ -1,4 +1,5 @@
 import pandas as pd
+from pandas.api.typing import NAType
 import numpy as np
 import re
 
@@ -59,7 +60,7 @@ def _get_vram_from_node(gpu_type: str, node: str) -> int:
     return vram
 
 
-def _get_vram_constraint(constraints: list[str], gpu_count: int, gpu_mem_usage: int) -> int | None:
+def _get_vram_constraint(constraints: list[str], gpu_count: int, gpu_mem_usage: int) -> int | NAType:
     """
     Get the VRAM assigned for a job based on its constraints and GPU usage.
 
@@ -73,8 +74,8 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int, gpu_mem_usage: 
         gpu_mem_usage (int): GPU memory usage in bytes.
 
     Returns:
-        int | None: Maximum VRAM amount in GiB obtained based on the provided constraints, multiplied by the
-                    number of GPUs. Returns None if no VRAM constraints are present.
+        int | NAType: Maximum VRAM amount in GiB obtained based on the provided constraints, multiplied by the
+                    number of GPUs. Returns NAType if no VRAM constraints are present.
 
     """
     vram_constraints = []
@@ -92,7 +93,7 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int, gpu_mem_usage: 
                 vram_constraints.append(VRAM_VALUES[gpu_type])
 
     if not (len(vram_constraints)):
-        return None  # if nothing is requested, return None
+        return pd.NA  # if nothing is requested, return NAType
 
     return max(vram_constraints) * gpu_count
 
@@ -170,11 +171,8 @@ def _get_approx_allocated_vram(gpu_types: list[str], node_list: list[str], gpu_c
         gpu_count (int): Number of GPUs requested by the job.
         gpu_mem_usage (int): GPU memory usage in bytes.
 
-    Returns:
+    Returns
         int: Total allocated (estimate) VRAM for the job in GiB (gibibyte).
-
-    Raises:
-        ValueError: If no valid nodes are found for a multivalent GPU type in the node list.
     """
 
     # one type of GPU
@@ -194,7 +192,7 @@ def _get_approx_allocated_vram(gpu_types: list[str], node_list: list[str], gpu_c
         return total_vram
 
     # estimate VRAM for multiple GPUs where exact number isn't known
-    # TODO: update this based on the updated GPU types which specify exact number of GPUs
+    # TODO (Ayush): update this based on the updated GPU types which specify exact number of GPUs
     allocated_vrams = []
     for gpu in gpu_types:
         if gpu in MULTIVALENT_GPUS:
@@ -242,8 +240,8 @@ def _fill_missing(res: pd.DataFrame) -> None:
 def preprocess_data(
     input_df: pd.DataFrame,
     min_elapsed_seconds: int = DEFAULT_MIN_ELAPSED_SECONDS,
-    include_failed_cancelled_jobs=False,
-    include_cpu_only_jobs=False,
+    include_failed_cancelled_jobs: bool = False,
+    include_cpu_only_jobs: bool = False,
 ) -> pd.DataFrame:
     """
     Preprocess dataframe, filtering out unwanted rows and columns, filling missing values and converting types.

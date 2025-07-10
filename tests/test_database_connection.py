@@ -6,7 +6,12 @@ import os
 
 @pytest.fixture
 def temp_file_db():
-    """Create a temporary file-based database for testing."""
+    """
+    Create a temporary file-based database for testing.
+
+    Yields:
+        DatabaseConnection: A connected temporary database instance for testing.
+    """
     fd, temp_db_path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     os.remove(temp_db_path)
