@@ -171,7 +171,7 @@ def _get_approx_allocated_vram(gpu_types: list[str], node_list: list[str], gpu_c
         gpu_count (int): Number of GPUs requested by the job.
         gpu_mem_usage (int): GPU memory usage in bytes.
 
-    Returns
+    Returns:
         int: Total allocated (estimate) VRAM for the job in GiB (gibibyte).
     """
 
