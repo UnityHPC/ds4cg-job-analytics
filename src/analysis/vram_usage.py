@@ -43,12 +43,17 @@ class EfficiencyAnalysis:
     It provides methods to load data, analyze workload efficiency, and evaluate CPU-GPU usage patterns.
     """
 
+    _efficiency_metric_vars = [
+        "jobs_with_efficiency_metrics",
+        "users_with_efficiency_metrics",
+        "pi_accounts_with_efficiency_metrics",
+    ]
+
     def __init__(self, db_path=None, table_name="Jobs", sample_size=None, random_state=None):
         try:
             self.jobs_df = load_jobs_dataframe_from_duckdb(db_path, table_name, sample_size, random_state)
-            self.jobs_with_efficiency_metrics = None
-            self.users_with_efficiency_metrics = None
-            self.pi_accounts_with_efficiency_metrics = None
+            for var in self._efficiency_metric_vars:
+                setattr(self, var, None)
             self.analysis_results = None
         except Exception as e:
             raise ValueError(f"Failed to load jobs DataFrame: {e}") from e
@@ -403,7 +408,32 @@ class EfficiencyAnalysis:
         inefficient_users = inefficient_users.sort_values("vram_hours", ascending=False)
         return inefficient_users
 
-    # TODO (Arda): The individual user's metrics is expected_value_alloc_vram_efficiency
+    def calculate_all_efficiency_metrics(self, filtered_jobs: pd.DataFrame):
+        """
+        Calculate all efficiency metrics for jobs, users, and PI accounts.
+
+        This method is a convenience wrapper that calculates job efficiency metrics,
+        user efficiency metrics, and PI account efficiency metrics in sequence.
+
+        Args:
+            filtered_jobs (pd.DataFrame): DataFrame containing jobs to analyze.
+
+        Returns:
+            pd.DataFrame: DataFrame with PI accounts and their efficiency metrics.
+
+        Raises:
+
+        """
+        try:
+            self.calculate_job_efficiency_metrics(filtered_jobs)
+            self.calculate_user_efficiency_metrics()
+            self.calculate_pi_account_efficiency_metrics()
+            # Store the variable names as a class-level constant for maintainability
+            return {var: getattr(self, var) for var in self._efficiency_metric_vars}
+
+        except Exception as e:
+            raise ValueError(f"Failed to calculate all efficiency metrics: {e}") from e
+
     def calculate_pi_account_efficiency_metrics(self):
         """
         Calculate PI account efficiency metrics based on user efficiency data.
