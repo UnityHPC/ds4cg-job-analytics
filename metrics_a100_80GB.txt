@@ -1,0 +1,81 @@
+A100 (80GB) Efficiency Analysis Results:
+{'avg_efficiency': np.float64(0.2799402985810018),
+ 'cpu_gpu_balance':                            JobID      gpu_hours  vram_efficiency  cpu_gpu_ratio
+workload_type                                                                  
+GPU-intensive (CPU<GPU)    77938  362190.996389         0.358854       0.332634
+Balanced (CPU≈GPU)         18155  202976.542222         0.208987       2.203225
+CPU-heavy (CPU>GPU)         9211   91748.619444         0.067827      11.566723
+Very CPU-heavy (CPU>>GPU)  10451   93424.101111         0.006546     269.081573,
+ 'duration_efficiency_patterns':                          JobID  vram_efficiency      gpu_hours
+duration_category                                             
+Short (<1h)              51017         0.175034   30173.497778
+Medium (1-6h)            38364         0.363716     102118.685
+Long (6-24h)             21178         0.338643  220671.890278
+Under two days (24-48h)   2918         0.440848   91998.033056
+Over two days (>48h)      2461         0.452746  308451.216111,
+ 'efficiency_patterns':                      Job_Count   GPU_Hours  ...  Avg_Used_GB  Share of tota GPU Hours
+efficiency_category                         ...                                      
+Very Low (<10%)          42627  173379.509  ...     1.587000                     23.0
+Low (10-30%)             16729  109473.089  ...    15.212000                     14.5
+Medium (30-60%)          16757  135638.741  ...    34.401001                     18.0
+High (60-100%)           24542  204252.099  ...    67.857002                     27.1
+
+[4 rows x 6 columns],
+ 'high_waste_gpu_hours': np.float64(410322.02638888883),
+ 'high_waste_hours_share': np.float64(54.4617428821975),
+ 'high_waste_jobs': 74509,
+ 'median_efficiency': np.float64(0.1023193359375),
+ 'report': ['HIGH PRIORITY: Significant inefficiency detected - user education '
+            'campaign needed',
+            'MAJOR OVER-ALLOCATION: >25% of total GPU hours has been wasted '
+            'with jobs with less than 30.0% efficiency.'],
+ 'total_gpu_hours': np.float64(753413.3222222222),
+ 'total_jobs': 115938}
+
+Inefficient Users:
+                          User  ...  Weighted_Efficiency_Contribution
+9           abhinavs_umass_edu  ...                               0.0
+23         aparashar_umass_edu  ...                               0.0
+62            dmaram_umass_edu  ...                               0.0
+194     sanupkrishna_umass_edu  ...                               0.0
+156        nmangwani_umass_edu  ...                               0.0
+..                         ...  ...                               ...
+86         hosseinpour_uri_edu  ...                          0.003101
+118            kraju_umass_edu  ...                          0.003782
+239        tpanambur_umass_edu  ...                          0.007263
+153  nikola_bukowiecka_uri_edu  ...                          0.018126
+121    kyle_demedeiros_uri_edu  ...                          0.037415
+
+[175 rows x 7 columns]
+
+Inefficient PIs:
+                        Account  ...  Weighted_Efficiency_Contribution
+40   pi_murat_inalpolat_uml_edu  ...                               0.0
+66           pi_casey_umass_edu  ...                               0.0
+162           pi_lgao_umass_edu  ...                               0.0
+10        pi_markregine_uri_edu  ...                               0.0
+174       pi_gcowles_umassd_edu  ...                          0.000001
+..                          ...  ...                               ...
+120        pi_hzhang2_umass_edu  ...                          0.001988
+117          pi_pkatz_umass_edu  ...                          0.003655
+228       pi_mparente_umass_edu  ...                          0.006542
+236        pi_dgobeille_uri_edu  ...                          0.018126
+127          pi_hendawi_uri_edu  ...                          0.031656
+
+[80 rows x 7 columns]
+
+Additional Metrics:
+            JobID  ...  request_size_category
+21       28989215  ...        Extreme (>64GB)
+81       29011960  ...        Extreme (>64GB)
+82       29011961  ...        Extreme (>64GB)
+93       29012688  ...        Large (16-32GB)
+143      29014540  ...        Large (16-32GB)
+...           ...  ...                    ...
+8516584  38469128  ...        Extreme (>64GB)
+8516585  38469132  ...        Extreme (>64GB)
+8516586  38469135  ...        Extreme (>64GB)
+8516587  38469159  ...        Extreme (>64GB)
+8516594  38466861  ...        Extreme (>64GB)
+
+[36265 rows x 50 columns]

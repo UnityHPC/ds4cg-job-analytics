@@ -1,0 +1,100 @@
+H100 (80GB) Efficiency Analysis Results:
+{'avg_efficiency': np.float64(0.29360799814631516),
+ 'cpu_gpu_balance':                            JobID    gpu_hours  vram_efficiency  cpu_gpu_ratio
+workload_type                                                                
+GPU-intensive (CPU<GPU)      906  7564.205556         0.553870       0.315245
+Balanced (CPU≈GPU)           402  6471.213611         0.108079       1.914552
+CPU-heavy (CPU>GPU)          358  5919.123333         0.024980      10.545260
+Very CPU-heavy (CPU>>GPU)    205  3461.044722         0.006390     422.225800,
+ 'duration_efficiency_patterns':                          JobID  vram_efficiency     gpu_hours
+duration_category                                            
+Short (<1h)                780         0.305683    336.799167
+Medium (1-6h)              564         0.335671     1544.4375
+Long (6-24h)               349         0.254910   3556.111111
+Under two days (24-48h)     93         0.280321   2794.530556
+Over two days (>48h)       106         0.120015  15588.751667,
+ 'efficiency_patterns':                      Job_Count  GPU_Hours  ...  Avg_Used_GB  Share of tota GPU Hours
+efficiency_category                        ...                                      
+Very Low (<10%)            714  12783.491  ...     2.164000                     53.7
+Low (10-30%)               169    716.968  ...    15.170000                      3.0
+Medium (30-60%)            211    963.509  ...    35.595001                      4.0
+High (60-100%)             460   2330.141  ...    69.222000                      9.8
+
+[4 rows x 6 columns],
+ 'high_waste_gpu_hours': np.float64(20061.435555555556),
+ 'high_waste_hours_share': np.float64(84.2187446577003),
+ 'high_waste_jobs': 1214,
+ 'median_efficiency': np.float64(0.04560546875),
+ 'report': ['CRITICAL: >50% of GPU hours have <30% efficiency - immediate '
+            'optimization needed',
+            'MAJOR OVER-ALLOCATION: >25% of total GPU hours has been wasted '
+            'with jobs with less than 30.0% efficiency.'],
+ 'total_gpu_hours': np.float64(23820.63),
+ 'total_jobs': 1892}
+
+Inefficient Users:
+                                   User  ...  Weighted_Efficiency_Contribution
+63                 tramnguyen_umass_edu  ...                               0.0
+56               siddharthjai_umass_edu  ...                          0.000273
+24                  emccleary_umass_edu  ...                          0.000277
+2                     absahoo_umass_edu  ...                          0.000315
+25                      heuck_umass_edu  ...                          0.000317
+43                    mnchase_umass_edu  ...                          0.000333
+59                 svdeshmukh_umass_edu  ...                          0.000402
+3                     achaloo_umass_edu  ...                          0.000426
+32                jkarnuthala_umass_edu  ...                          0.000624
+23                      elobo_umass_edu  ...                          0.000629
+39  madhavisuyog_pagare_student_uml_edu  ...                          0.000713
+31                 jjeyasingh_umass_edu  ...                          0.000793
+61                   syerawar_umass_edu  ...                          0.001364
+12                ayman_sandouk_uri_edu  ...                          0.002901
+69                yuncongyang_umass_edu  ...                           0.00297
+30                 jiagengliu_umass_edu  ...                          0.004093
+7                     amalali_umass_edu  ...                          0.004358
+9                      anaseh_umass_edu  ...                          0.004405
+4                      acpham_umass_edu  ...                          0.005623
+1                     aafzali_umass_edu  ...                          0.005652
+37                 lclawrence_umass_edu  ...                           0.00702
+33                   jnainani_umass_edu  ...                          0.011899
+22               dhruvmaheshw_umass_edu  ...                          0.012693
+29               jeongyeob_chae_uri_edu  ...                          0.032392
+
+[24 rows x 7 columns]
+
+Inefficient PIs:
+                            Account  ...  Weighted_Efficiency_Contribution
+80            pi_bioch642_umass_edu  ...                          0.000277
+254              pi_heuck_umass_edu  ...                          0.000316
+272            pi_sniekum_umass_edu  ...                          0.000341
+39            pi_mccallum_umass_edu  ...                          0.000434
+99              pi_hongyu_umass_edu  ...                           0.00056
+5                pi_yzick_umass_edu  ...                          0.000629
+52   pi_mohammadariful_alam_uml_edu  ...                          0.000713
+38            pi_mfiterau_umass_edu  ...                          0.001638
+159          pi_brownsarahm_uri_edu  ...                          0.002093
+109        pi_wenlongzhao_umass_edu  ...                          0.003202
+281            pi_chuangg_umass_edu  ...                          0.003744
+91         pi_ahoumansadr_umass_edu  ...                          0.004289
+241              pi_phaas_umass_edu  ...                          0.004358
+43            pi_aghasemi_umass_edu  ...                          0.005652
+116             pi_jensen_umass_edu  ...                          0.005937
+266           pi_gvanhorn_umass_edu  ...                          0.006748
+219             pi_kdonohue_uri_edu  ...                          0.032392
+
+[17 rows x 7 columns]
+
+Additional Metrics:
+            JobID  ...  request_size_category
+23110    28992305  ...        Large (16-32GB)
+23115    28992344  ...        Large (16-32GB)
+25141    28991959  ...        Large (16-32GB)
+25151    28992015  ...        Large (16-32GB)
+25156    28992079  ...        Large (16-32GB)
+...           ...  ...                    ...
+8403260  38347815  ...   Very Large (32-64GB)
+8444402  38382359  ...        Extreme (>64GB)
+8508950  38482597  ...        Extreme (>64GB)
+8513786  38480938  ...        Extreme (>64GB)
+8514833  38382364  ...        Extreme (>64GB)
+
+[1226 rows x 50 columns]

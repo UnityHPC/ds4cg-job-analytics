@@ -7,14 +7,14 @@ import pandas as pd
 from pathlib import Path
 from src.preprocess.preprocess import preprocess_data
 from src.database.database_connection import DatabaseConnection  # Make sure this matches the actual file/class name
-from src.config.constants import MIN_ELAPSED_SECONDS
+from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from src.preprocess.preprocess import ram_map
+from src.config.constants import RAM_MAP
 import os
 
-def load_jobs_dataframe_from_duckdb(db_path=None, table_name="Jobs", sample_size=None, random_state=None):
+def load_jobs_dataframe_from_duckdb(db_path=None, table_name="Jobs", sample_size=None, random_state=None, query=None):
     """
     Connect to the DuckDB slurm_data_small.db and return the jobs table as a pandas DataFrame.
 
@@ -29,10 +29,9 @@ def load_jobs_dataframe_from_duckdb(db_path=None, table_name="Jobs", sample_size
         db_path = Path(__file__).resolve().parents[2] / "data" / "slurm_data.db"
     db = DatabaseConnection(str(db_path))
 
-    jobs_df = db.fetch_all(table_name=table_name)
+    jobs_df = db.fetch_all(table_name=table_name) if query is None else db.fetch_query(query)
     processed_data = preprocess_data(
         jobs_df,
-        min_elapsed_second=0,
         include_failed_cancelled_jobs=False,
     )
     db.disconnect()
@@ -46,8 +45,14 @@ class EfficiencyAnalysis:
     It provides methods to load data, analyze workload efficiency, and evaluate CPU-GPU usage patterns.
     """
 
-    def __init__(self, db_path=None, table_name="Jobs", sample_size=None, random_state=None):
-        self.jobs_df = load_jobs_dataframe_from_duckdb(db_path, table_name, sample_size, random_state)
+    def __init__(self, db_path=None, table_name="Jobs", sample_size=None, random_state=None, query=None):
+        self.jobs_df = load_jobs_dataframe_from_duckdb(
+            db_path=db_path,
+            table_name=table_name,
+            sample_size=sample_size,
+            random_state=random_state,
+            query=query
+        )
         self.efficiency_df = None
         self.analysis_results = None
 
@@ -59,7 +64,7 @@ class EfficiencyAnalysis:
         gpu_mem_usage_max=None,
         gpu_mem_usage_exact=None,
         gpus_min=1,
-        elapsed_seconds_min=MIN_ELAPSED_SECONDS,
+        elapsed_seconds_min=DEFAULT_MIN_ELAPSED_SECONDS,
     ) -> pd.DataFrame:
         """
         Analyze jobs based on constraints, GPU allocation, and usage criteria.
@@ -358,13 +363,16 @@ class EfficiencyAnalysis:
         Returns:
             tuple: A tuple containing GPU jobs DataFrame and a dictionary with GPU type counts and their percentages.
         """
-        gpu_types_for_mem = [k for k, v in ram_map.items() if v == memory_gb]
-        print("PRINTING GPU TYPES")
-        print("gpu types", gpu_types_for_mem)
-        def gpu_type_matches(x):
-            types = x if isinstance(x, list | np.ndarray) else [x]
-            return any(str(g).strip().lower() in gpu_types_for_mem for g in types)
-        filtered = self.jobs_df[self.jobs_df['GPUType'].apply(gpu_type_matches)]
+        valid_memory_values = RAM_MAP.values()
+        if memory_gb not in valid_memory_values:
+            raise ValueError(f"Invalid memory class: {memory_gb}GB. Valid values are: {valid_memory_values}")
+        else:
+            print(f"Filtering jobs for memory class: {memory_gb}GB")
+            gpu_types_for_mem = [k for k, v in RAM_MAP.items() if v == memory_gb]
+            def gpu_type_matches(x):
+                types = x if isinstance(x, list | np.ndarray) else [x]
+                return any(str(g).strip().lower() in gpu_types_for_mem for g in types)
+            filtered = self.jobs_df[self.jobs_df['GPUType'].apply(gpu_type_matches)]
 
         # Count jobs for each GPU type in the memory class
         def extract_gpu_types(x):
@@ -457,7 +465,84 @@ class EfficiencyAnalysis:
             plt.savefig(f"agg_metrics_{memory_gb}GB.png", bbox_inches='tight', dpi=200)
             plt.savefig(f"agg_metrics_{memory_gb}GB_table.png", bbox_inches='tight', dpi=200)
             plt.show()
-            # Annotate bars with percentages
+            
+    def aggregate_gpu_metrics_by_query(self, query, show_matplotlib_tables=True):
+        """
+        Aggregate and display metrics for each GPU type for jobs matching a SQL query.
+        Args:
+            query (str): SQL query to select jobs.
+            show_matplotlib_tables (bool): Whether to display the summary table using matplotlib.
+        Returns:
+            None
+        """
+        # Load jobs matching the query
+        jobs_df = load_jobs_dataframe_from_duckdb(query=query)
+        if jobs_df.empty:
+            print(f"No jobs found for query: {query}")
+            return
+        self.jobs_df = jobs_df
+        self.calculate_efficiency_metrics()
+        # Get unique GPU types in the filtered jobs
+        unique_gpu_types = (
+            self.jobs_df['GPUType']
+            .dropna()
+            .explode()
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            .value_counts()
+            .index
+        )
+        if not unique_gpu_types.any():
+            print(f"No GPU types found for query: {query}")
+            return
+        print("printing unique gpu types", unique_gpu_types)
+        metrics = [
+            "Mean GPU Memory Used (GB)",
+            "Median GPU Memory Used (GB)",
+            "Mean VRAM Efficiency",
+            "Median VRAM Efficiency",
+            "Total User GPU Hours",
+            "Mean Weighted VRAM Efficiency",
+            "Median Weighted VRAM Efficiency"
+        ]
+        results = {gpu_type.upper(): [] for gpu_type in unique_gpu_types}
+        for gpu_type in unique_gpu_types:
+            gpu_jobs = self.efficiency_df[self.efficiency_df['GPUType'].apply(
+                lambda x, gpu_type=gpu_type: gpu_type in [str(g).strip().lower() for g in (x if isinstance(x, list | np.ndarray) else [x])]
+            )]
+            if gpu_jobs.empty:
+                results[gpu_type.upper()] = [None] * len(metrics)
+                continue
+            results[gpu_type.upper()] = [
+                round(gpu_jobs["gpu_memory_used_gb"].mean(), 2),
+                round(gpu_jobs["gpu_memory_used_gb"].median(), 2),
+                round(gpu_jobs["vram_efficiency"].mean(), 3),
+                round(gpu_jobs["vram_efficiency"].median(), 3),
+                round(gpu_jobs["gpu_hours"].sum(), 2),
+                round(gpu_jobs["user_weighted_vram_efficiency"].mean(), 3),
+                round(gpu_jobs["user_weighted_vram_efficiency"].median(), 3)
+            ]
+        summary_df = pd.DataFrame(results, index=metrics)
+        print(f"\n===== Aggregated Metrics Table for query: {query} =====")
+        print(summary_df)
+        if show_matplotlib_tables:
+            fig, ax = plt.subplots(figsize=(8, 2 + 0.5 * len(metrics)))
+            ax.axis('off')
+            table = ax.table(
+                cellText=summary_df.values,
+                rowLabels=summary_df.index,
+                colLabels=summary_df.columns,
+                loc='center',
+                cellLoc='center'
+            )
+            table.auto_set_font_size(False)
+            table.set_fontsize(10)
+            table.scale(1.5, 1.5)
+            ax.set_title(f"Aggregated Metrics for query", fontweight='bold')
+            plt.savefig("agg_metrics_query.png", bbox_inches='tight', dpi=200)
+            plt.savefig("agg_metrics_query_table.png", bbox_inches='tight', dpi=200)
+            plt.show()
             
     def additional_metrics(self, jobs_df=None):
         """
@@ -648,8 +733,6 @@ class EfficiencyAnalysis:
                 row.append(f"{data_counts[gpu.upper()][i]}\n({data_pcts[gpu.upper()][i]})")
             table_data.append(row)
         # Plot as PNG
-        import matplotlib.pyplot as plt
-        from matplotlib.font_manager import FontProperties
         fig, ax = plt.subplots(figsize=(8, 3 + 0.7 * len(cat_labels)))
         ax.axis('off')
         table = ax.table(
@@ -691,24 +774,27 @@ def get_top_n_gpus(jobs_df, n):
     top_n = gpu_types.value_counts().head(n).index.tolist()
     return top_n
 
-def contains_a100(gpu_array):
+
+
+def contains_gpu_type(gpu_array, gpu_type):
     if isinstance(gpu_array, list | np.ndarray):
-        return any(str(gpu).strip().lower() == 'a100' for gpu in gpu_array)
-    return False
+        return any(str(gpu).strip().lower() == gpu_type for gpu in gpu_array)
 
 
-
-def filter_a100s(jobs_df):
-    a100_jobs_df = jobs_df[jobs_df['GPUType'].apply(contains_a100)]
-    return a100_jobs_df
 
 
 
 if __name__ == "__main__":
-    efficiency = EfficiencyAnalysis()
-    # Aggregated metrics table (per-GPU)
-    efficiency.aggregate_gpu_metrics_by_type(80)
-    # Detailed comparison, low-efficiency subset, and plots
+    # Query for jobs where Constraints contains 'a100' or 'h100' (case-insensitive, with double quotes for reserved word)
+    query = (
+        """SELECT * FROM Jobs
+        WHERE \"Constraints\" IS NOT NULL AND
+        (lower(\"Constraints\") LIKE '%a100%' OR lower(\"Constraints\") LIKE '%h100%')"""
+    )
+    efficiency = EfficiencyAnalysis(query=query)
+    # Aggregated metrics table (per-GPU) using the new query-based method
+    efficiency.aggregate_gpu_metrics_by_query(query)
+    # Detailed comparison, low-efficiency subset, and plots (still uses memory_gb=80 for now)
     efficiency.compare_gpu_types_metrics(
         memory_gb=80,
         efficiency_threshold=0.3,
