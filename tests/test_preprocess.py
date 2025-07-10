@@ -139,6 +139,22 @@ def test_pre_process_data_include_failed_cancelled_job(mock_data):
     assert data["Status"].value_counts()[StatusEnum.CANCELLED.value] == expect_cancelled_status
 
 
+def test_pre_process_data_include_custom_qos(mock_data):
+    mock_data_frame = mock_data[0]
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_custom_qos=True)
+    ground_truth = helper_filter_irrelevant_records(mock_data_frame, 600, include_custom_qos=True)
+    filtered_ground_truth = ground_truth[
+        (ground_truth["Status"] != "CANCELLED")
+        & (ground_truth["Status"] != "FAILED")
+        & (ground_truth["GPUs"].notna())
+        & (ground_truth["GPUType"].notna())
+    ].copy()
+    assert len(data) == len(filtered_ground_truth)
+    expect_ids = filtered_ground_truth["JobID"].to_list()
+    for id in data["JobID"]:
+        assert id in expect_ids
+
+
 def test_pre_process_data_include_all(mock_data):
     """
     Test that the preprocessed data includes all jobs when both CPU-only and FAILED/CANCELLED jobs are specified.
@@ -149,8 +165,9 @@ def test_pre_process_data_include_all(mock_data):
         min_elapsed_seconds=600,
         include_failed_cancelled_jobs=True,
         include_cpu_only_jobs=True,
+        include_custom_qos=True,
     )
-    ground_truth = helper_filter_irrelevant_records(mock_data[0], 600)
+    ground_truth = helper_filter_irrelevant_records(mock_data[0], 600, include_custom_qos=True)
 
     expect_failed_status = len(ground_truth[(ground_truth["Status"] == StatusEnum.FAILED.value)])
     expect_cancelled_status = len(ground_truth[(ground_truth["Status"] == StatusEnum.CANCELLED.value)])

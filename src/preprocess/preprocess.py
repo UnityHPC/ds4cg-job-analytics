@@ -247,6 +247,7 @@ def preprocess_data(
     min_elapsed_seconds: int = DEFAULT_MIN_ELAPSED_SECONDS,
     include_failed_cancelled_jobs=False,
     include_cpu_only_jobs=False,
+    include_custom_qos=False,
 ) -> pd.DataFrame:
     """
     Preprocess dataframe, filtering out unwanted rows and columns, filling missing values and converting types.
@@ -292,16 +293,17 @@ def preprocess_data(
     mask &= data["GPUs"].notna() | include_cpu_only_jobs
 
     # for filtering columns which may or may not appear in the dataset
+    qos_values = {e.value for e in QOSEnum}
     filter_conditions = [
         (
             "Status",
             lambda df: ((df["Status"] != StatusEnum.FAILED.value) & (df["Status"] != StatusEnum.CANCELLED.value))
             | include_failed_cancelled_jobs,
         ),
+        ("QOS", lambda df: (df["QOS"] != QOSEnum.UPDATES.value) & ((df["QOS"].isin(qos_values)) | include_custom_qos)),
         ("Elapsed", lambda df: df["Elapsed"] >= min_elapsed_seconds),
         ("Account", lambda df: df["Account"] != AdminsAccountEnum.ROOT.value),
         ("Partition", lambda df: df["Partition"] != PartitionEnum.BUILDING.value),
-        ("QOS", lambda df: df["QOS"] != QOSEnum.UPDATES.value),
     ]
 
     for col, cond in filter_conditions:

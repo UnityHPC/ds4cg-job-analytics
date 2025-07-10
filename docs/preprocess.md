@@ -12,6 +12,7 @@
     - If `GPUType` is null, the value will be filled with `["cpu"]`
     - If `GPUs` is null or is 0, the value will be 0.
 - **Keeping jobs where the status is "Failed" or "Cancelled"**
+- **Keeping jobs where the QOS is customized (not normal, long, or short)**
 
 ## Records Omitted If:
 - `Elapsed` is less than the minimum threshold

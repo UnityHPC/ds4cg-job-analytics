@@ -11,12 +11,14 @@ from src.config.enum_constants import (
 import pandas as pd
 
 
-def helper_filter_irrelevant_records(input_df: pd.DataFrame, min_elapsed_seconds: int) -> pd.DataFrame:
+def helper_filter_irrelevant_records(
+    input_df: pd.DataFrame, min_elapsed_seconds: int, include_custom_qos=False
+) -> pd.DataFrame:
     """
     Helper function to make basic filtering on a ground truth dataframe, intended to use for test only.
 
     Given a ground truth dataframe, this will create a new dataframe without records meeting the following criteria:
-    - QOS is updates
+    - QOS is updates, or contains custom values if include_custom_qos is False
     - Account is root
     - Partition is building
     - Elasped time is less than min_elapsed
@@ -24,16 +26,18 @@ def helper_filter_irrelevant_records(input_df: pd.DataFrame, min_elapsed_seconds
     Args:
         input_df (pd.DataFrame): Input dataframe to filter. Note that the Elapsed field should be in unit seconds.
         min_elapsed_seconds (int): Minimum elapsed time in seconds.
+        include_custom_qos (bool): condition on whether to include records with customized QOS values or not
 
     Returns:
         pd.DataFrame: Filtered dataframe.
     """
-
+    qos_values = [e.value for e in QOSEnum]
     res = input_df[
         (input_df["Elapsed"] >= min_elapsed_seconds)
         & (input_df["Account"] != AdminsAccountEnum.ROOT.value)
         & (input_df["Partition"] != PartitionEnum.BUILDING.value)
         & (input_df["QOS"] != QOSEnum.UPDATES.value)
+        & ((input_df["QOS"].isin(qos_values)) | include_custom_qos)
     ]
     return res
 
