@@ -228,8 +228,7 @@ def _fill_missing(res: pd.DataFrame) -> None:
     # fill default values for specific columns
     res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)
     res.loc[:, "Interactive"] = res["Interactive"].fillna("non-interactive")
-    # TODO: convert all of constraints to list, do not fill null values
-    res.loc[:, "Constraints"] = res["Constraints"].apply(lambda x: x.tolist() if isinstance(x, np.ndarray) else [])
+    res.loc[:, "Constraints"] = res["Constraints"].apply(lambda x: x.tolist() if isinstance(x, np.ndarray) else x)
     res.loc[:, "GPUType"] = (
         res["GPUType"]
         .fillna("")
