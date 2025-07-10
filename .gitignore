@@ -4,7 +4,6 @@
 /venv
 /duckdb
 
-
 # Compiled Python files
 *.py[ocd]
 __pycache__
@@ -42,3 +41,4 @@ data/
 *.patch
 *.diff
 /docs/build
+/site

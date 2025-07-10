@@ -13,6 +13,7 @@ from src.config.enum_constants import (
 def _helper_filter_irrelevant_records(input_df: pd.DataFrame, min_elapsed_seconds: int) -> pd.DataFrame:
     """
     Private function to help generate expected ground truth dataframe for test.
+
     Given a ground truth dataframe, this will create a new dataframe without records meeting the following criteria:
     - QOS is updates
     - Account is root
@@ -37,7 +38,7 @@ def _helper_filter_irrelevant_records(input_df: pd.DataFrame, min_elapsed_second
     return res
 
 
-def test_pre_process_data_filtred_columns(mock_data_frame):
+def test_preprocess_data_filtered_columns(mock_data_frame):
     """
     Test that the preprocessed data does not contain irrelevant columns.
     """
@@ -48,7 +49,7 @@ def test_pre_process_data_filtred_columns(mock_data_frame):
     assert "Preempted" not in data.columns
 
 
-def test_pre_process_data_filtered_gpu(mock_data_frame):
+def test_preprocess_data_filtered_gpu(mock_data_frame):
     """
     Test that the preprocessed data does not contain null GPUType and GPUs.
     """
@@ -59,7 +60,7 @@ def test_pre_process_data_filtered_gpu(mock_data_frame):
     assert not any(is_gpu_null)
 
 
-def test_pre_process_data_filtered_status(mock_data_frame):
+def test_preprocess_data_filtered_status(mock_data_frame):
     """
     Test that the preprocessed data does not contain FAILED or CANCELLED jobs.
     """
@@ -70,7 +71,7 @@ def test_pre_process_data_filtered_status(mock_data_frame):
     assert not any(status_cancelled)
 
 
-def test_pre_process_data_filtered_min_elapses_1(mock_data_frame):
+def test_preprocess_data_filtered_min_elapses_1(mock_data_frame):
     """
     Test that the preprocessed data does not contain jobs with elapsed time below the threshold (300 seconds).
     """
@@ -81,7 +82,7 @@ def test_pre_process_data_filtered_min_elapses_1(mock_data_frame):
     assert not any(elapsed_below_threshold)
 
 
-def test_pre_process_data_filter_min_esplapes_2(mock_data_frame):
+def test_preprocess_data_filter_min_esplapes_2(mock_data_frame):
     """
     Test that the preprocessed data contains only jobs with elapsed time below the threshold (700 seconds).
     """
@@ -96,7 +97,7 @@ def test_pre_process_data_filter_min_esplapes_2(mock_data_frame):
     assert len(data) == len(ground_truth)
 
 
-def test_pre_process_data_filtered_root_account(mock_data_frame):
+def test_preprocess_data_filtered_root_account(mock_data_frame):
     """
     Test that the preprocessed data does not contain jobs with root account, partition building, or qos updates.
     """
@@ -109,7 +110,7 @@ def test_pre_process_data_filtered_root_account(mock_data_frame):
     assert not any(partition_building)
 
 
-def test_pre_process_data_include_cpu_job(mock_data_frame):
+def test_preprocess_data_include_cpu_job(mock_data_frame):
     """
     Test that the preprocessed data includes CPU-only jobs when specified.
     """
@@ -133,7 +134,7 @@ def test_pre_process_data_include_cpu_job(mock_data_frame):
     assert data["GPUs"].value_counts()[0] == expected_gpus_count_0
 
 
-def test_pre_process_data_include_failed_cancelled_job(mock_data_frame):
+def test_preprocess_data_include_failed_cancelled_job(mock_data_frame):
     """
     Test that the preprocessed data includes FAILED and CANCELLED jobs when specified.
     """
@@ -157,10 +158,9 @@ def test_pre_process_data_include_failed_cancelled_job(mock_data_frame):
     assert data["Status"].value_counts()[StatusEnum.CANCELLED.value] == expect_cancelled_status
 
 
-def test_pre_process_data_include_all(mock_data_frame):
+def test_preprocess_data_include_all(mock_data_frame):
     """
-    Test that the preprocessed data includes all jobs when both CPU-only and FAILED/CANCELLED
-    jobs are specified.
+    Test that the preprocessed data includes all jobs when both CPU-only and FAILED/CANCELLED jobs are specified.
     """
     data = preprocess_data(
         input_df=mock_data_frame,
@@ -184,7 +184,7 @@ def test_pre_process_data_include_all(mock_data_frame):
     assert data["Status"].value_counts()[StatusEnum.COMPLETED.value] == expect_completed_status
 
 
-def test_pre_process_data_fill_missing_interactive(mock_data_frame):
+def test_preprocess_data_fill_missing_interactive(mock_data_frame):
     """
     Test that the preprocessed data fills missing interactive job types with 'non-interactive' correctly.
     """
@@ -202,7 +202,7 @@ def test_pre_process_data_fill_missing_interactive(mock_data_frame):
     assert interactive_stat[InteractiveEnum.NON_INTERACTIVE.value] == expect_non_interactive
 
 
-def test_pre_process_data_fill_missing_array_id(mock_data_frame):
+def test_preprocess_data_fill_missing_array_id(mock_data_frame):
     """
     Test that the preprocessed data fills missing ArrayID with -1 correctly.
     """
@@ -218,7 +218,7 @@ def test_pre_process_data_fill_missing_array_id(mock_data_frame):
     assert array_id_stat[-1] == expect_array_id_null
 
 
-def test_pre_process_data_fill_missing_gpu_type(mock_data_frame):
+def test_preprocess_data_fill_missing_gpu_type(mock_data_frame):
     """
     Test that the preprocessed data fills missing GPUType with 'cpu' correctly.
     """
@@ -238,7 +238,7 @@ def test_pre_process_data_fill_missing_gpu_type(mock_data_frame):
     assert gpus_stat[0] == expect_gpus_null
 
 
-def test_pre_process_data_fill_missing_constraints(mock_data_frame):
+def test_preprocess_data_fill_missing_constraints(mock_data_frame):
     """
     Test that the preprocessed data fills missing Constraints with empty numpy array correctly.
     """
@@ -250,6 +250,7 @@ def test_pre_process_data_fill_missing_constraints(mock_data_frame):
     )
     ground_truth = _helper_filter_irrelevant_records(mock_data_frame, 100)
     expect_constraints_null = len(ground_truth[(ground_truth["Constraints"].isna())])
+
     assert sum(len(x) == 0 for x in data["Constraints"]) == expect_constraints_null
 
 
@@ -347,7 +348,7 @@ def test_category_account(mock_data_frame):
     assert expected.issubset(set(data["Account"].cat.categories))
 
 
-def test_pre_proess_timedelta_conversion(mock_data_frame):
+def test_preprocess_timedelta_conversion(mock_data_frame):
     """
     Test that the preprocessed data converts elapsed time to timedelta.
     """
@@ -360,6 +361,24 @@ def test_pre_proess_timedelta_conversion(mock_data_frame):
     ground_truth = _helper_filter_irrelevant_records(mock_data_frame, 600)
     max_len = len(ground_truth)
     time_limit = data["TimeLimit"]
+
     assert time_limit.dtype == "timedelta64[ns]"
     assert time_limit[0].total_seconds() == ground_truth["TimeLimit"][0]
     assert time_limit[max_len - 1].total_seconds() == ground_truth["TimeLimit"][max_len - 1]
+
+
+def test_preprocess_gpu_type(mock_data_frame):
+    """
+    Test that the GPUType column is correctly filled and transformed during preprocessing.
+    """
+
+    data = preprocess_data(
+        input_df=mock_data_frame,
+        include_cpu_only_jobs=True,
+    )
+
+    # Check that GPUType is filled with 'cpu' for CPU-only jobs
+    assert all(row == ["cpu"] for row in data.loc[data["GPUType"].isna(), "GPUType"])
+
+    # Check that numpy arrays in GPUType are converted to lists
+    assert all(isinstance(row, list) for row in data["GPUType"] if not pd.isna(row))
