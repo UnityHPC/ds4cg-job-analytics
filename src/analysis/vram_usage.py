@@ -1,5 +1,5 @@
 """
-Functions to analyze efficiency of Jobs based on their VRAM usage.
+Tools to analyze efficiency of Jobs based on their VRAM usage.
 
 The aim is to identify potential inefficiencies in GPU usage and notify users or PIs about these issues.
 """
