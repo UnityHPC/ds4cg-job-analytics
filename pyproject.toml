@@ -42,7 +42,9 @@ select = [
     # Docstring capitalization: D403, D405
     "D403", "D405",
     # Docstring should not start with this: D404
-    "D404"
+    "D404",
+    # flake8-annotations: ANN
+    "ANN",
 ]
 ignore = [
     # Ignore use ternary operator in if statements
