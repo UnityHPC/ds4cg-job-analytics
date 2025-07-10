@@ -27,11 +27,12 @@ visible in Jupyter, run
 
     python -m ipykernel install --user --name "Duck DB"
 
+from within the environment. This will add "Duck DB" as a kernel option in the dropdown.
+
 By default, Jupyter Notebook outoputs are removed via a git filter before the notebook is committed to git. To add an exception and keep the output of a notebook, add the following line to [notebooks/.gitattributes](```notebooks/.gitattributes```):
 
     <NOTEBOOK_NAME>.ipynb !filter=strip-notebook-output
 
-from within the environment. This will add "Duck DB" as a kernel option in the dropdown.
 
 ## Development Environment
 
