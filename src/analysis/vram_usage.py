@@ -7,10 +7,14 @@ The aim is to identify potential inefficiencies in GPU usage and notify users or
 import pandas as pd
 import numpy as np
 from pathlib import Path
+import matplotlib.pyplot as plt
+
 from collections.abc import Callable
+
 from src.preprocess.preprocess import preprocess_data
 from src.database import DatabaseConnection
 from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
+from src.config.enum_constants import TimeUnitEnum
 
 
 def load_jobs_dataframe_from_duckdb(db_path, table_name="Jobs", sample_size=None, random_state=None):
@@ -597,85 +601,361 @@ class EfficiencyAnalysis:
         inefficient_pis = inefficient_pis.sort_values("Weighted_Efficiency_Contribution", ascending=True)
         return
 
-    def plot_vram_efficiency(self, users, start_date=None, end_date=None):
+    def filter_jobs_by_date_range(self, start_date=None, end_date=None, days_back=None):
         """
-        Plot VRAM efficiency over time for specific users within a date range.
+        Filter jobs based on a specific date range or relative days back.
+
+        Args:
+            start_date (str): Start date in 'YYYY-MM-DD' format (optional).
+            end_date (str): End date in 'YYYY-MM-DD' format (optional).
+            days_back (int): Number of days back from today to filter jobs (optional).
+
+        Returns:
+            pd.DataFrame: Filtered jobs DataFrame.
+        """
+        data = self.jobs_w_efficiency_metrics.copy()
+
+        if days_back:
+            start_date = pd.Timestamp.now() - pd.Timedelta(days=days_back)
+
+        if start_date:
+            data = data[data['StartTime'] >= pd.to_datetime(start_date)]
+        if end_date:
+            data = data[data['StartTime'] <= pd.to_datetime(end_date)]
+
+        return data
+
+    def group_jobs_by_time(self, data, time_unit):
+        """
+        Group jobs by a specified time unit (Month, Week, Day).
+
+        Args:
+            data (pd.DataFrame): Jobs DataFrame.
+            time_unit (str): Time unit to group by ('Month', 'Week', 'Day').
+
+        Returns:
+            pd.DataFrame: Grouped jobs DataFrame.
+        """
+        if time_unit == TimeUnitEnum.MONTHS.value:
+            data['TimeGroup'] = pd.to_datetime(data['StartTime']).dt.to_period('M')
+        elif time_unit == TimeUnitEnum.WEEKS.value:
+            data['TimeGroup'] = pd.to_datetime(data['StartTime']).dt.to_period('W')
+        elif time_unit == TimeUnitEnum.DAYS.value:
+            data['TimeGroup'] = pd.to_datetime(data['StartTime']).dt.date
+        else:
+            raise ValueError("Invalid time unit. Choose 'Months', 'Weeks', or 'Days'.")
+
+        return data
+
+    def plot_vram_efficiency(
+        self,
+        users,
+        start_date=None,
+        end_date=None,
+        days_back=None,
+        time_unit=TimeUnitEnum.MONTHS.value,
+        remove_zero_values=True,
+        max_points=12,
+        annotation_style="hover",  # "hover", "combined", "table", "none"
+        show_secondary_y=False,  # Show job counts on secondary y-axis
+    ):
+        """
+        Plot VRAM efficiency over time for specific users with improved annotation options.
 
         Parameters:
         - users (list): List of user names to plot.
         - start_date (str): Start date in 'YYYY-MM-DD' format (optional).
         - end_date (str): End date in 'YYYY-MM-DD' format (optional).
+        - days_back (int): Number of days back from today to filter jobs (optional).
+        - time_unit (str): Time unit to group by ('Month', 'Week', 'Day').
+        - remove_zero_values (bool): Whether to remove zero efficiency values from the plot.
+        - max_points (int): Maximum number of points to plot to avoid memory issues.
+        - annotation_style (str): Style for annotations ("hover", "combined", "table", "none").
+        - show_secondary_y (bool): Whether to show job counts on secondary y-axis.
         """
-        import matplotlib.pyplot as plt
         import pandas as pd
 
-        # Filter data by date range if provided
-        data = self.jobs_w_efficiency_metrics.copy()
-        if start_date:
-            data = data[data["StartTime"] >= pd.to_datetime(start_date)]
-        if end_date:
-            data = data[data["StartTime"] <= pd.to_datetime(end_date)]
+        # Filter data by date range or days back
+        data = self.filter_jobs_by_date_range(start_date=start_date, end_date=end_date, days_back=days_back)
 
-        # Ensure 'Month' column is added to the DataFrame
-        data["Month"] = pd.to_datetime(data["StartTime"]).dt.to_period("M")
+        # Group data by the specified time unit
+        data = self.group_jobs_by_time(data, time_unit)
 
-        plt.figure(figsize=(10, 6))
+        # Create figure and axis
+        fig, ax1 = plt.subplots(figsize=(12, 8))
+        
+        # Prepare secondary axis if needed
+        if show_secondary_y:
+            ax2 = ax1.twinx()
+            ax2.set_ylabel('Job Count', color='tab:gray')
+            ax2.tick_params(axis='y', labelcolor='tab:gray')
+        
+        # Store annotation data for table display
+        annotation_data = []
+        colors = plt.cm.tab10(range(len(users)))
 
-        for user in users:
+        for idx, user in enumerate(users):
             # Filter data for the specific user
-            user_data = data[data["User"] == user]
+            user_data = data[data['User'] == user]
+            
+            if user_data.empty:
+                continue
 
-            # Calculate monthly efficiency
-            monthly_efficiency = []
-            monthly_hours = []
-            monthly_job_counts = []
-            for month, month_data in user_data.groupby("Month"):
-                user_gpu_hours = month_data["job_hours"].sum()
-                total_gpu_hours = data[data["Month"] == month]["job_hours"].sum()
+            # Calculate efficiency metrics grouped by time unit
+            grouped_efficiency = []
+            grouped_hours = []
+            grouped_job_counts = []
+            time_groups = []
 
-                efficiency = (month_data["alloc_vram_efficiency"] * user_gpu_hours / total_gpu_hours).mean()
-                monthly_efficiency.append((month, efficiency))
+            for time_group, group_data in user_data.groupby('TimeGroup'):
+                user_gpu_hours = group_data['job_hours'].sum()
+                total_gpu_hours = data[data['TimeGroup'] == time_group]['job_hours'].sum()
 
-                monthly_hours.append(user_gpu_hours)
-                monthly_job_counts.append(month_data["JobID"].count())
+                if total_gpu_hours > 0:
+                    efficiency = (group_data['alloc_vram_efficiency'] * user_gpu_hours / total_gpu_hours).mean()
+                else:
+                    efficiency = 0
+                    
+                grouped_efficiency.append(efficiency)
+                grouped_hours.append(user_gpu_hours)
+                grouped_job_counts.append(group_data['JobID'].count())
+                time_groups.append(time_group)
 
-            monthly_efficiency = pd.DataFrame(monthly_efficiency, columns=["Month", "Efficiency"])
-            monthly_efficiency["Month"] = monthly_efficiency["Month"].astype(str)
+            # Create DataFrame for easier manipulation
+            user_df = pd.DataFrame({
+                'TimeGroup': time_groups,
+                'Efficiency': grouped_efficiency,
+                'GPU_Hours': grouped_hours,
+                'Job_Count': grouped_job_counts
+            })
 
-            # Plot the efficiency for the user
-            plt.plot(monthly_efficiency["Month"], monthly_efficiency["Efficiency"], marker="o", label=user)
+            # Remove zero values if specified
+            if remove_zero_values:
+                user_df = user_df[user_df['Efficiency'] > 0]
 
-            # Annotate the plot with monthly hours and job counts
-            for i, (_month, hours, job_count) in enumerate(
-                zip(monthly_efficiency["Month"], monthly_hours, monthly_job_counts, strict=False)
-            ):
-                plt.text(
-                    i,
-                    monthly_efficiency.loc[i, "Efficiency"],
-                    f"{hours:.1f} hrs",
-                    fontsize=9,
-                    ha="center",
-                    va="bottom",
-                )
-                plt.text(
-                    i,
-                    monthly_efficiency.loc[i, "Efficiency"] - 0.05,
-                    f"{job_count} jobs",
-                    fontsize=9,
-                    ha="center",
-                    va="top",
-                )
+            # Limit the number of points to plot
+            if len(user_df) > max_points:
+                user_df = user_df.iloc[-max_points:]  # Take most recent points
+                
+            if user_df.empty:
+                continue
 
-        plt.title("Weighted VRAM Efficiency Over Time")
-        plt.xlabel("Month")
-        plt.ylabel("Average VRAM Efficiency")
-        plt.xticks(rotation=45)
-        plt.legend(title="Users")
+            # Convert time groups to string for plotting
+            user_df['TimeGroup_Str'] = user_df['TimeGroup'].astype(str)
+            x_positions = range(len(user_df))
+
+            # Plot efficiency on primary axis
+            line = ax1.plot(x_positions, user_df['Efficiency'], 
+                           marker='o', label=f'{user} (Efficiency)', 
+                           color=colors[idx], linewidth=2, markersize=6)
+
+            # Plot job counts on secondary axis if enabled
+            if show_secondary_y:
+                ax2.plot(x_positions, user_df['Job_Count'], 
+                        marker='s', label=f'{user} (Jobs)', 
+                        color=colors[idx], alpha=0.6, linestyle='--', markersize=4)
+
+            # Handle annotations based on style
+            if annotation_style == "hover":
+                # Create hover-like annotations (minimal, clean)
+                for i, (_, row) in enumerate(user_df.iterrows()):
+                    ax1.annotate(f'{row["GPU_Hours"]:.1f}h', 
+                               (i, row['Efficiency']),
+                               xytext=(5, 5), textcoords='offset points',
+                               fontsize=8, alpha=0.7, 
+                               bbox=dict(boxstyle="round,pad=0.2", facecolor='white', alpha=0.7))
+            
+            elif annotation_style == "combined":
+                # Combine hours and jobs in single annotation
+                for i, (_, row) in enumerate(user_df.iterrows()):
+                    ax1.annotate(f'{row["GPU_Hours"]:.1f}h\n{row["Job_Count"]}j', 
+                               (i, row['Efficiency']),
+                               xytext=(0, 10), textcoords='offset points',
+                               fontsize=7, ha='center',
+                               bbox=dict(boxstyle="round,pad=0.2", facecolor='white', alpha=0.8))
+
+            # Store data for table display
+            for _, row in user_df.iterrows():
+                annotation_data.append({
+                    'User': user,
+                    'Time': row['TimeGroup_Str'],
+                    'Efficiency': f"{row['Efficiency']:.3f}",
+                    'GPU_Hours': f"{row['GPU_Hours']:.1f}",
+                    'Job_Count': row['Job_Count']
+                })
+
+        # Set labels and title
+        ax1.set_xlabel(f'Time Period ({time_unit})')
+        ax1.set_ylabel('Average VRAM Efficiency')
+        ax1.set_title(f'VRAM Efficiency Over Time ({time_unit})')
+        
+        # Set x-axis labels if we have data
+        if 'user_df' in locals() and len(user_df) > 0:
+            ax1.set_xticks(range(len(user_df)))
+            ax1.set_xticklabels(user_df['TimeGroup_Str'], rotation=45, ha='right')
+
+        # Add legends
+        lines1, labels1 = ax1.get_legend_handles_labels()
+        if show_secondary_y:
+            lines2, labels2 = ax2.get_legend_handles_labels()
+            ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left', bbox_to_anchor=(1.05, 1))
+        else:
+            ax1.legend(loc='upper left', bbox_to_anchor=(1.05, 1))
+
         plt.tight_layout()
         plt.show()
-        return
+        
+        # Display annotation table if requested
+        if annotation_style == "table" and annotation_data:
+            print("\n" + "="*80)
+            print("DETAILED METRICS TABLE")
+            print("="*80)
+            table_df = pd.DataFrame(annotation_data)
+            if not table_df.empty:
+                print(table_df.to_string(index=False))
+            print("="*80)
+        
+        return fig
 
+    def plot_vram_efficiency_interactive(
+        self,
+        users,
+        start_date=None,
+        end_date=None,
+        days_back=None,
+        time_unit=TimeUnitEnum.MONTHS.value,
+        remove_zero_values=True,
+        max_points=12,
+    ):
+        """
+        Create an interactive plot with tooltips showing detailed metrics.
+        
+        Requires plotly to be installed: pip install plotly
+        """
+        try:
+            import plotly.graph_objects as go
+            from plotly.subplots import make_subplots
+        except ImportError:
+            print("Plotly not installed. Install with: pip install plotly")
+            return self.plot_vram_efficiency(users, start_date, end_date, days_back, 
+                                           time_unit, remove_zero_values, max_points, 
+                                           annotation_style="table")
 
+        # Filter data by date range or days back
+        data = self.filter_jobs_by_date_range(start_date=start_date, end_date=end_date, days_back=days_back)
+
+        # Group data by the specified time unit
+        data = self.group_jobs_by_time(data, time_unit)
+
+        # Create subplots with secondary y-axis
+        fig = make_subplots(
+            specs=[[{"secondary_y": True}]],
+            subplot_titles=[f'VRAM Efficiency Over Time ({time_unit})']
+        )
+
+        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
+                  '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+
+        for idx, user in enumerate(users):
+            # Filter data for the specific user
+            user_data = data[data['User'] == user]
+            
+            if user_data.empty:
+                continue
+
+            # Calculate efficiency metrics grouped by time unit
+            grouped_data = []
+
+            for time_group, group_data in user_data.groupby('TimeGroup'):
+                user_gpu_hours = group_data['job_hours'].sum()
+                total_gpu_hours = data[data['TimeGroup'] == time_group]['job_hours'].sum()
+
+                if total_gpu_hours > 0:
+                    efficiency = (group_data['alloc_vram_efficiency'] * user_gpu_hours / total_gpu_hours).mean()
+                else:
+                    efficiency = 0
+                    
+                grouped_data.append({
+                    'TimeGroup': str(time_group),
+                    'Efficiency': efficiency,
+                    'GPU_Hours': user_gpu_hours,
+                    'Job_Count': group_data['JobID'].count()
+                })
+
+            if not grouped_data:
+                continue
+                
+            user_df = pd.DataFrame(grouped_data)
+
+            # Remove zero values if specified
+            if remove_zero_values:
+                user_df = user_df[user_df['Efficiency'] > 0]
+
+            # Limit the number of points to plot
+            if len(user_df) > max_points:
+                user_df = user_df.iloc[-max_points:]
+                
+            if user_df.empty:
+                continue
+
+            # Create hover text with detailed information
+            hover_text = [
+                f"User: {user}<br>" +
+                f"Time: {row['TimeGroup']}<br>" +
+                f"Efficiency: {row['Efficiency']:.3f}<br>" +
+                f"GPU Hours: {row['GPU_Hours']:.1f}<br>" +
+                f"Job Count: {row['Job_Count']}"
+                for _, row in user_df.iterrows()
+            ]
+
+            # Add efficiency trace
+            fig.add_trace(
+                go.Scatter(
+                    x=user_df['TimeGroup'],
+                    y=user_df['Efficiency'],
+                    mode='lines+markers',
+                    name=f'{user} (Efficiency)',
+                    line=dict(color=colors[idx % len(colors)], width=2),
+                    marker=dict(size=8),
+                    hovertext=hover_text,
+                    hoverinfo='text'
+                ),
+                secondary_y=False
+            )
+
+            # Add job count trace on secondary y-axis
+            fig.add_trace(
+                go.Scatter(
+                    x=user_df['TimeGroup'],
+                    y=user_df['Job_Count'],
+                    mode='lines+markers',
+                    name=f'{user} (Job Count)',
+                    line=dict(color=colors[idx % len(colors)], width=1, dash='dash'),
+                    marker=dict(size=6, symbol='square'),
+                    opacity=0.6,
+                    hovertext=hover_text,
+                    hoverinfo='text'
+                ),
+                secondary_y=True
+            )
+
+        # Update layout
+        fig.update_layout(
+            title=f'Interactive VRAM Efficiency Analysis ({time_unit})',
+            xaxis_title=f'Time Period ({time_unit})',
+            hovermode='closest',
+            width=1000,
+            height=600
+        )
+
+        # Set y-axes titles
+        fig.update_yaxes(title_text="VRAM Efficiency", secondary_y=False)
+        fig.update_yaxes(title_text="Job Count", secondary_y=True)
+
+        fig.show()
+        return fig
+    
+    
 def filter_zero_vram_requested_with_gpu_allocated(df, requested_vram=0, gpus_min=1):
     """
     Return jobs where requested_vram is greater than or equal to a value (default 0) and GPUs >= gpus_min (default 1).
@@ -683,9 +963,9 @@ def filter_zero_vram_requested_with_gpu_allocated(df, requested_vram=0, gpus_min
     Args:
         df (pd.DataFrame): The jobs DataFrame.
         requested_vram (int, float): Value to filter requested_vram
-        gpus_min (int): Minimum GPUs allocated
+        gpus_min (int): Minimum number of GPUs allocated
 
     Returns:
-        pd.DataFrame: Filtered DataFrame with jobs matching the criteria.
+        pd.DataFrame: Filtered DataFrame with jobs meeting the criteria
     """
-    return df[(df["requested_vram"] >= requested_vram) & (df["GPUs"] >= gpus_min)]
+    return df[(df["requested_vram"] >= requested_vram) & (df["GPUs"] >= gpus_min)].copy()

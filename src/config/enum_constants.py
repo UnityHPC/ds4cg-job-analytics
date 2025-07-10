@@ -79,3 +79,12 @@ class PartitionEnum(Enum):
     URI_RICHAMP = "uri-richamp"
     VISTERRA = "visterra"
     ZHOULIN_CPU = "zhoulin-cpu"
+
+class TimeUnitEnum(Enum):
+    SECONDS = "Seconds"
+    MINUTES = "Minutes"
+    HOURS = "Hours"
+    DAYS = "Days"
+    WEEKS = "Weeks"
+    MONTHS = "Months"
+    YEARS = "Years"

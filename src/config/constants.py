@@ -5,6 +5,8 @@ VRAM_VALUES = {
     "a100-40g": 40,  # 40GB variant of a100 that can be specified explicitly in constraints
     "a100-80g": 80,  # 80GB variant of a100 that can be specified explicitly in constraints
     "v100": 16,
+    "v100-32g": 32,  # 32GB variant of v100 that can be specified explicitly in constraints
+    "v100-16g": 16,  # 16GB variant of v100 that can be specified explicitly in constraints
     "a40": 48,
     "gh200": 95,
     "rtx_8000": 48,
