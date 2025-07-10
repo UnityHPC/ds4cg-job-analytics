@@ -12,7 +12,12 @@ from src.database import DatabaseConnection
 from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
 
 
-def load_jobs_dataframe_from_duckdb(db_path, table_name="Jobs", sample_size=None, random_state=None):
+def load_jobs_dataframe_from_duckdb(
+    db_path: str | Path,
+    table_name: str = "Jobs",
+    sample_size: int | None = None,
+    random_state: pd._typing.RandomState | None = None,
+):
     """
     Connect to the DuckDB database and return the relevant table as a pandas DataFrame.
 
@@ -42,14 +47,21 @@ class EfficiencyAnalysis:
 
     It provides methods to load data, analyze workload efficiency, and evaluate CPU-GPU usage patterns.
     """
-
+                
+    # Store the variable names as a class-level constant for maintainability
     _efficiency_metric_vars = [
         "jobs_with_efficiency_metrics",
         "users_with_efficiency_metrics",
         "pi_accounts_with_efficiency_metrics",
     ]
 
-    def __init__(self, db_path=None, table_name="Jobs", sample_size=None, random_state=None):
+    def __init__(
+        self,
+        db_path: str | Path,
+        table_name: str = "Jobs",
+        sample_size: int | None = None,
+        random_state: pd._typing.RandomState | None = None,
+    ):
         try:
             self.jobs_df = load_jobs_dataframe_from_duckdb(db_path, table_name, sample_size, random_state)
             for var in self._efficiency_metric_vars:
@@ -287,9 +299,10 @@ class EfficiencyAnalysis:
             pd.DataFrame: DataFrame with users and their average VRAM efficiency
         """
         if self.jobs_with_efficiency_metrics is None:
-            raise ValueError(
-                "Jobs DataFrame with efficiency metrics is not available. "
-                "Please run calculate_job_efficiency_metrics first."
+            self.calculate_job_efficiency_metrics(self.jobs_df)
+            print(
+                "Jobs DataFrame with efficiency metrics was not available. "
+                "Calculated it using the input jobs DataFrame."
             )
 
         # Compute user_job_hours_per_job once and reuse for both metrics
@@ -419,16 +432,15 @@ class EfficiencyAnalysis:
             filtered_jobs (pd.DataFrame): DataFrame containing jobs to analyze.
 
         Returns:
-            pd.DataFrame: DataFrame with PI accounts and their efficiency metrics.
+            dict: A dictionary containing DataFrames with efficiency metrics for jobs, users, and PI accounts.
 
         Raises:
-
+            ValueError: If any of the calculations fail.
         """
         try:
             self.calculate_job_efficiency_metrics(filtered_jobs)
             self.calculate_user_efficiency_metrics()
             self.calculate_pi_account_efficiency_metrics()
-            # Store the variable names as a class-level constant for maintainability
             return {var: getattr(self, var) for var in self._efficiency_metric_vars}
 
         except Exception as e:
@@ -445,9 +457,10 @@ class EfficiencyAnalysis:
             pd.DataFrame: DataFrame with PI accounts and their efficiency metrics
         """
         if self.users_with_efficiency_metrics is None:
-            raise ValueError(
-                "Users with efficiency metrics DataFrame is not available. "
-                "Please run calculate_user_efficiency_metrics first."
+            self.calculate_user_efficiency_metrics()
+            print(
+                "Users DataFrame with efficiency metrics was not available. "
+                "Calculated it using the  DataFrame of jobs with efficiency metrics."
             )
 
         pi_efficiency_metrics = (
