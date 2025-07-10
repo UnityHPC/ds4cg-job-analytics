@@ -58,8 +58,15 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # Ignore some rules in Benjamin's file
 
-"scripts/*" = ["N", "NPY", "PD", "D100", "TD"]
-"notebooks/SlurmGPU.ipynb" = ["N", "NPY", "PD", "D100", "TD"]
+"scripts/*" = ["N", "NPY", "PD", "D100", "TD", "ANN"]
+"notebooks/SlurmGPU.ipynb" = ["N", "NPY", "PD", "D100", "TD", "ANN"]
+
+# TODO (Arda): Remove these ignores once the code is fixed
+"tests/*" = ["ANN"]
+"src/preprocess/*" = ["ANN"]
+"src/database/*" = ["ANN"]
+"src/analysis/visualize_columns.py" = ["ANN"]
+
 
 [tool.ruff.lint.isort]
 # Combine multiple 'as' imports on a single line (e.g., import foo as bar, baz as qux)

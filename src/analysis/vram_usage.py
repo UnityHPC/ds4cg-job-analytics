@@ -357,9 +357,10 @@ class EfficiencyAnalysis:
             pd.DataFrame: DataFrame with users and their average VRAM efficiency
         """
         if self.users_with_efficiency_metrics is None:
-            raise ValueError(
-                "Users with efficiency metrics DataFrame is not available. "
-                "Please run calculate_user_efficiency_metrics first."
+            self.calculate_user_efficiency_metrics()
+            print(
+                "Users DataFrame with efficiency metrics was not available. "
+                "Calculated it using the DataFrame of jobs with efficiency metrics."
             )
 
         mask = pd.Series(
@@ -394,9 +395,10 @@ class EfficiencyAnalysis:
             pd.DataFrame: DataFrame with users and their total VRAM hours
         """
         if self.users_with_efficiency_metrics is None:
-            raise ValueError(
-                "Users with efficiency metrics DataFrame is not available. "
-                "Please run calculate_user_efficiency_metrics first."
+            self.calculate_user_efficiency_metrics()
+            print(
+                "Users DataFrame with efficiency metrics was not available. "
+                "Calculated it using the DataFrame of jobs with efficiency metrics."
             )
 
         mask = pd.Series(
@@ -507,9 +509,10 @@ class EfficiencyAnalysis:
 
     def find_inefficient_pis_by_vram_hours(self, vram_hours_threshold: float = 200, min_jobs: int = 5) -> pd.DataFrame:
         if self.pi_accounts_with_efficiency_metrics is None:
-            raise ValueError(
-                "PI accounts with efficiency metrics DataFrame is not available. "
-                "Please run calculate_pi_account_efficiency_metrics first."
+            self.calculate_pi_account_efficiency_metrics()
+            print(
+                "PI accounts with efficiency metrics DataFrame was not available. "
+                "Calculated it using the DataFrame of users with efficiency metrics."
             )
 
         mask = pd.Series(
