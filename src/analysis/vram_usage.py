@@ -48,9 +48,9 @@ class EfficiencyAnalysis:
     def __init__(self, db_path=None, table_name="Jobs", sample_size=None, random_state=None):
         try:
             self.jobs_df = load_jobs_dataframe_from_duckdb(db_path, table_name, sample_size, random_state)
-            self.jobs_w_efficiency_metrics = None
-            self.users_w_efficiency_metrics = None
-            self.pi_accounts_w_efficiency_metrics = None
+            self.jobs_with_efficiency_metrics = None
+            self.users_with_efficiency_metrics = None
+            self.pi_accounts_with_efficiency_metrics = None
             self.analysis_results = None
         except Exception as e:
             raise ValueError(f"Failed to load jobs DataFrame: {e}") from e
@@ -291,8 +291,8 @@ class EfficiencyAnalysis:
         if "CPUMemUsage" in self.jobs_df.columns:
             filtered_jobs.loc[:, "used_cpu_gib"] = filtered_jobs["CPUMemUsage"] / (2**30)
 
-        self.jobs_w_efficiency_metrics = filtered_jobs
-        return self.jobs_w_efficiency_metrics
+        self.jobs_with_efficiency_metrics = filtered_jobs
+        return self.jobs_with_efficiency_metrics
 
     def calculate_user_efficiency_metrics(self):
         """
@@ -301,7 +301,7 @@ class EfficiencyAnalysis:
         Returns:
             pd.DataFrame: DataFrame with users and their average VRAM efficiency
         """
-        if self.jobs_w_efficiency_metrics is None:
+        if self.jobs_with_efficiency_metrics is None:
             raise ValueError(
                 "Jobs DataFrame with efficiency metrics is not available. "
                 "Please run calculate_job_efficiency_metrics first."
@@ -309,13 +309,13 @@ class EfficiencyAnalysis:
 
         # Compute user_job_hours_per_job once and reuse for both metrics
         user_job_hours_per_job = (
-            self.jobs_w_efficiency_metrics
+            self.jobs_with_efficiency_metrics
             .groupby("User", observed=True)["job_hours"]
             .transform("sum")
         )
 
         users_w_efficiency_metrics = (
-            self.jobs_w_efficiency_metrics
+            self.jobs_with_efficiency_metrics
             .groupby("User", observed=False)
             .agg(
                 job_count=("JobID", "count"),
@@ -325,25 +325,25 @@ class EfficiencyAnalysis:
             .reset_index()
         )
 
-        self.jobs_w_efficiency_metrics.loc[:, "weighted_alloc_vram_efficiency"] = (
-            self.jobs_w_efficiency_metrics["alloc_vram_efficiency"]
-            * self.jobs_w_efficiency_metrics["job_hours"]
+        self.jobs_with_efficiency_metrics.loc[:, "weighted_alloc_vram_efficiency"] = (
+            self.jobs_with_efficiency_metrics["alloc_vram_efficiency"]
+            * self.jobs_with_efficiency_metrics["job_hours"]
             / user_job_hours_per_job
         )
         users_w_efficiency_metrics.loc[:, "expected_value_alloc_vram_efficiency"] = (
-            self.jobs_w_efficiency_metrics
+            self.jobs_with_efficiency_metrics
             .groupby("User", observed=True)["weighted_alloc_vram_efficiency"]
             .sum()
             .to_numpy()
         )
 
-        self.jobs_w_efficiency_metrics.loc[:, "weighted_gpu_count"] = (
-            self.jobs_w_efficiency_metrics["gpu_count"]
-            * self.jobs_w_efficiency_metrics["job_hours"]
+        self.jobs_with_efficiency_metrics.loc[:, "weighted_gpu_count"] = (
+            self.jobs_with_efficiency_metrics["gpu_count"]
+            * self.jobs_with_efficiency_metrics["job_hours"]
             / user_job_hours_per_job
         )
         users_w_efficiency_metrics.loc[:, "expected_value_gpu_count"] = (
-            self.jobs_w_efficiency_metrics.groupby("User", observed=True)["weighted_gpu_count"]
+            self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_gpu_count"]
             .sum()
             .to_numpy()
         )
@@ -351,17 +351,17 @@ class EfficiencyAnalysis:
         # Calculate metric representing the total amount of GPU memory resources a user has been allocated over time.
         # It answers the question: “How much VRAM, and for how long, did this user occupy?”
         users_w_efficiency_metrics.loc[:, "vram_hours"] = (
-            self.jobs_w_efficiency_metrics.groupby("User", observed=True)
+            self.jobs_with_efficiency_metrics.groupby("User", observed=True)
             .apply(lambda df: (df["allocated_vram"] * df["job_hours"]).sum())
             .to_numpy()
         )
 
-        self.jobs_w_efficiency_metrics = self.jobs_w_efficiency_metrics.drop(
+        self.jobs_with_efficiency_metrics = self.jobs_with_efficiency_metrics.drop(
             columns=["weighted_alloc_vram_efficiency", "weighted_gpu_count"]
         )
 
-        self.users_w_efficiency_metrics = users_w_efficiency_metrics
-        return self.users_w_efficiency_metrics
+        self.users_with_efficiency_metrics = users_w_efficiency_metrics
+        return self.users_with_efficiency_metrics
     
     def find_inefficient_users_by_alloc_vram_efficiency(self, efficiency_threshold: float = 0.3, min_jobs: int = 5):
         """
@@ -374,26 +374,26 @@ class EfficiencyAnalysis:
         Returns:
             pd.DataFrame: DataFrame with users and their average VRAM efficiency
         """
-        if self.users_w_efficiency_metrics is None:
+        if self.users_with_efficiency_metrics is None:
             raise ValueError(
                 "Users with efficiency metrics DataFrame is not available. "
                 "Please run calculate_user_efficiency_metrics first."
             )
 
-        mask = pd.Series([True] * len(self.users_w_efficiency_metrics), index=self.users_w_efficiency_metrics.index)
+        mask = pd.Series([True] * len(self.users_with_efficiency_metrics), index=self.users_with_efficiency_metrics.index)
 
-        col = self.users_w_efficiency_metrics["expected_value_alloc_vram_efficiency"]
+        col = self.users_with_efficiency_metrics["expected_value_alloc_vram_efficiency"]
         mask &= (
             col.le(efficiency_threshold)
         )
 
-        col = self.users_w_efficiency_metrics["job_count"]
+        col = self.users_with_efficiency_metrics["job_count"]
         mask &= (
             col.ge(min_jobs)
         )
 
         inefficient_users = (
-            self.users_w_efficiency_metrics[mask]
+            self.users_with_efficiency_metrics[mask]
         )
 
         # Sort by the metric ascending (lower is worse)
@@ -414,26 +414,26 @@ class EfficiencyAnalysis:
         Returns:
             pd.DataFrame: DataFrame with users and their total VRAM hours
         """
-        if self.users_w_efficiency_metrics is None:
+        if self.users_with_efficiency_metrics is None:
             raise ValueError(
                 "Users with efficiency metrics DataFrame is not available. "
                 "Please run calculate_user_efficiency_metrics first."
             )
 
-        mask = pd.Series([True] * len(self.users_w_efficiency_metrics), index=self.users_w_efficiency_metrics.index)
+        mask = pd.Series([True] * len(self.users_with_efficiency_metrics), index=self.users_with_efficiency_metrics.index)
 
-        col = self.users_w_efficiency_metrics["vram_hours"]
+        col = self.users_with_efficiency_metrics["vram_hours"]
         mask &= (
             col.ge(vram_hours_threshold)
         )
 
-        col = self.users_w_efficiency_metrics["job_count"]
+        col = self.users_with_efficiency_metrics["job_count"]
         mask &= (
             col.ge(min_jobs)
         )
 
         inefficient_users = (
-            self.users_w_efficiency_metrics[mask]
+            self.users_with_efficiency_metrics[mask]
         )
 
         # Sort by the metric descending (higher is worse)
@@ -454,14 +454,14 @@ class EfficiencyAnalysis:
         Returns:
             pd.DataFrame: DataFrame with PI accounts and their efficiency metrics
         """
-        if self.users_w_efficiency_metrics is None:
+        if self.users_with_efficiency_metrics is None:
             raise ValueError(
                 "Users with efficiency metrics DataFrame is not available. "
                 "Please run calculate_user_efficiency_metrics first."
             )
 
         pi_efficiency_metrics = (
-            self.users_w_efficiency_metrics
+            self.users_with_efficiency_metrics
             .groupby("pi_account", observed=True)
             .agg(
                 job_count=("job_count", "sum"),
@@ -474,65 +474,65 @@ class EfficiencyAnalysis:
 
         # Compute pi_acc_vram_hours once and reuse for both metrics
         pi_acc_vram_hours = (
-            self.users_w_efficiency_metrics
+            self.users_with_efficiency_metrics
             .groupby("pi_account", observed=True)["vram_hours"]
             .transform("sum")
         )
 
-        self.users_w_efficiency_metrics.loc[:, "weighted_ev_alloc_vram_efficiency"] = (
-            self.users_w_efficiency_metrics["expected_value_alloc_vram_efficiency"]
-            * self.users_w_efficiency_metrics["vram_hours"]
+        self.users_with_efficiency_metrics.loc[:, "weighted_ev_alloc_vram_efficiency"] = (
+            self.users_with_efficiency_metrics["expected_value_alloc_vram_efficiency"]
+            * self.users_with_efficiency_metrics["vram_hours"]
             / pi_acc_vram_hours
         )
 
         pi_efficiency_metrics.loc[:, "expected_value_alloc_vram_efficiency"] = (
-            self.users_w_efficiency_metrics.groupby("pi_account", observed=True)["weighted_ev_alloc_vram_efficiency"]
+            self.users_with_efficiency_metrics.groupby("pi_account", observed=True)["weighted_ev_alloc_vram_efficiency"]
             .sum()
             .to_numpy()
         )
 
-        self.users_w_efficiency_metrics.loc[:, "weighted_ev_gpu_count"] = (
-            self.users_w_efficiency_metrics["expected_value_gpu_count"]
-            * self.users_w_efficiency_metrics["vram_hours"]
+        self.users_with_efficiency_metrics.loc[:, "weighted_ev_gpu_count"] = (
+            self.users_with_efficiency_metrics["expected_value_gpu_count"]
+            * self.users_with_efficiency_metrics["vram_hours"]
             / pi_acc_vram_hours
         )
         pi_efficiency_metrics.loc[:, "expected_value_gpu_count"] = (
-            self.users_w_efficiency_metrics.groupby("pi_account", observed=True)["weighted_ev_gpu_count"]
+            self.users_with_efficiency_metrics.groupby("pi_account", observed=True)["weighted_ev_gpu_count"]
             .sum()
             .to_numpy()
         )
 
-        self.users_w_efficiency_metrics = self.users_w_efficiency_metrics.drop(
+        self.users_with_efficiency_metrics = self.users_with_efficiency_metrics.drop(
             columns=["weighted_ev_alloc_vram_efficiency"]
         )
 
-        self.pi_accounts_w_efficiency_metrics = pi_efficiency_metrics
-        return self.pi_accounts_w_efficiency_metrics
+        self.pi_accounts_with_efficiency_metrics = pi_efficiency_metrics
+        return self.pi_accounts_with_efficiency_metrics
 
     def find_inefficient_pis_by_vram_hours(self, vram_hours_threshold: float = 200, min_jobs: int = 5):
-        if self.pi_accounts_w_efficiency_metrics is None:
+        if self.pi_accounts_with_efficiency_metrics is None:
             raise ValueError(
                 "PI accounts with efficiency metrics DataFrame is not available. "
                 "Please run calculate_pi_account_efficiency_metrics first."
             )
 
         mask = pd.Series(
-            [True] * len(self.pi_accounts_w_efficiency_metrics),
-            index=self.pi_accounts_w_efficiency_metrics.index
+            [True] * len(self.pi_accounts_with_efficiency_metrics),
+            index=self.pi_accounts_with_efficiency_metrics.index
         )
 
-        col = self.pi_accounts_w_efficiency_metrics["pi_acc_vram_hours"]
+        col = self.pi_accounts_with_efficiency_metrics["pi_acc_vram_hours"]
         mask &= (
             col.ge(vram_hours_threshold)
         )
 
-        col = self.pi_accounts_w_efficiency_metrics["job_count"]
+        col = self.pi_accounts_with_efficiency_metrics["job_count"]
         mask &= (
             col.ge(min_jobs)
         )
 
         inefficient_pi_accounts = (
-            self.pi_accounts_w_efficiency_metrics[mask]
+            self.pi_accounts_with_efficiency_metrics[mask]
         )
 
         # Sort by the metric descending (higher is worse)
