@@ -110,7 +110,6 @@ def _calculate_approx_vram_single_gpu_type(
         gpu_types:
             - list[str]: list containing a single GPU type used in the job.
             - dict[str, int]: dictionary with the count of the GPU type used in the job.
-
         node_list (list[str]): List of nodes where the job ran.
         gpu_count (int): Number of GPUs requested by the job.
         gpu_mem_usage (int): GPU memory usage in bytes.
@@ -181,10 +180,8 @@ def _get_approx_allocated_vram(
             List of GPU types used in the job. This could be a list of strings (if using the old
             database format) or a dictionary with GPU types as keys and their counts as values
             (if using the new database format).
-
             - list[str]: List containing the types of GPUs used in the job.
             - dict[str, int]: Dictionary with the type of GPUs and the exact count used in the job.
-
         node_list (list[str]): List of nodes where the job ran.
         gpu_count (int): Number of GPUs requested by the job.
         gpu_mem_usage (int): GPU memory usage in bytes.
@@ -358,6 +355,14 @@ def preprocess_data(
 
     Returns:
         pd.DataFrame: The preprocessed dataframe
+
+    Notes:
+        - The function supports two formats for the 'GPUType' column in the dataframe:
+            1. Old format: list of GPU type strings, e.g. ['a100', 'v100']
+            2. New format: dict mapping GPU type to count, e.g. {'a100': 2, 'v100': 1}
+        - Both formats are automatically detected and handled for all VRAM calculations and downstream processing.
+        - The output DataFrame will have missing values filled, time columns converted,
+          and new columns added for VRAM and job statistics.
     """
 
     data = input_df.drop(columns=["UUID", "EndTime", "Nodes", "Preempted"], axis=1, inplace=False)
