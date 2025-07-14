@@ -283,25 +283,26 @@ class EfficiencyAnalysis:
         filtered_jobs.loc[:, "job_hours"] = (
             filtered_jobs["Elapsed"].dt.total_seconds() * filtered_jobs["gpu_count"] / 3600
         )
+        filtered_jobs.loc[:, "vram_hours"] = (
+            filtered_jobs["allocated_vram"] * filtered_jobs["job_hours"]
+        )
         filtered_jobs.loc[:, "used_vram_gib"] = filtered_jobs["GPUMemUsage"] / (2**30)
+        # Compute alloc_vram_efficiency, a float in the range [0, 1].
         filtered_jobs.loc[:, "alloc_vram_efficiency"] = (
             filtered_jobs["used_vram_gib"] / filtered_jobs["allocated_vram"]
         )
-        # TODO (Arda): Clip alloc_vram_efficiency to 1
 
-        # Compute vram_constraint_efficiency, a nullable float. Set to NA if vram_constraint is NA
+        # Compute vram_constraint_efficiency, a nullable float in the range [0, 1]. Set to NA if vram_constraint is NA
         filtered_jobs.loc[:, "vram_constraint_efficiency"] = (
             filtered_jobs["used_vram_gib"] / filtered_jobs["vram_constraint"]
         )
-        # TODO (Arda): Decide if it should clip vram_constraint_efficiency to 1
 
         # Calculate job allocated VRAM efficiency score
-        # This is a log-transformed score that penalizes low efficiency and longer job_hours
-        # TODO (Arda): Update the implementation of alloc_vram_efficiency_score
+        # This is a log-transformed score that penalizes low efficiency and longer vram_hours
         # Set the score to -inf where alloc_vram_efficiency is zero to avoid divide by zero/log of zero
         alloc_vram_eff = filtered_jobs["alloc_vram_efficiency"]
         filtered_jobs["alloc_vram_efficiency_score"] = (
-            np.log(alloc_vram_eff.where(alloc_vram_eff > 0)) * filtered_jobs["job_hours"]
+            np.log(alloc_vram_eff.where(alloc_vram_eff > 0)) * filtered_jobs["vram_hours"]
         ).where(alloc_vram_eff > 0, -np.inf)
 
         # Add CPU memory metrics if available
