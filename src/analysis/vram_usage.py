@@ -102,7 +102,7 @@ class EfficiencyAnalysis:
     @staticmethod
     def apply_numeric_filter(
         col: pd.Series,
-        filter: int | float | list | set | tuple | dict | pd._libs.missing.NAType,
+        filter: int | float | list | set | tuple | dict | pd.api.typing.NAType,
         permissible_filter_types: set[FilterTypeEnum],
         filter_name: str,
     ) -> pd.Series:
@@ -111,9 +111,10 @@ class EfficiencyAnalysis:
 
         Args:
             col (pd.Series): The column to filter.
-            filter (int | float | list | set | tuple | dict | pd._libs.missing.NAType): The filter value(s).
+            filter (int | float | list | set | tuple | dict | pd.api.typing.NAType): The filter value(s).
             permissible_filter_types (set[FilterTypeEnum]): Set of permissible filter types.
             filter_name (str): Name of the filter.
+
         Returns:
             pd.Series: Boolean mask.
 
@@ -166,7 +167,7 @@ class EfficiencyAnalysis:
 
     def filter_jobs_for_analysis(
         self,
-        vram_constraint_filter: int | float | list | set | tuple | dict | pd._libs.missing.NAType | None = None,
+        vram_constraint_filter: int | float | list | set | tuple | dict | pd.api.typing.NAType | None = None,
         gpu_mem_usage_filter: int | float | dict | None = None,
         allocated_vram_filter: int | float | list | set | tuple | dict | None = None,
         gpu_count_filter: int | float | list | set | tuple | dict | None = None,
@@ -199,7 +200,7 @@ class EfficiencyAnalysis:
             elapsed_seconds_min (int): Minimum elapsed time in seconds
 
         Returns:
-            DataFrame: Filtered jobs DataFrame based on the specified criteria.
+            pd.DataFrame: Filtered jobs DataFrame based on the specified criteria.
 
         Raises:
             ValueError: If the filter is invalid.
@@ -271,10 +272,10 @@ class EfficiencyAnalysis:
         Refer to the documentation for the definition of the metrics calculated.
 
         Args:
-            filtered_jobs (DataFrame): DataFrame containing jobs to analyze.
+            filtered_jobs (pd.DataFrame): DataFrame containing jobs to analyze.
 
         Returns:
-            DataFrame: Jobs with efficiency metrics added
+            pd.DataFrame: Jobs with efficiency metrics added
         """
 
         # rename GPUs to gpu_count for clarity
@@ -379,7 +380,7 @@ class EfficiencyAnalysis:
     
     def find_inefficient_users_by_alloc_vram_efficiency(
         self,
-        alloc_vram_efficiency_filter: int | float | list | set | tuple | dict | pd._libs.missing.NAType | None,
+        alloc_vram_efficiency_filter: int | float | dict | None,
         min_jobs: int = 5
     ) -> pd.DataFrame:
         """
@@ -427,7 +428,7 @@ class EfficiencyAnalysis:
 
     def find_inefficient_users_by_vram_hours(
         self,
-        vram_hours_filter: int | float | list | set | tuple | dict | pd._libs.missing.NAType = 200, 
+        vram_hours_filter: int | float | dict = 200, 
         min_jobs: int = 5
     ) -> pd.DataFrame:
         """
@@ -569,7 +570,7 @@ class EfficiencyAnalysis:
 
     def find_inefficient_pis_by_vram_hours(
         self,
-        vram_hours_filter: int | float | list | set | tuple | dict | pd._libs.missing.NAType = 200,
+        vram_hours_filter: int | float | dict = 200,
         min_jobs: int = 5
     ) -> pd.DataFrame:
         """
