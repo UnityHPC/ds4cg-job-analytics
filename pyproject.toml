@@ -36,14 +36,15 @@ select = [
     "NPY",
     # pandas-vet: PD
     "PD",
-    # 1 blank line between summary and description: D205
-    "D205",
     # flake8-todos: TD
     "TD",
     # pydoclint: DOC
     "DOC",
     # flake8-annotations: ANN
     "ANN",
+    # pydocstyle: D
+    # One blank line between summary and description: D205
+    "D205",
     # Docstring capitalization: D403, D405
     "D403", "D405",
     # Docstring should not start with this: D404
