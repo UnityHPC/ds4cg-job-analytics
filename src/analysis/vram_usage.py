@@ -63,6 +63,18 @@ class EfficiencyAnalysis:
         sample_size: int | None = None,
         random_state: pd._typing.RandomState | None = None,
     ) -> None:
+        """
+        Initialize the EfficiencyAnalysis class.
+
+        Args:
+            db_path (str or Path): Path to the DuckDB database.
+            table_name (str, optional): Table name to query. Defaults to 'Jobs'.
+            sample_size (int, optional): Number of rows to sample from the DataFrame. Defaults to None.
+            random_state (pd._typing.RandomState, optional): Random state for reproducibility. Defaults to None.
+
+        Raises:
+            RuntimeError: If the jobs DataFrame cannot be loaded from the database.
+        """
         try:
             self.jobs_df = load_jobs_dataframe_from_duckdb(db_path, table_name, sample_size, random_state)
             # Initialize efficiency metric class attributes to None
@@ -70,12 +82,19 @@ class EfficiencyAnalysis:
                 setattr(self, var, None)
             self.analysis_results: dict | None = None
         except Exception as e:
-            raise ValueError(f"Failed to load jobs DataFrame: {e}") from e
+            raise RuntimeError(f"Failed to load jobs DataFrame: {e}") from e
 
     @staticmethod
     def is_numeric_type(val: object) -> bool:
         """
         Check if the value is a numeric type (int, float, np.integer, np.floating, pd.Int64Dtype, pd.Float64Dtype).
+
+        Args:
+
+            val (object): The value to check.
+
+        Returns:
+            bool: True if the value is numeric, False otherwise.
         """
         return pd.api.types.is_integer_dtype(type(val)) or pd.api.types.is_float_dtype(type(val))
     
@@ -480,8 +499,8 @@ class EfficiencyAnalysis:
             self.calculate_pi_account_efficiency_metrics()
             return {var: getattr(self, var) for var in self._efficiency_metric_vars}
 
-        except Exception as e:
-            raise ValueError(f"Failed to calculate all efficiency metrics: {e}") from e
+        except (KeyError, ValueError, TypeError, AttributeError) as e:
+            raise RuntimeError(f"Failed to calculate all efficiency metrics: {e}") from e
 
     def calculate_pi_account_efficiency_metrics(self) -> pd.DataFrame:
         """
