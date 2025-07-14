@@ -14,34 +14,29 @@ from src.config.constants import VRAM_VALUES
 import os
 
 def load_jobs_dataframe_from_duckdb(
-    db_path: str = None,
+    db_path: str | Path,
     table_name: str = "Jobs",
-    sample_size: int = None,
-    random_state: int = None,
-    query: str = None, query=None
+    sample_size: int | None = None,
+    random_state: pd._typing.RandomState | None = None, query: str = None
 ) -> pd.DataFrame:
     """
-    Connect to the DuckDB slurm_data_small.db and return the jobs table as a pandas DataFrame.
+    Connect to the DuckDB database and return the relevant table as a pandas DataFrame.
 
     Args:
-        db_path (str or Path, optional): Path to the DuckDB database. Defaults to 'data/slurm_data_small.db'.
+        db_path (str or Path): Path to the DuckDB database.
         table_name (str, optional): Table name to query. Defaults to 'Jobs'.
-        sample_size (int, optional): Number of samples to return.
-        random_state (int, optional): Random state for sampling.
-        query (str, optional): SQL query to execute.
 
     Returns:
         pd.DataFrame: DataFrame containing the table data.
     """
-    if db_path is None:
-        db_path = Path(__file__).resolve().parents[2] / "data" / "slurm_data.db"
+    if isinstance(db_path, Path):
+        db_path = db_path.resolve()
     db = DatabaseConnection(str(db_path))
+
     jobs_df = db.fetch_all_jobs(table_name=table_name) if query is None else db.fetch_query(query)
     processed_data = preprocess_data(
-        jobs_df,
-        include_failed_cancelled_jobs=False,
+        jobs_df, min_elapsed_seconds=0, include_failed_cancelled_jobs=False, include_cpu_only_jobs=False
     )
-    db.disconnect()
     if sample_size is not None:
         processed_data = processed_data.sample(n=sample_size, random_state=random_state)
     return processed_data
