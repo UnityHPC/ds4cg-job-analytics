@@ -299,11 +299,20 @@ class EfficiencyAnalysis:
 
         # Calculate job allocated VRAM efficiency score
         # This is a log-transformed score that penalizes low efficiency and longer vram_hours
-        # Set the score to -inf where alloc_vram_efficiency is zero to avoid divide by zero/log of zero
         alloc_vram_eff = filtered_jobs["alloc_vram_efficiency"]
-        filtered_jobs["alloc_vram_efficiency_score"] = (
+        filtered_jobs.loc[:, "alloc_vram_efficiency_score"] = (
             np.log(alloc_vram_eff.where(alloc_vram_eff > 0)) * filtered_jobs["vram_hours"]
         ).where(alloc_vram_eff > 0, -np.inf)
+
+        # Calculate vram_constraint_efficiency score
+        vram_constraint_eff = filtered_jobs["vram_constraint_efficiency"]
+        # Avoid log(0) and propagate pd.NA: if NA, score is NA; if 0, score is -np.inf
+        score = pd.Series(pd.NA, index=filtered_jobs.index, dtype=pd.Float64Dtype())
+        mask_valid = vram_constraint_eff.notna() & (vram_constraint_eff > 0)
+        mask_zero = vram_constraint_eff.notna() & (vram_constraint_eff == 0)
+        score[mask_valid] = np.log(vram_constraint_eff[mask_valid]) * filtered_jobs.loc[mask_valid, "vram_hours"]
+        score[mask_zero] = -np.inf
+        filtered_jobs.loc[:, "vram_constraint_efficiency_score"] = score
 
         # Add CPU memory metrics if available
         if "CPUMemUsage" in self.jobs_df.columns:
