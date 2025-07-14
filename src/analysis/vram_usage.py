@@ -286,12 +286,6 @@ class EfficiencyAnalysis:
             np.log(alloc_vram_eff.where(alloc_vram_eff > 0)) * filtered_jobs["job_hours"]
         ).where(alloc_vram_eff > 0, -np.inf)
 
-        # Calculate weighted vram efficiency per job, normalized by total job_hours for that specific PI
-        pi_gpu_hours = filtered_jobs.groupby("Account", observed=True)["job_hours"].transform("sum")
-        filtered_jobs.loc[:, "pi_weighted_vram_efficiency"] = (
-            filtered_jobs["alloc_vram_efficiency"] * filtered_jobs["job_hours"]
-        ) / pi_gpu_hours
-
         # Add CPU memory metrics if available
         if "CPUMemUsage" in self.jobs_df.columns:
             filtered_jobs.loc[:, "used_cpu_gib"] = filtered_jobs["CPUMemUsage"] / (2**30)
