@@ -173,7 +173,7 @@ contains tools to add a number of useful derived columns for plotting and analys
 | CPUs |  SMALLINT | Number of CPUs |
 | Memory |  INTEGER | Job allocated memory (bytes) |
 | GPUs |  SMALLINT | Number of GPUs requested |
-| GPUType |  VARCHAR[] | List of GPU types |
+| GPUType |  DICT | Dictionary of GPUTypes and number of GPUs as key-value pairs |
 | GPUMemUsage |  FLOAT | GPU memory usage (bytes) |
 | GPUComputeUsage |  FLOAT | GPU compute usage (pct) |
 | CPUMemUsage |  FLOAT | GPU memory usage (bytes) |
