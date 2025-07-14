@@ -17,4 +17,5 @@ def mock_data_frame():
     except Exception as e:
         raise Exception("Exception at mock_data_frame") from e
     finally:
+        del db
         shutil.rmtree(temp_db_dir)
