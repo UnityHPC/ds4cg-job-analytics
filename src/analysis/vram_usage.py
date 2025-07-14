@@ -148,7 +148,7 @@ class EfficiencyAnalysis:
     def filter_jobs_for_analysis(
         self,
         vram_constraint_filter: int | float | list | set | tuple | dict | pd._libs.missing.NAType | None = None,
-        gpu_mem_usage_filter: int | float | list | set | tuple | dict | None = None,
+        gpu_mem_usage_filter: int | float | dict | None = None,
         allocated_vram_filter: int | float | list | set | tuple | dict | None = None,
         gpu_count_filter: int | float | list | set | tuple | dict | None = None,
         elapsed_seconds_min: int | float = DEFAULT_MIN_ELAPSED_SECONDS,
