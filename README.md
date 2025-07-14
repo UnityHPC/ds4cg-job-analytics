@@ -15,6 +15,10 @@ The following guidelines may prove helpful in maximizing the utility of this rep
 ## Getting started on Unity
 
 You'll need to first install a few dependencies, which include DuckDB, Pandas, and some plotting libraries. More details for running the project will need be added here later.
+### Version Control
+To provide the path of the git configuration file of this project to git, run:
+
+    git config --local include.path ../.gitconfig
 
 ### Jupyter notebooks
 
@@ -24,6 +28,11 @@ visible in Jupyter, run
     python -m ipykernel install --user --name "Duck DB"
 
 from within the environment. This will add "Duck DB" as a kernel option in the dropdown.
+
+By default, Jupyter Notebook outoputs are removed via a git filter before the notebook is committed to git. To add an exception and keep the output of a notebook, add the following line to [notebooks/.gitattributes](```notebooks/.gitattributes```):
+
+    <NOTEBOOK_NAME>.ipynb !filter=strip-notebook-output
+
 
 ## Development Environment
 
