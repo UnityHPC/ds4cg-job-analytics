@@ -4,6 +4,7 @@ Declaration of some enum class such as constants values of categorical types.
 
 from enum import Enum
 
+
 class InteractiveEnum(Enum):
     NON_INTERACTIVE = "non-interactive"
     SHELL = "shell"
@@ -81,9 +82,30 @@ class PartitionEnum(Enum):
 
 
 class FilterTypeEnum(Enum):
-    DICTIONARY = "dictionary",
-    LIST = "list",
-    SET = "set",
-    TUPLE = "tuple",
-    SCALAR = "scalar",
-    PD_NA = "pd_na",
+    DICTIONARY = ("dictionary",)
+    LIST = ("list",)
+    SET = ("set",)
+    TUPLE = ("tuple",)
+    SCALAR = ("scalar",)
+    PD_NA = ("pd_na",)
+
+
+class ROCProportionMetricsEnum(Enum):
+    """
+    Contains metrics for calculating proportion of data on ROC plot (y-axis)
+    """
+
+    JOB_HOURS = "job_hours"
+    JOB_NUMS = "job_nums"
+
+
+class EfficiencyMetricsJobsEnum(Enum):
+    """
+    Contains efficiency metrics for calculating efficiency of jobs
+
+    These are used in the jobs metrics calculation and also in the ROC plot as x-axis.
+    """
+
+    ALLOC_VRAM_EFFICIENCY = "alloc_vram_efficiency"
+    VRAM_CONSTRAINT_EFFICIENCY = "vram_constraint_efficiency"
+    ALLOC_VRAM_EFFICIENCY_SCORE = "alloc_vram_efficiency_score"
