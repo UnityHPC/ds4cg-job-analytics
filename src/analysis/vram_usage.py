@@ -41,7 +41,6 @@ def load_jobs_dataframe_from_duckdb(
         processed_data = processed_data.sample(n=sample_size, random_state=random_state)
     return processed_data
 
-
 class EfficiencyAnalysis:
     """
     Class to encapsulate the efficiency analysis of jobs based on various metrics.
@@ -97,7 +96,6 @@ class EfficiencyAnalysis:
             bool: True if the value is numeric, False otherwise.
         """
         return pd.api.types.is_integer_dtype(type(val)) or pd.api.types.is_float_dtype(type(val))
-    
 
     @staticmethod
     def apply_numeric_filter(
