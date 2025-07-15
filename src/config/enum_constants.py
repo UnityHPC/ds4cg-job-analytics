@@ -97,6 +97,8 @@ class ROCProportionMetricsEnum(Enum):
 
     JOB_HOURS = "job_hours"
     JOBS = "jobs"
+    USER = "User"
+    PI_GROUP = "Account"
 
 
 class JobEfficiencyMetricsEnum(Enum):
