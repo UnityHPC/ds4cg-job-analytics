@@ -152,6 +152,7 @@ contains tools to add a number of useful derived columns for plotting and analys
 | UUID   | VARCHAR | Unique identifier | 
 | JobID  | INTEGER | Slurm job ID |
 | ArrayID | INTEGER | Position in job array |
+|ArrayJobID| INTEGER | Slurm job ID within array|
 | JobName |  VARCHAR | Name of job |
 | IsArray |  BOOLEAN | Indicator if job is part of an array |
 | Interactive |  VARCHAR | Indicator if job was interactive
