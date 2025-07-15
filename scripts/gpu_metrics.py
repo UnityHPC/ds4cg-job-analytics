@@ -60,7 +60,6 @@ class GPUMetrics:
         self,
         metricsfile="./modules/admin-resources/reporting/slurm_data.db",
         min_elapsed=600,
-        local=False,
     ) -> None:
         """Initialize GPUMetrics with job data from a DuckDB database.
 
