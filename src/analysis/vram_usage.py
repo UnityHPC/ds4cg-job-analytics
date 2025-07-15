@@ -366,8 +366,21 @@ class EfficiencyAnalysis:
             * self.jobs_with_efficiency_metrics["job_hours"]
             / user_job_hours_per_job
         )
+
         users_w_efficiency_metrics.loc[:, "expected_value_alloc_vram_efficiency"] = (
             self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_alloc_vram_efficiency"]
+            .sum()
+            .to_numpy()
+        )
+
+        self.jobs_with_efficiency_metrics.loc[:, "weighted_vram_constraint_efficiency"] = (
+            self.jobs_with_efficiency_metrics["vram_constraint_efficiency"]
+            * self.jobs_with_efficiency_metrics["job_hours"]
+            / user_job_hours_per_job
+        )
+
+        users_w_efficiency_metrics.loc[:, "expected_value_vram_constraint_efficiency"] = (
+            self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_vram_constraint_efficiency"]
             .sum()
             .to_numpy()
         )
@@ -391,7 +404,7 @@ class EfficiencyAnalysis:
         )
 
         self.jobs_with_efficiency_metrics = self.jobs_with_efficiency_metrics.drop(
-            columns=["weighted_alloc_vram_efficiency", "weighted_gpu_count"]
+            columns=["weighted_alloc_vram_efficiency", "weighted_vram_constraint_efficiency", "weighted_gpu_count"]
         )
 
         self.users_with_efficiency_metrics = users_w_efficiency_metrics
