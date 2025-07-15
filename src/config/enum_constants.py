@@ -82,9 +82,9 @@ class PartitionEnum(Enum):
 
 
 class FilterTypeEnum(Enum):
-    DICTIONARY = ("dictionary",)
-    LIST = ("list",)
-    SET = ("set",)
-    TUPLE = ("tuple",)
-    SCALAR = ("scalar",)
-    PD_NA = ("pd_na",)
+    DICTIONARY = "dictionary"
+    LIST = "list"
+    SET = "set"
+    TUPLE = "tuple"
+    SCALAR = "scalar"
+    PD_NA = "pd_na"
