@@ -31,7 +31,7 @@ def _get_vram_from_node(gpu_type: str, node: str) -> int:
         This logic is based on the cluster specifications documented at:
         https://docs.unity.rc.umass.edu/documentation/cluster_specs/nodes/
 
-        TODO: Consider reading this information from a config file or database.
+        TODO (Ayush): Consider reading this information from a config file or database.
     """
     vram = 0
     if gpu_type not in MULTIVALENT_GPUS:
@@ -282,7 +282,7 @@ def preprocess_data(
     ].copy()
 
     _fill_missing(res)
-    # type casting for columns involving time
+    # Type casting for columns involving time
     time_columns = ["StartTime", "SubmitTime"]
     for col in time_columns:
         res[col] = pd.to_datetime(res[col], errors="coerce")
@@ -295,7 +295,7 @@ def preprocess_data(
     res.loc[:, "Queued"] = res["StartTime"] - res["SubmitTime"]
     res.loc[:, "vram_constraint"] = res.apply(
         lambda row: _get_vram_constraint(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1
-    ).astype(pd.Int64Dtype())
+    ).astype(pd.Int64Dtype()) # Use Int64Dtype to allow for nullable integers
     res.loc[:, "allocated_vram"] = res.apply(
         lambda row: _get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
         axis=1,
@@ -303,7 +303,7 @@ def preprocess_data(
     res.loc[:, "user_jobs"] = res.groupby("User")["User"].transform("size")
     res.loc[:, "account_jobs"] = res.groupby("Account")["Account"].transform("size")
 
-    # convert columns to categorical
+    # Convert columns to categorical
 
     for col, enum_obj in ATTRIBUTE_CATEGORIES.items():
         enum_values = [e.value for e in enum_obj]
