@@ -13,7 +13,7 @@ build-backend = "setuptools.build_meta"
 # Ruff configuration options
 line-length = 119 # Override ruff's default so that lines aren't more than 120 characters
 target-version = "py311"
-preview = true
+preview = true # enable preview features to support new pydocstyle rules 
 
 # Formatting
 indent-width = 4
@@ -61,8 +61,6 @@ ignore = [
     "TD003",
     # Ignore removing returns section when function doesn't return anything
     "DOC202",
-    # Ignore insert at least 2 spaces before inline comments
-    "E261"
 ]
 
 [tool.ruff.lint.per-file-ignores]
