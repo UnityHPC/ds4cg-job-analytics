@@ -315,11 +315,11 @@ class EfficiencyAnalysis:
         filtered_jobs.loc[:, "vram_constraint_efficiency_score"] = score
 
         # Add CPU memory metrics if available
-        if "CPUMemUsage" in self.jobs_df.columns:
-            filtered_jobs.loc[:, "used_cpu_gib"] = filtered_jobs["CPUMemUsage"] / (2**30)
-            filtered_jobs.loc[:, "allocated_cpu_gib"] = filtered_jobs["Memory"] / (2**20) # Memory is in KiB
+        if "CPUMemUsage" in self.jobs_df.columns and "Memory" in self.jobs_df.columns:
+            filtered_jobs.loc[:, "used_cpu_mem_gib"] = filtered_jobs["CPUMemUsage"] / (2**30)
+            filtered_jobs.loc[:, "allocated_cpu_mem_gib"] = filtered_jobs["Memory"] / (2**10) # Memory is in MiB
             filtered_jobs.loc[:, "cpu_mem_efficiency"] = (
-                filtered_jobs["used_cpu_gib"] / filtered_jobs["allocated_cpu_gib"]
+                filtered_jobs["used_cpu_mem_gib"] / filtered_jobs["allocated_cpu_mem_gib"]
             )
             filtered_jobs = filtered_jobs.drop(columns=["CPUMemUsage", "Memory"])
 
