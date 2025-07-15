@@ -345,12 +345,18 @@ class EfficiencyAnalysis:
             "job_hours"
         ].transform("sum")
 
+        def avg_non_inf(x):
+            valid = x[x != -np.inf]
+            return valid.mean() if not valid.empty else np.nan
+
         users_w_efficiency_metrics = (
-            self.jobs_with_efficiency_metrics.groupby("User", observed=False)
+            self.jobs_with_efficiency_metrics.groupby("User", observed=True)
             .agg(
-                job_count=("JobID", "count"),
-                user_job_hours=("job_hours", "sum"),
-                pi_account=("Account", "first"),
+            job_count=("JobID", "count"),
+            user_job_hours=("job_hours", "sum"),
+            pi_account=("Account", "first"),
+            avg_alloc_vram_efficiency_score=("alloc_vram_efficiency_score", avg_non_inf),
+            avg_vram_constraint_efficiency_score=("vram_constraint_efficiency_score", avg_non_inf),
             )
             .reset_index()
         )
