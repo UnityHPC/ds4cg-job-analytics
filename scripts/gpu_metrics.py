@@ -68,8 +68,6 @@ class GPUMetrics:
             metricsfile (str, optional): Path to the DuckDB database file containing job data.
             min_elapsed (int, optional): Minimum elapsed time (in seconds) for jobs to be included.
         """
-        if local:
-            metricsfile = "../data/slurm_data_small.db"
         self.con = duckdb.connect(metricsfile)
         # TODO - handle array jobs properly
         df = self.con.query(
