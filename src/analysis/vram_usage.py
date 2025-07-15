@@ -10,7 +10,7 @@ from pathlib import Path
 from src.preprocess.preprocess import preprocess_data
 from src.database import DatabaseConnection
 from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
-from src.config.enum_constants import FilterTypeEnum, EfficiencyMetricsJobsEnum
+from src.config.enum_constants import FilterTypeEnum, JobEfficiencyMetricsEnum
 
 
 def load_jobs_dataframe_from_duckdb(
@@ -285,13 +285,13 @@ class EfficiencyAnalysis:
             filtered_jobs["Elapsed"].dt.total_seconds() * filtered_jobs["gpu_count"] / 3600
         )
         filtered_jobs.loc[:, "used_vram_gib"] = filtered_jobs["GPUMemUsage"] / (2**30)
-        filtered_jobs.loc[:, EfficiencyMetricsJobsEnum.ALLOC_VRAM_EFFICIENCY.value] = (
+        filtered_jobs.loc[:, JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY.value] = (
             filtered_jobs["used_vram_gib"] / filtered_jobs["allocated_vram"]
         )
         # TODO (Arda): Clip alloc_vram_efficiency to 1
 
         # Compute vram_constraint_efficiency, a nullable float. Set to NA if vram_constraint is NA
-        filtered_jobs.loc[:, EfficiencyMetricsJobsEnum.VRAM_CONSTRAINT_EFFICIENCY.value] = (
+        filtered_jobs.loc[:, JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY.value] = (
             filtered_jobs["used_vram_gib"] / filtered_jobs["vram_constraint"]
         )
         # TODO (Arda): Decide if it should clip vram_constraint_efficiency to 1
@@ -300,8 +300,8 @@ class EfficiencyAnalysis:
         # This is a log-transformed score that penalizes low efficiency and longer job_hours
         # TODO (Arda): Update the implementation of alloc_vram_efficiency_score
         # Set the score to -inf where alloc_vram_efficiency is zero to avoid divide by zero/log of zero
-        alloc_vram_eff = filtered_jobs["alloc_vram_efficiency"]
-        filtered_jobs[EfficiencyMetricsJobsEnum.ALLOC_VRAM_EFFICIENCY_SCORE.value] = (
+        alloc_vram_eff = filtered_jobs[JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY.value]
+        filtered_jobs[JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE.value] = (
             np.log(alloc_vram_eff.where(alloc_vram_eff > 0)) * filtered_jobs["job_hours"]
         ).where(alloc_vram_eff > 0, -np.inf)
 

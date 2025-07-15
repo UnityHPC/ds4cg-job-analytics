@@ -96,10 +96,10 @@ class ROCProportionMetricsEnum(Enum):
     """
 
     JOB_HOURS = "job_hours"
-    JOB_NUMS = "job_nums"
+    JOBS = "jobs"
 
 
-class EfficiencyMetricsJobsEnum(Enum):
+class JobEfficiencyMetricsEnum(Enum):
     """
     Contains efficiency metrics for calculating efficiency of jobs
 
