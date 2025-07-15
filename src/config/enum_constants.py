@@ -4,6 +4,7 @@ Declaration of some enum class such as constants values of categorical types.
 
 from enum import Enum
 
+
 class InteractiveEnum(Enum):
     NON_INTERACTIVE = "non-interactive"
     SHELL = "shell"

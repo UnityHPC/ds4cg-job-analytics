@@ -56,13 +56,20 @@ def get_requested_vram(constraints):
 class GPUMetrics:
     """A class for computing and plotting metrics about GPU jobs."""
 
-    def __init__(self, metricsfile="./modules/admin-resources/reporting/slurm_data.db", min_elapsed=600) -> None:
+    def __init__(
+        self,
+        metricsfile="./modules/admin-resources/reporting/slurm_data.db",
+        min_elapsed=600,
+        local=False,
+    ) -> None:
         """Initialize GPUMetrics with job data from a DuckDB database.
 
         Args:
             metricsfile (str, optional): Path to the DuckDB database file containing job data.
             min_elapsed (int, optional): Minimum elapsed time (in seconds) for jobs to be included.
         """
+        if local:
+            metricsfile = "../data/slurm_data_small.db"
         self.con = duckdb.connect(metricsfile)
         # TODO - handle array jobs properly
         df = self.con.query(

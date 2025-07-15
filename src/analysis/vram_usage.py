@@ -41,13 +41,14 @@ def load_jobs_dataframe_from_duckdb(
         processed_data = processed_data.sample(n=sample_size, random_state=random_state)
     return processed_data
 
+
 class EfficiencyAnalysis:
     """
     Class to encapsulate the efficiency analysis of jobs based on various metrics.
 
     It provides methods to load data, analyze workload efficiency, and evaluate CPU-GPU usage patterns.
     """
-                
+
     # Store the variable names as a class-level constant for maintainability
     _efficiency_metric_vars = [
         "jobs_with_efficiency_metrics",
@@ -225,7 +226,7 @@ class EfficiencyAnalysis:
                     self.jobs_df["GPUMemUsage"],
                     gpu_mem_usage_filter,
                     {FilterTypeEnum.SCALAR, FilterTypeEnum.DICTIONARY},
-                    "gpu_mem_usage_filter"
+                    "gpu_mem_usage_filter",
                 )
             except ValueError as e:
                 raise ValueError("Invalid GPU memory usage filter.") from e
@@ -237,7 +238,7 @@ class EfficiencyAnalysis:
                     self.jobs_df["allocated_vram"],
                     allocated_vram_filter,
                     set(FilterTypeEnum.__members__.values()).difference({FilterTypeEnum.PD_NA}),
-                    "allocated_vram_filter"
+                    "allocated_vram_filter",
                 )
             except ValueError as e:
                 raise ValueError("Invalid allocated VRAM filter.") from e
@@ -249,7 +250,7 @@ class EfficiencyAnalysis:
                     self.jobs_df["GPUs"],
                     gpu_count_filter,
                     set(FilterTypeEnum.__members__.values()).difference({FilterTypeEnum.PD_NA}),
-                    "gpu_count_filter"
+                    "gpu_count_filter",
                 )
             except ValueError as e:
                 raise ValueError("Invalid GPU count filter.") from e
@@ -375,11 +376,9 @@ class EfficiencyAnalysis:
 
         self.users_with_efficiency_metrics = users_w_efficiency_metrics
         return self.users_with_efficiency_metrics
-    
+
     def find_inefficient_users_by_alloc_vram_efficiency(
-        self,
-        alloc_vram_efficiency_filter: int | float | dict | None,
-        min_jobs: int = 5
+        self, alloc_vram_efficiency_filter: int | float | dict | None, min_jobs: int = 5
     ) -> pd.DataFrame:
         """
         Identify users with low expected allocated VRAM efficiency across their jobs compared to others
@@ -425,9 +424,7 @@ class EfficiencyAnalysis:
         return inefficient_users
 
     def find_inefficient_users_by_vram_hours(
-        self,
-        vram_hours_filter: int | float | dict = 200, 
-        min_jobs: int = 5
+        self, vram_hours_filter: int | float | dict = 200, min_jobs: int = 5
     ) -> pd.DataFrame:
         """
         Identify users with high VRAM-hours across their jobs compared to others.
@@ -567,9 +564,7 @@ class EfficiencyAnalysis:
         return self.pi_accounts_with_efficiency_metrics
 
     def find_inefficient_pis_by_vram_hours(
-        self,
-        vram_hours_filter: int | float | dict = 200,
-        min_jobs: int = 5
+        self, vram_hours_filter: int | float | dict = 200, min_jobs: int = 5
     ) -> pd.DataFrame:
         """
         Identify inefficient PI accounts based on VRAM hours.
