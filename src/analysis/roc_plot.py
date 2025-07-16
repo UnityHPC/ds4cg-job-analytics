@@ -10,13 +10,15 @@ Actions item:
 - Refactor the calculate effciency threshold function DONE
 - For the plot(), don't focus on group by for now, implement validation, errors raise, null handling for columns DONE
 - how can we also allow options for filtering  -> allow passing filtered dataframe. DONE
-- Extend the plot() to accept some other columns (vram_hours, users)
+- Extend the plot() to accept some other columns (vram_hours, users) DONE
+- Need another function that have multiple plot lines, for example for different users or pi_group
 
 TODO (Tan): consider writing tests for validate_input function
 Low priority:
+- For each some threshold, can plot the data of y axis on the plot
 - explore group by option
 - can try to integrate the aggregation metrics (in case we want to group by)
-- refactor roc_plot to use less arguments
+- refactor roc_plot to use less arguments, consider printing out statistics info of thresholds
 """
 
 from pathlib import Path
@@ -71,6 +73,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         Raises:
             KeyError: If the specified metrics are not found in the DataFrame.
             ValueError: If the threshold step is not a positive number.
+            ValueError: If min_threshold is greater than max_threshold.
         """
         if threshold_metric.value not in input_df.columns:
             raise KeyError(f"Threshold metric '{threshold_metric.value}' not found in DataFrame.")
@@ -107,15 +110,9 @@ class ROCVisualizer(EfficiencyAnalysis):
         Returns:
             list[float]: List of proportions corresponding to each threshold.
 
-        Raises:
-            KeyError: If the specified threshold_metric or proportion_metric is not found in the DataFrame
         """
 
         threshold_values = plot_data_frame[threshold_metric.value].to_numpy()
-        # temp = np.mean(threshold_values)
-        # print(np.mean(threshold_values), np.std(threshold_values))
-        # print((threshold_values <= temp).sum())
-        # print((threshold_values <= 0).sum() / len(plot_data_frame))
         if proportion_metric == ROCProportionMetricsEnum.JOBS:
             total_count = len(plot_data_frame)
             if plot_percentage:
@@ -125,19 +122,29 @@ class ROCVisualizer(EfficiencyAnalysis):
             else:
                 proportions = [(threshold_values <= threshold).sum() for threshold in thresholds_arr]
         else:
-            metric_values = plot_data_frame[proportion_metric.value].to_numpy()
-            total_sum = metric_values.sum()
-
-            if total_sum == 0:
-                return np.zeros(len(thresholds_arr))
-
             proportions = []
-            for threshold in thresholds_arr:
-                mask = threshold_values <= threshold
-                proportion = (
-                    metric_values[mask].sum() / total_sum * 100 if plot_percentage else metric_values[mask].sum()
-                )
-                proportions.append(proportion)
+            metric_values = plot_data_frame[proportion_metric.value].to_numpy()
+            count_unique_proportion_metric = {ROCProportionMetricsEnum.USER, ROCProportionMetricsEnum.PI_GROUP}
+            # check if we are dealing with USER metrics
+            if proportion_metric in count_unique_proportion_metric:
+                total_unique = len(np.unique(metric_values))
+                for threshold in thresholds_arr:
+                    mask = threshold_values <= threshold
+                    unique_count = len(np.unique(metric_values[mask]))
+                    proportion = unique_count / total_unique * 100 if plot_percentage else unique_count
+                    proportions.append(proportion)
+            else:
+                total_sum = metric_values.sum()
+
+                if total_sum == 0:
+                    return np.zeros(len(thresholds_arr))
+
+                for threshold in thresholds_arr:
+                    mask = threshold_values <= threshold
+                    proportion = (
+                        metric_values[mask].sum() / total_sum * 100 if plot_percentage else metric_values[mask].sum()
+                    )
+                    proportions.append(proportion)
         return np.array(proportions)
 
     def plot_roc(
@@ -171,10 +178,6 @@ class ROCVisualizer(EfficiencyAnalysis):
         Returns:
             tuple[Figure, list[Axes]]: A tuple containing the figure, list of axes.
 
-        Raises:
-            KeyError: If the specified threshold_metric or proportion_metric is not found in the DataFrame
-            ValueError: If the min_threshold is greater than max_threshold or if the threshold_step is not positive.
-            ValueError: If no data is available for the specified threshold metric.
         """
 
         data = self.jobs_with_efficiency_metrics
