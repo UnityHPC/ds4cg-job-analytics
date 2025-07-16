@@ -345,9 +345,18 @@ class EfficiencyAnalysis:
             "job_hours"
         ].transform("sum")
 
-        def avg_non_inf(x):
+        def avg_non_inf(x: pd.Series) -> float | pd.api.typing.NAType:
+            """
+            Helper function to calculate the average of a Series, ignoring -np.inf values.
+            
+            Args:
+                x (pd.Series): Series to calculate the average from.
+                
+            Returns:
+                float: Average of the Series, ignoring -np.inf values. Returns pd.NA if no valid values.
+            """
             valid = x[x != -np.inf]
-            return valid.mean() if not valid.empty else np.nan
+            return valid.mean() if not valid.empty else pd.NA
 
         users_w_efficiency_metrics = (
             self.jobs_with_efficiency_metrics.groupby("User", observed=True)
@@ -363,35 +372,38 @@ class EfficiencyAnalysis:
 
         self.jobs_with_efficiency_metrics.loc[:, "weighted_alloc_vram_efficiency"] = (
             self.jobs_with_efficiency_metrics["alloc_vram_efficiency"]
-            * self.jobs_with_efficiency_metrics["job_hours"]
+            * self.jobs_with_efficiency_metrics["vram_hours"]
             / user_job_hours_per_job
         )
 
+
         users_w_efficiency_metrics.loc[:, "expected_value_alloc_vram_efficiency"] = (
             self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_alloc_vram_efficiency"]
-            .sum()
-            .to_numpy()
+            .apply(lambda series: series.sum() if not series.isnull().all() else pd.NA)
+            .values
         )
 
         self.jobs_with_efficiency_metrics.loc[:, "weighted_vram_constraint_efficiency"] = (
             self.jobs_with_efficiency_metrics["vram_constraint_efficiency"]
-            * self.jobs_with_efficiency_metrics["job_hours"]
+            * self.jobs_with_efficiency_metrics["vram_hours"]
             / user_job_hours_per_job
-        )
+        ).astype(pd.Float64Dtype())
 
         users_w_efficiency_metrics.loc[:, "expected_value_vram_constraint_efficiency"] = (
             self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_vram_constraint_efficiency"]
-            .sum()
-            .to_numpy()
+            .apply(lambda series: series.sum() if not series.isnull().all() else pd.NA)
+            .values
         )
 
         self.jobs_with_efficiency_metrics.loc[:, "weighted_gpu_count"] = (
             self.jobs_with_efficiency_metrics["gpu_count"]
-            * self.jobs_with_efficiency_metrics["job_hours"]
+            * self.jobs_with_efficiency_metrics["vram_hours"]
             / user_job_hours_per_job
         )
         users_w_efficiency_metrics.loc[:, "expected_value_gpu_count"] = (
-            self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_gpu_count"].sum().to_numpy()
+            self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_gpu_count"]
+            .apply(lambda series: series.sum() if not series.isnull().all() else pd.NA)
+            .values
         )
 
         # Calculate metric representing the total amount of GPU memory resources a user has been allocated over time.
@@ -399,8 +411,8 @@ class EfficiencyAnalysis:
         users_w_efficiency_metrics.loc[:, "vram_hours"] = (
             (self.jobs_with_efficiency_metrics["allocated_vram"] * self.jobs_with_efficiency_metrics["job_hours"])
             .groupby(self.jobs_with_efficiency_metrics["User"], observed=True)
-            .sum()
-            .to_numpy()
+            .apply(lambda series: series.sum() if not series.isnull().all() else pd.NA)
+            .values
         )
 
         self.jobs_with_efficiency_metrics = self.jobs_with_efficiency_metrics.drop(
@@ -559,6 +571,8 @@ class EfficiencyAnalysis:
                 pi_acc_job_hours=("user_job_hours", "sum"),
                 user_count=("User", "nunique"),
                 pi_acc_vram_hours=("vram_hours", "sum"),
+                avg_alloc_vram_efficiency_score=("avg_alloc_vram_efficiency_score", "mean"),
+                avg_vram_constraint_efficiency_score=("avg_vram_constraint_efficiency_score", "mean"),
             )
             .reset_index()
         )
@@ -578,8 +592,22 @@ class EfficiencyAnalysis:
             self.users_with_efficiency_metrics.groupby("pi_account", observed=True)[
                 "weighted_ev_alloc_vram_efficiency"
             ]
-            .sum()
-            .to_numpy()
+            .apply(lambda series: series.sum() if not series.isnull().all() else pd.NA)
+            .values
+        )
+
+        self.users_with_efficiency_metrics.loc[:, "weighted_ev_vram_constraint_efficiency"] = (
+            self.users_with_efficiency_metrics["expected_value_vram_constraint_efficiency"]
+            * self.users_with_efficiency_metrics["vram_hours"]
+            / pi_acc_vram_hours
+        )
+
+        pi_efficiency_metrics.loc[:, "expected_value_vram_constraint_efficiency"] = (
+            self.users_with_efficiency_metrics.groupby("pi_account", observed=True)[
+                "weighted_ev_vram_constraint_efficiency"
+            ]
+            .apply(lambda series: series.sum() if not series.isnull().all() else pd.NA)
+            .values
         )
 
         self.users_with_efficiency_metrics.loc[:, "weighted_ev_gpu_count"] = (
@@ -589,12 +617,12 @@ class EfficiencyAnalysis:
         )
         pi_efficiency_metrics.loc[:, "expected_value_gpu_count"] = (
             self.users_with_efficiency_metrics.groupby("pi_account", observed=True)["weighted_ev_gpu_count"]
-            .sum()
-            .to_numpy()
+            .apply(lambda series: series.sum() if not series.isnull().all() else pd.NA)
+            .values
         )
 
         self.users_with_efficiency_metrics = self.users_with_efficiency_metrics.drop(
-            columns=["weighted_ev_alloc_vram_efficiency", "weighted_ev_gpu_count"]
+            columns=["weighted_ev_alloc_vram_efficiency", "weighted_ev_vram_constraint_efficiency", "weighted_ev_gpu_count"]
         )
 
         self.pi_accounts_with_efficiency_metrics = pi_efficiency_metrics
