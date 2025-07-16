@@ -18,6 +18,7 @@ def load_jobs_dataframe_from_duckdb(
     table_name: str = "Jobs",
     sample_size: int | None = None,
     random_state: pd._typing.RandomState | None = None,
+    query: str | None = None,
 ) -> pd.DataFrame:
     """
     Connect to the DuckDB database and return the relevant table as a pandas DataFrame.
@@ -33,9 +34,9 @@ def load_jobs_dataframe_from_duckdb(
         db_path = db_path.resolve()
     db = DatabaseConnection(str(db_path))
 
-    jobs_df = db.fetch_all_jobs(table_name=table_name)
+    jobs_df = db.fetch_all_jobs(table_name=table_name) if query is None else db.fetch_query(query)
     processed_data = preprocess_data(
-        jobs_df, min_elapsed_second=0, include_failed_cancelled_jobs=False, include_cpu_only_jobs=False
+        jobs_df, min_elapsed_seconds=0, include_failed_cancelled_jobs=False, include_cpu_only_jobs=False
     )
     if sample_size is not None:
         processed_data = processed_data.sample(n=sample_size, random_state=random_state)
@@ -61,6 +62,7 @@ class EfficiencyAnalysis:
         table_name: str = "Jobs",
         sample_size: int | None = None,
         random_state: pd._typing.RandomState | None = None,
+        query: str | None = None,
     ) -> None:
         """
         Initialize the EfficiencyAnalysis class.
@@ -75,7 +77,7 @@ class EfficiencyAnalysis:
             RuntimeError: If the jobs DataFrame cannot be loaded from the database.
         """
         try:
-            self.jobs_df = load_jobs_dataframe_from_duckdb(db_path, table_name, sample_size, random_state)
+            self.jobs_df = load_jobs_dataframe_from_duckdb(db_path, table_name, sample_size, random_state, query=query)
             # Initialize efficiency metric class attributes to None
             for var in self._efficiency_metric_vars:
                 setattr(self, var, None)
@@ -618,7 +620,7 @@ class EfficiencyAnalysis:
         # Sort by the metric descending (higher is worse)
         inefficient_pi_accounts = inefficient_pi_accounts.sort_values("pi_acc_vram_hours", ascending=False)
         return inefficient_pi_accounts
-    def aggregate_gpu_metrics_by_query(self, query, show_matplotlib_tables=True):
+    def aggregate_gpu_metrics_by_query(self, query):
         """
         Aggregate and display metrics for each GPU type for jobs matching a SQL query.
         Args:
@@ -631,7 +633,7 @@ class EfficiencyAnalysis:
         if self.jobs_df.empty:
             print(f"No jobs found for query: {query}")
             return
-        self.calculate_efficiency_metrics()
+        self.calculate_job_efficiency_metrics(filtered_jobs=self.jobs_df)
         # Get unique GPU types in the filtered jobs
         unique_gpu_types = (
             self.jobs_df['GPUType']
@@ -658,7 +660,7 @@ class EfficiencyAnalysis:
         ]
         results = {gpu_type.upper(): [] for gpu_type in unique_gpu_types}
         for gpu_type in unique_gpu_types:
-            gpu_jobs = self.efficiency_df[self.efficiency_df['GPUType'].apply(
+            gpu_jobs = self.jobs_df[self.jobs_df['GPUType'].apply(
                 lambda x, gpu_type=gpu_type: gpu_type in [str(g).strip().lower() for g in (x if isinstance(x, list | np.ndarray) else [x])]
             )]
             if gpu_jobs.empty:
