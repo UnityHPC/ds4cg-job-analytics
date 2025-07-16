@@ -80,6 +80,7 @@ class PartitionEnum(Enum):
     VISTERRA = "visterra"
     ZHOULIN_CPU = "zhoulin-cpu"
 
+
 class TimeUnitEnum(Enum):
     SECONDS = "Seconds"
     MINUTES = "Minutes"
