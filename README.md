@@ -172,9 +172,9 @@ contains tools to add a number of useful derived columns for plotting and analys
 | Nodes |  VARCHAR | Job nodes as compact string |
 | NodeList |  VARCHAR[] | List of job nodes |
 | CPUs |  SMALLINT | Number of CPUs |
-| Memory |  INTEGER | Job allocated memory (bytes) |
+| Memory |  INT | Job allocated memory (MiB) |
 | GPUs |  SMALLINT | Number of GPUs requested |
-| GPUType |  DICT | Dictionary of GPUTypes and number of GPUs as key-value pairs |
+| GPUType |  DICT | Dictionary with keys as type of GPU (str) and the values as number of GPUs corresponding to that type (int) |
 | GPUMemUsage |  FLOAT | GPU memory usage (bytes) |
 | GPUComputeUsage |  FLOAT | GPU compute usage (pct) |
 | CPUMemUsage |  FLOAT | GPU memory usage (bytes) |
