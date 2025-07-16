@@ -144,7 +144,9 @@ def _calculate_approx_vram_single_gpu_type(
         # calculate all VRAM for all nodes in the node_list
         node_values = set()  # to avoid duplicates
         for node in node_list:
-            node_values.add(_get_vram_from_node(gpu, node))
+            node_vram = _get_vram_from_node(gpu, node)
+            if node_vram != 0:  # only consider nodes with non-zero VRAM
+                node_values.add(_get_vram_from_node(gpu, node))
 
         if not node_values:
             raise ValueError(f"No valid nodes found for multivalent GPU type '{gpu}' in node list: {node_list}")
@@ -193,13 +195,15 @@ def _get_approx_allocated_vram(gpu_types: list[str], node_list: list[str], gpu_c
 
     # estimate VRAM for multiple GPUs where exact number isn't known
     # TODO (Ayush): update this based on the updated GPU types which specify exact number of GPUs
-    allocated_vrams = []
+    allocated_vrams = set()
     for gpu in gpu_types:
         if gpu in MULTIVALENT_GPUS:
             for node in node_list:
-                allocated_vrams.append(_get_vram_from_node(gpu, node))
+                node_vram = _get_vram_from_node(gpu, node)
+                if node_vram != 0:
+                    allocated_vrams.add(_get_vram_from_node(gpu, node))
         else:
-            allocated_vrams.append(VRAM_VALUES[gpu])
+            allocated_vrams.add(VRAM_VALUES[gpu])
 
     vram_values = sorted(list(allocated_vrams))
     total_vram = vram_values.pop(0) * gpu_count  # use the GPU with the minimum VRAM value
@@ -231,7 +235,7 @@ def _fill_missing(res: pd.DataFrame) -> None:
         res["GPUType"]
         .fillna("")
         .apply(
-            lambda x: ["cpu"] if (isinstance(x, str) and x == "") else x.tolist() if isinstance(x, np.ndarray) else x
+            lambda x: (["cpu"] if (isinstance(x, str) and x == "") else x.tolist() if isinstance(x, np.ndarray) else x)
         )
     )
     res.loc[:, "GPUs"] = res["GPUs"].fillna(0)
