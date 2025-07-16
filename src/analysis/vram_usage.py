@@ -4,6 +4,7 @@ Tools to analyze efficiency of Jobs based on their VRAM usage.
 The aim is to identify potential inefficiencies in GPU usage and notify users or PIs about these issues.
 """
 
+from typing import cast
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -13,33 +14,38 @@ from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
 from src.config.enum_constants import FilterTypeEnum
 
 
-def load_jobs_dataframe_from_duckdb(
+def load_preprocessed_jobs_dataframe_from_duckdb(
     db_path: str | Path,
     table_name: str = "Jobs",
     sample_size: int | None = None,
     random_state: pd._typing.RandomState | None = None,
 ) -> pd.DataFrame:
     """
-    Connect to the DuckDB database and return the relevant table as a pandas DataFrame.
+    Load jobs DataFrame from a DuckDB database and preprocess it.
 
     Args:
         db_path (str or Path): Path to the DuckDB database.
         table_name (str, optional): Table name to query. Defaults to 'Jobs'.
+        sample_size (int, optional): Number of rows to sample from the DataFrame. Defaults to None (no sampling).
+        random_state (pd._typing.RandomState, optional): Random state for reproducibility. Defaults to None.
 
     Returns:
         pd.DataFrame: DataFrame containing the table data.
     """
     if isinstance(db_path, Path):
         db_path = db_path.resolve()
-    db = DatabaseConnection(str(db_path))
+    try:
+        db = DatabaseConnection(str(db_path))
 
-    jobs_df = db.fetch_all_jobs(table_name=table_name)
-    processed_data = preprocess_data(
-        jobs_df, min_elapsed_seconds=0, include_failed_cancelled_jobs=False, include_cpu_only_jobs=False
-    )
-    if sample_size is not None:
-        processed_data = processed_data.sample(n=sample_size, random_state=random_state)
-    return processed_data
+        jobs_df = db.fetch_all_jobs(table_name=table_name)
+        processed_data = preprocess_data(
+            jobs_df, min_elapsed_seconds=0, include_failed_cancelled_jobs=False, include_cpu_only_jobs=False
+        )
+        if sample_size is not None:
+            processed_data = processed_data.sample(n=sample_size, random_state=random_state)
+        return processed_data
+    except Exception as e:
+            raise RuntimeError(f"Failed to load jobs DataFrame: {e}") from e
 
 class EfficiencyAnalysis:
     """
@@ -57,31 +63,25 @@ class EfficiencyAnalysis:
 
     def __init__(
         self,
-        db_path: str | Path,
-        table_name: str = "Jobs",
-        sample_size: int | None = None,
-        random_state: pd._typing.RandomState | None = None,
+        jobs_df: pd.DataFrame,
     ) -> None:
         """
         Initialize the EfficiencyAnalysis class.
 
         Args:
-            db_path (str or Path): Path to the DuckDB database.
-            table_name (str, optional): Table name to query. Defaults to 'Jobs'.
-            sample_size (int, optional): Number of rows to sample from the DataFrame. Defaults to None.
-            random_state (pd._typing.RandomState, optional): Random state for reproducibility. Defaults to None.
+            jobs_df (pd.DataFrame): DataFrame containing job data.
 
         Raises:
             RuntimeError: If the jobs DataFrame cannot be loaded from the database.
         """
-        try:
-            self.jobs_df = load_jobs_dataframe_from_duckdb(db_path, table_name, sample_size, random_state)
-            # Initialize efficiency metric class attributes to None
-            for var in self._efficiency_metric_vars:
-                setattr(self, var, None)
-            self.analysis_results: dict | None = None
-        except Exception as e:
-            raise RuntimeError(f"Failed to load jobs DataFrame: {e}") from e
+        if jobs_df.empty:
+            raise ValueError("The jobs DataFrame is empty. Please provide a valid DataFrame with job data.")
+        self.jobs_df = jobs_df
+        # Initialize efficiency metric class attributes to None
+        for var in self._efficiency_metric_vars:
+            setattr(self, var, None)
+        self.analysis_results: dict | None = None
+
 
     @staticmethod
     def is_numeric_type(val: object) -> bool:
@@ -155,10 +155,8 @@ class EfficiencyAnalysis:
             else:
                 # Only allow numeric types
                 if EfficiencyAnalysis.is_numeric_type(filter):
-                    if isinstance(filter, np.number):
-                        # Convert numpy number to native Python type
-                        filter = filter.item()
-                        mask &= col.eq(filter)
+                    numeric_filter = cast(float | int, filter)
+                    mask &= col.eq(numeric_filter)
                 else:
                     raise ValueError("Filter must be a numeric value if not one of the other types.")
         return mask
@@ -379,8 +377,8 @@ class EfficiencyAnalysis:
 
         users_w_efficiency_metrics.loc[:, "expected_value_alloc_vram_efficiency"] = (
             self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_alloc_vram_efficiency"]
-            .apply(lambda series: series.sum() if not series.isnull().all() else pd.NA)
-            .values
+            .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
+            .to_numpy()
         )
 
         self.jobs_with_efficiency_metrics.loc[:, "weighted_vram_constraint_efficiency"] = (
@@ -391,8 +389,8 @@ class EfficiencyAnalysis:
 
         users_w_efficiency_metrics.loc[:, "expected_value_vram_constraint_efficiency"] = (
             self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_vram_constraint_efficiency"]
-            .apply(lambda series: series.sum() if not series.isnull().all() else pd.NA)
-            .values
+            .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
+            .to_numpy()
         )
 
         self.jobs_with_efficiency_metrics.loc[:, "weighted_gpu_count"] = (
@@ -402,8 +400,8 @@ class EfficiencyAnalysis:
         )
         users_w_efficiency_metrics.loc[:, "expected_value_gpu_count"] = (
             self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_gpu_count"]
-            .apply(lambda series: series.sum() if not series.isnull().all() else pd.NA)
-            .values
+            .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
+            .to_numpy()
         )
 
         # Calculate metric representing the total amount of GPU memory resources a user has been allocated over time.
@@ -411,8 +409,8 @@ class EfficiencyAnalysis:
         users_w_efficiency_metrics.loc[:, "vram_hours"] = (
             (self.jobs_with_efficiency_metrics["allocated_vram"] * self.jobs_with_efficiency_metrics["job_hours"])
             .groupby(self.jobs_with_efficiency_metrics["User"], observed=True)
-            .apply(lambda series: series.sum() if not series.isnull().all() else pd.NA)
-            .values
+            .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
+            .to_numpy()
         )
 
         self.jobs_with_efficiency_metrics = self.jobs_with_efficiency_metrics.drop(
@@ -592,8 +590,8 @@ class EfficiencyAnalysis:
             self.users_with_efficiency_metrics.groupby("pi_account", observed=True)[
                 "weighted_ev_alloc_vram_efficiency"
             ]
-            .apply(lambda series: series.sum() if not series.isnull().all() else pd.NA)
-            .values
+            .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
+            .to_numpy()
         )
 
         self.users_with_efficiency_metrics.loc[:, "weighted_ev_vram_constraint_efficiency"] = (
@@ -606,8 +604,8 @@ class EfficiencyAnalysis:
             self.users_with_efficiency_metrics.groupby("pi_account", observed=True)[
                 "weighted_ev_vram_constraint_efficiency"
             ]
-            .apply(lambda series: series.sum() if not series.isnull().all() else pd.NA)
-            .values
+            .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
+            .to_numpy()
         )
 
         self.users_with_efficiency_metrics.loc[:, "weighted_ev_gpu_count"] = (
@@ -617,12 +615,16 @@ class EfficiencyAnalysis:
         )
         pi_efficiency_metrics.loc[:, "expected_value_gpu_count"] = (
             self.users_with_efficiency_metrics.groupby("pi_account", observed=True)["weighted_ev_gpu_count"]
-            .apply(lambda series: series.sum() if not series.isnull().all() else pd.NA)
-            .values
+            .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
+            .to_numpy()
         )
 
         self.users_with_efficiency_metrics = self.users_with_efficiency_metrics.drop(
-            columns=["weighted_ev_alloc_vram_efficiency", "weighted_ev_vram_constraint_efficiency", "weighted_ev_gpu_count"]
+            columns=[
+                "weighted_ev_alloc_vram_efficiency",
+                "weighted_ev_vram_constraint_efficiency",
+                "weighted_ev_gpu_count"
+            ]
         )
 
         self.pi_accounts_with_efficiency_metrics = pi_efficiency_metrics
@@ -680,3 +682,69 @@ class EfficiencyAnalysis:
         # Sort by the metric descending (higher is worse)
         inefficient_pi_accounts = inefficient_pi_accounts.sort_values("pi_acc_vram_hours", ascending=False)
         return inefficient_pi_accounts
+
+    def sort_and_filter_records_with_metrics(
+        self,
+        efficiency_metric_var: str,
+        sorting_key: str,
+        ascending: bool,
+        filter_criteria: dict[str, int | float | dict | pd.api.typing.NAType]
+    ) -> pd.DataFrame:
+        """
+        Sort and filter records based on specified criteria.
+
+        Args:
+            efficiency_metric_var (str): The variable name for the efficiency metric DataFrame to use
+            sorting_key (str): Column name to sort the results by
+            ascending (bool): Whether to sort in ascending order
+            filter_criteria (dict[str, int | float | dict | pd.NA]): Dictionary of filter criteria to apply
+
+        Returns:
+            pd.DataFrame: DataFrame with the filtered records sorted by the specified key and their order
+
+        Raises:
+            ValueError: If the sorting key is not valid or if ascending is not a boolean value
+            ValueError: If the filter criteria are invalid
+        """
+        if efficiency_metric_var not in self._efficiency_metric_vars:
+            raise ValueError(
+                f"Invalid efficiency metric variable: {efficiency_metric_var}. "
+                f"Must be one of {self._efficiency_metric_vars}."
+            )
+        metrics_df = getattr(self, efficiency_metric_var)
+
+        if metrics_df is None:
+            print(
+                f"The {efficiency_metric_var} DataFrame is not available. "
+                "Calculating it by running all metrics calculations:"
+            )
+            self.calculate_all_efficiency_metrics(self.jobs_df)
+
+        if sorting_key not in getattr(self, efficiency_metric_var).columns:
+            raise ValueError(f"Sorting key '{sorting_key}' is not a valid column in the DataFrame.")
+        if not isinstance(ascending, bool):
+            raise ValueError("ascending must be a boolean value.")
+
+        mask = pd.Series(
+            [True] * len(getattr(self, efficiency_metric_var)),
+            index=getattr(self, efficiency_metric_var).index,
+        )
+
+        for column, filter in filter_criteria.items():
+            try:
+                mask &= EfficiencyAnalysis.apply_numeric_filter(
+                    getattr(self, efficiency_metric_var)[column],
+                    filter,
+                    {FilterTypeEnum.SCALAR, FilterTypeEnum.DICTIONARY, FilterTypeEnum.PD_NA},
+                    filter_name=f"{column}_filter",
+                )
+            except ValueError as e:
+                raise ValueError(f"Invalid filter for {column}.") from e
+
+        filtered_records = getattr(self, efficiency_metric_var)[mask]
+
+        # Sort by the specified key and order
+
+        filtered_records = filtered_records.sort_values(sorting_key, ascending=ascending)
+
+        return filtered_records
