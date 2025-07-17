@@ -15,10 +15,15 @@ The following guidelines may prove helpful in maximizing the utility of this rep
 ## Getting started on Unity
 
 You'll need to first install a few dependencies, which include DuckDB, Pandas, and some plotting libraries. More details for running the project will need be added here later.
+
 ### Version Control
 To provide the path of the git configuration file of this project to git, run:
 
     git config --local include.path ../.gitconfig
+
+To ensure consistent LF line endings across all platforms, run the following command when developing on Windows machines:
+
+    git config --local core.autocrlf input
 
 ### Jupyter notebooks
 

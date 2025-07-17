@@ -391,6 +391,9 @@ class EfficiencyAnalysis:
 
         Returns:
             pd.DataFrame: DataFrame with users and their average VRAM efficiency
+
+        Raises:
+            ValueError: If the filter for expected_value_alloc_vram_efficiency is invalid.
         """
         if self.users_with_efficiency_metrics is None:
             self.calculate_user_efficiency_metrics()
@@ -487,7 +490,7 @@ class EfficiencyAnalysis:
             dict: A dictionary containing DataFrames with efficiency metrics for jobs, users, and PI accounts.
 
         Raises:
-            ValueError: If any of the calculations fail.
+            RuntimeError: If any of the calculations fail.
         """
         try:
             self.calculate_job_efficiency_metrics(filtered_jobs)
