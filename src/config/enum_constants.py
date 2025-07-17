@@ -89,9 +89,37 @@ class PartitionEnum(Enum):
 
 @unique
 class FilterTypeEnum(Enum):
+    """
+    An enumeration representing different types of filterable data structures.
+
+    Attributes:
+        DICTIONARY: Represents a Python dictionary type.
+        LIST: Represents a Python list type.
+        SET: Represents a Python set type.
+        TUPLE: Represents a Python tuple type.
+        SCALAR: Represents a scalar value (e.g., int, float, str).
+        PD_NA: Represents a pandas 'NA' value for missing data.
+    """
     DICTIONARY = auto()
     LIST = auto()
     SET = auto()
     TUPLE = auto()
-    SCALAR = auto()
+    NUMERIC_SCALAR = auto()
     PD_NA = auto()
+
+
+@unique
+class MetricsDataFrameNameEnum(Enum):
+    """
+    An enumeration representing the names of DataFrames containing efficiency metrics.
+
+    Attributes:
+        JOBS: DataFrame name for jobs with efficiency metrics.
+        USERS: DataFrame name for users with efficiency metrics.
+        PI_GROUPS: DataFrame name for PI accounts/groups with efficiency metrics.
+    """
+    JOBS = "jobs_with_efficiency_metrics"
+    USERS = "users_with_efficiency_metrics"
+    PI_GROUPS = "pi_accounts_with_efficiency_metrics"
+ 
+

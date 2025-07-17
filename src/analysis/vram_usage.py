@@ -11,7 +11,7 @@ from pathlib import Path
 from src.preprocess.preprocess import preprocess_data
 from src.database import DatabaseConnection
 from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
-from src.config.enum_constants import FilterTypeEnum
+from src.config.enum_constants import FilterTypeEnum, MetricsDataFrameNameEnum
 
 
 def load_preprocessed_jobs_dataframe_from_duckdb(
@@ -56,14 +56,9 @@ class EfficiencyAnalysis:
     Class to encapsulate the efficiency analysis of jobs based on various metrics.
 
     It provides methods to load data, analyze workload efficiency, and evaluate CPU-GPU usage patterns.
-    """
 
-    # Store the variable names as a class-level constant for maintainability
-    _efficiency_metric_vars = [
-        "jobs_with_efficiency_metrics",
-        "users_with_efficiency_metrics",
-        "pi_accounts_with_efficiency_metrics",
-    ]
+    The metrics are generated in separate DataFrames for each category in MetricsDataFrameNameEnum.
+    """
 
     def __init__(
         self,
@@ -82,8 +77,8 @@ class EfficiencyAnalysis:
             raise ValueError("The jobs DataFrame is empty. Please provide a valid DataFrame with job data.")
         self.jobs_df = jobs_df
         # Initialize efficiency metric class attributes to None
-        for var in self._efficiency_metric_vars:
-            setattr(self, var, None)
+        for var in MetricsDataFrameNameEnum:
+            setattr(self, var.value, None)
         self.analysis_results: dict | None = None
 
     @staticmethod
@@ -156,12 +151,15 @@ class EfficiencyAnalysis:
                 if "max" in filter:
                     mask &= col.le(filter["max"]) if inclusive else col.lt(filter["max"])
             else:
-                # Only allow numeric types
-                if EfficiencyAnalysis.is_numeric_type(filter):
-                    numeric_filter = cast(float | int, filter)
-                    mask &= col.eq(numeric_filter)
+                if FilterTypeEnum.NUMERIC_SCALAR not in permissible_filter_types:
+                    raise ValueError(f"{filter_name} cannot be a numeric scalar.")
                 else:
-                    raise ValueError("Filter must be a numeric value if not one of the other types.")
+                    # Only allow numeric types
+                    if EfficiencyAnalysis.is_numeric_type(filter):
+                        numeric_filter = cast(float | int, filter)
+                        mask &= col.eq(numeric_filter)
+                    else:
+                        raise ValueError(f"{filter_name} must be a numeric type.")
         return mask
 
     def filter_jobs_for_analysis(
@@ -225,7 +223,7 @@ class EfficiencyAnalysis:
                 mask &= EfficiencyAnalysis.apply_numeric_filter(
                     self.jobs_df["GPUMemUsage"],
                     gpu_mem_usage_filter,
-                    {FilterTypeEnum.SCALAR, FilterTypeEnum.DICTIONARY},
+                    {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY},
                     "gpu_mem_usage_filter",
                 )
             except ValueError as e:
@@ -456,7 +454,7 @@ class EfficiencyAnalysis:
                 mask &= EfficiencyAnalysis.apply_numeric_filter(
                     self.users_with_efficiency_metrics["expected_value_alloc_vram_efficiency"],
                     alloc_vram_efficiency_filter,
-                    {FilterTypeEnum.SCALAR, FilterTypeEnum.DICTIONARY},
+                    {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY},
                     filter_name="expected_value_alloc_vram_efficiency",
                 )
             except ValueError as e:
@@ -506,7 +504,7 @@ class EfficiencyAnalysis:
                 mask &= EfficiencyAnalysis.apply_numeric_filter(
                     self.users_with_efficiency_metrics["vram_hours"],
                     vram_hours_filter,
-                    {FilterTypeEnum.SCALAR, FilterTypeEnum.DICTIONARY},
+                    {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY},
                     filter_name="vram_hours_filter",
                 )
             except ValueError as e:
@@ -541,7 +539,7 @@ class EfficiencyAnalysis:
             self.calculate_job_efficiency_metrics(filtered_jobs)
             self.calculate_user_efficiency_metrics()
             self.calculate_pi_account_efficiency_metrics()
-            return {var: getattr(self, var) for var in self._efficiency_metric_vars}
+            return {var.value: getattr(self, var.value) for var in MetricsDataFrameNameEnum}
 
         except (KeyError, ValueError, TypeError, AttributeError) as e:
             raise RuntimeError(f"Failed to calculate all efficiency metrics: {e}") from e
@@ -667,7 +665,7 @@ class EfficiencyAnalysis:
                 mask &= EfficiencyAnalysis.apply_numeric_filter(
                     self.pi_accounts_with_efficiency_metrics["pi_acc_vram_hours"],
                     vram_hours_filter,
-                    {FilterTypeEnum.SCALAR, FilterTypeEnum.DICTIONARY},
+                    {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY},
                     filter_name="pi_acc_vram_hours_filter",
                 )
             except ValueError as e:
@@ -684,7 +682,7 @@ class EfficiencyAnalysis:
 
     def sort_and_filter_records_with_metrics(
         self,
-        efficiency_metric_var: str,
+        metrics_df_name_enum: MetricsDataFrameNameEnum,
         sorting_key: str,
         ascending: bool,
         filter_criteria: dict[str, int | float | dict | pd.api.typing.NAType]
@@ -696,7 +694,11 @@ class EfficiencyAnalysis:
             efficiency_metric_var (str): The variable name for the efficiency metric DataFrame to use
             sorting_key (str): Column name to sort the results by
             ascending (bool): Whether to sort in ascending order
-            filter_criteria (dict[str, int | float | dict | pd.NA]): Dictionary of filter criteria to apply
+            filter_criteria (dict[str, int | float | dict | pd.NA]): Dictionary of filter criteria to apply.
+                Each key is a column name, and the value is the filter to apply to that column. The filter can be:
+                    - int | float: select rows where the column value equals the filter value
+                    - dict with 'min'/'max' and required 'inclusive' (bool): select rows in the range
+                    - pd.NA: select rows where the column value is pd.NA
 
         Returns:
             pd.DataFrame: DataFrame with the filtered records sorted by the specified key and their order
@@ -705,42 +707,42 @@ class EfficiencyAnalysis:
             ValueError: If the sorting key is not valid or if ascending is not a boolean value
             ValueError: If the filter criteria are invalid
         """
-        if efficiency_metric_var not in self._efficiency_metric_vars:
+        if not isinstance(metrics_df_name_enum, MetricsDataFrameNameEnum):
             raise ValueError(
-                f"Invalid efficiency metric variable: {efficiency_metric_var}. "
-                f"Must be one of {self._efficiency_metric_vars}."
+                f"Invalid efficiency metric type: {metrics_df_name_enum}. "
+                f"Must be a member of MetricsDataFrameNameEnum."
             )
-        metrics_df = getattr(self, efficiency_metric_var)
+        metrics_df = getattr(self, metrics_df_name_enum.value)
 
         if metrics_df is None:
             print(
-                f"The {efficiency_metric_var} DataFrame is not available. "
+                f"The {metrics_df_name_enum.value} DataFrame is not available. "
                 "Calculating it by running all metrics calculations:"
             )
             self.calculate_all_efficiency_metrics(self.jobs_df)
 
-        if sorting_key not in getattr(self, efficiency_metric_var).columns:
+        if sorting_key not in getattr(self, metrics_df_name_enum.value).columns:
             raise ValueError(f"Sorting key '{sorting_key}' is not a valid column in the DataFrame.")
         if not isinstance(ascending, bool):
             raise ValueError("ascending must be a boolean value.")
 
         mask = pd.Series(
-            [True] * len(getattr(self, efficiency_metric_var)),
-            index=getattr(self, efficiency_metric_var).index,
+            [True] * len(getattr(self, metrics_df_name_enum.value)),
+            index=getattr(self, metrics_df_name_enum.value).index,
         )
 
         for column, filter in filter_criteria.items():
             try:
                 mask &= EfficiencyAnalysis.apply_numeric_filter(
-                    getattr(self, efficiency_metric_var)[column],
+                    getattr(self, metrics_df_name_enum.value)[column],
                     filter,
-                    {FilterTypeEnum.SCALAR, FilterTypeEnum.DICTIONARY, FilterTypeEnum.PD_NA},
+                    {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY, FilterTypeEnum.PD_NA},
                     filter_name=f"{column}_filter",
                 )
             except ValueError as e:
                 raise ValueError(f"Invalid filter for {column}.") from e
 
-        filtered_records = getattr(self, efficiency_metric_var)[mask]
+        filtered_records = getattr(self, metrics_df_name_enum.value)[mask]
 
         # Sort by the specified key and order
 
