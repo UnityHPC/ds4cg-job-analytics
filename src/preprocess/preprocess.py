@@ -201,6 +201,7 @@ def _get_approx_allocated_vram(
         total_vram = _calculate_approx_vram_single_gpu_type(gpu_types, node_list, gpu_count, gpu_mem_usage)
         return total_vram
 
+    # Use helper function to calculate VRAM usage for new GPUType format
     if isinstance(gpu_types, dict):
         total_vram = _calculate_allocated_vram_new_format(gpu_types, node_list, gpu_mem_usage)
         return total_vram
@@ -389,6 +390,7 @@ def preprocess_data(
     _fill_missing(res)
 
     first_non_null = res["GPUType"].dropna().iloc[0]
+    # Log the format of GPUType being used
     if isinstance(first_non_null, dict):
         print("[Preprocessing] Running with new database format: GPU types as dictionary.")
     elif isinstance(first_non_null, list):
