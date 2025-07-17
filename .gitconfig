@@ -1,18 +1,19 @@
 [filter "strip-notebook-output"]
-clean = jupyter nbconvert --ClearOutputPreprocessor.enabled=True --ClearMetadataPreprocessor.enabled=True --to=notebook --stdin --stdout --log-level=ERROR
+clean = jupyter nbconvert --ClearOutputPreprocessor.enabled=True --ClearMetadataPreprocessor.enabled=True \
+    --TagRemovePreprocessor.enabled=True --to=notebook --stdin --stdout --log-level=ERROR
 
-[difftool "nbdime"]
-cmd = nbdiff-web "$LOCAL" "$REMOTE"
+[difftool "jupyternotebook"]
+cmd = git-nbdiffdriver diff "$LOCAL" "$REMOTE"
 trustExitCode = false
 
-[diff "nbdime"]
+[diff "jupyternotebook"]
 name = "jupyter notebook diff"
-textconv = jupyter nbconvert --to=script --stdout
+command = git-nbdiffdriver diff
 
-[merge "nbdime"]
+[merge "jupyternotebook"]
 name = "Jupyter Notebook nbdime merge"
 driver = git-nbmergedriver merge %O %A %B %A
 
-# [mergetool "nbdime"]
-# cmd = nbmerge-web "$BASE" "$LOCAL" "$REMOTE" "$MERGED"
-# trustExitCode = false
+[mergetool "jupyternotebook"]
+cmd = nbmerge-web "$BASE" "$LOCAL" "$REMOTE" "$MERGED"
+trustExitCode = false

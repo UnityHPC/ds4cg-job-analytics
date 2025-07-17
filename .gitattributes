@@ -4,5 +4,5 @@
 * text=auto eol=lf
 
 # Define the merge and diff driver for Jupyter Notebook files.
-# *.ipynb merge=nbdime
-# *.ipynb diff=nbdime
+*.ipynb	diff=jupyternotebook
+*.ipynb	merge=jupyternotebook
