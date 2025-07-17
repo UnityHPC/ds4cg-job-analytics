@@ -13,6 +13,6 @@ textconv = jupyter nbconvert --to=script --stdout
 name = "Jupyter Notebook nbdime merge"
 driver = git-nbmergedriver merge %O %A %B %A
 
-[mergetool "nbdime"]
-cmd = nbmerge-web "$BASE" "$LOCAL" "$REMOTE" "$MERGED"
-trustExitCode = false
+# [mergetool "nbdime"]
+# cmd = nbmerge-web "$BASE" "$LOCAL" "$REMOTE" "$MERGED"
+# trustExitCode = false
