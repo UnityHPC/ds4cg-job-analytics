@@ -231,6 +231,14 @@ def _calculate_alloc_vram_multiple_gpu_types_with_count(
             # Not enough distinct nodes, use min VRAM for each GPU
             for gpu, count in multivalent.items():
                 allocated_vram += min(MULTIVALENT_GPUS[gpu]) * count
+            
+            # if the estimate is less than the usage, update it
+            if allocated_vram < gpu_mem_usage / 2**30:
+                for gpu, gpu_count in multivalent.items():
+                    while gpu_count > 0 and allocated_vram < (gpu_mem_usage / 2**30):
+                        allocated_vram += min(MULTIVALENT_GPUS[gpu])
+                        gpu_count -= 1
+
         return allocated_vram
 
     # Case 3: Mixed multivalent and non-multivalent GPUs
