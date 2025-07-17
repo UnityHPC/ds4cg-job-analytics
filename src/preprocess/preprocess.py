@@ -123,10 +123,8 @@ def _calculate_approx_vram_single_gpu_type(
     """
 
     if isinstance(gpu_types, dict):
-        print("[Preprocessing] Running with new database format: GPU types as dictionary.")
         gpu, gpu_count = list(gpu_types.items())[0]
     else:
-        print("[Preprocessing] Running with old database format: GPU types as list.")
         gpu = gpu_types[0]
 
     if gpu not in MULTIVALENT_GPUS:
@@ -191,9 +189,6 @@ def _get_approx_allocated_vram(
 
     Returns:
         int: Total allocated (estimate) VRAM for the job in GiB (gibibyte).
-
-    Raises:
-        ValueError: If no valid nodes are found for a multivalent GPU type in the node list.
 
     Notes:
         - When `gpu_types` is a dictionary, the function calculates VRAM based on the counts of each GPU type.
