@@ -17,9 +17,8 @@ def mock_data_frame():
     except Exception as e:
         raise Exception("Exception at mock_data_frame") from e
     finally:
-        if db is not None and db.is_connected():
-            db.connection.close()
-            shutil.rmtree(temp_db_dir)
+        del db
+        shutil.rmtree(temp_db_dir)
 
 
 @pytest.fixture(scope="module")
@@ -34,6 +33,5 @@ def mock_data_frame_new_format():
     except Exception as e:
         raise Exception("Exception at mock_data_frame_new_format") from e
     finally:
-        if db is not None and db.is_connected():
-            db.connection.close()
-            shutil.rmtree(temp_db_dir)
+        del db
+        shutil.rmtree(temp_db_dir)
