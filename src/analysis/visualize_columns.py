@@ -30,6 +30,9 @@ class DataVisualizer:
 
         Returns:
             None
+
+        Raises:
+            ValueError: If no DataFrame is provided.
         """
         self.df = None
         if df is not None:
@@ -102,6 +105,7 @@ class DataVisualizer:
 
         Raises:
             ValueError: If output_dir_path is provided but is not a valid directory.
+            PermissionError: If output_dir_path is not writable.
         """
         if output_dir_path is not None:
             if not isinstance(output_dir_path, Path):
@@ -560,6 +564,9 @@ class DataVisualizer:
             col (str): The name of the column to plot.
             output_dir_path (Path | None): The directory to save the plot.
 
+        Raises:
+            ValueError: If the column does not contain valid statuses or if all counts are zero.
+
         Returns:
             None
         """
@@ -654,13 +661,17 @@ class DataVisualizer:
         Returns:
             None
         """
+        # TODO (Arda): Add support for new GPUType column format (dictionary)
 
         # GPUType should be a numpy array or list-like per row
         # Check if all non-null entries are numpy arrays
         col_data = jobs_df[col]
         non_null = col_data.dropna()
-        if not all(isinstance(x, np.ndarray) for x in non_null):
-            msg = f"Error: Not all entries in column '{col}' are numpy arrays. Example values:\n{non_null.head()}"
+        if not all(isinstance(x, np.ndarray | list) for x in non_null):
+            msg = (
+                f"Error: Not all entries in column '{col}' are numpy arrays or lists. "
+                f"Example values:\n{non_null.head()}"
+            )
             print(msg)
             raise ValueError(msg)
 
@@ -727,6 +738,9 @@ class DataVisualizer:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
             output_dir_path (Path | None): The directory to save the plot.
+
+        Raises:
+            ValueError: If the column does not contain valid QOS or if all counts are zero.
 
         Returns:
             None
@@ -1211,9 +1225,6 @@ class DataVisualizer:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
             output_dir_path (Path | None): The directory to save the plot.
-
-        Raises:
-            ValueError: If the column does not contain numpy arrays or if any entry is not a numpy array.
 
         Returns:
             None

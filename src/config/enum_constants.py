@@ -4,6 +4,7 @@ Declaration of some enum class such as constants values of categorical types.
 
 from enum import Enum, unique, auto
 
+
 @unique
 class InteractiveEnum(Enum):
     NON_INTERACTIVE = "non-interactive"
@@ -13,12 +14,14 @@ class InteractiveEnum(Enum):
     RSTUDIO = "bc_rstudio"
     DESKTOP = "bc_desktop"
 
+
 @unique
 class QOSEnum(Enum):
     NORMAL = "normal"
     UPDATES = "updates"
     SHORT = "short"
     LONG = "long"
+
 
 @unique
 class StatusEnum(Enum):
@@ -31,15 +34,18 @@ class StatusEnum(Enum):
     PENDING = "PENDING"
     NODE_FAIL = "NODE_FAIL"
 
+
 @unique
 class ExitCodeEnum(Enum):
     SUCCESS = "SUCCESS"
     ERROR = "ERROR"
     SIGNALED = "SIGNALED"
 
+
 @unique
 class AdminsAccountEnum(Enum):
     ROOT = "root"
+
 
 @unique
 class PartitionEnum(Enum):
@@ -79,6 +85,7 @@ class PartitionEnum(Enum):
     URI_RICHAMP = "uri-richamp"
     VISTERRA = "visterra"
     ZHOULIN_CPU = "zhoulin-cpu"
+
 
 @unique
 class FilterTypeEnum(Enum):
