@@ -11,10 +11,9 @@ Actions item:
 - For the plot(), don't focus on group by for now, implement validation, errors raise, null handling for columns DONE
 - how can we also allow options for filtering  -> allow passing filtered dataframe. DONE
 - Extend the plot() to accept some other columns (vram_hours, users) DONE
-- Need another function that have multiple plot lines, for example for different users or pi_group
+- Need another function that have multiple plot lines, for example for different users or pi_group DONE
 
 TODO (Tan): consider writing tests for validate_input function
-Low priority:
 - For each some threshold, can plot the data of y axis on the plot
 - explore group by option
 - can try to integrate the aggregation metrics (in case we want to group by)
@@ -201,6 +200,7 @@ class ROCVisualizer(EfficiencyAnalysis):
                         metric_values[mask].sum() / total_sum * 100 if plot_percentage else metric_values[mask].sum()
                     )
                     proportions.append(proportion)
+        print(proportions[-1])
         return np.array(proportions)
 
     def plot_roc(
@@ -285,6 +285,29 @@ class ROCVisualizer(EfficiencyAnalysis):
         axe.set_ylabel(y_label)
         axe.set_xlabel(f"Threshold values ({threshold_metric.value})")
         axe.plot(thresholds_arr, proportions_data)
+
+        # Add markers for some data points
+        num_markers = 10
+        step = len(thresholds_arr) / num_markers
+        marker_indices = [int(i * step) for i in range(num_markers)]
+        for idx in marker_indices:
+            x_val = thresholds_arr[idx]
+            y_val = proportions_data[idx]
+
+            # Add marker
+            axe.plot(x_val, y_val, "go", markersize=5, zorder=5)
+
+            # Add text label showing (x, y) values
+            axe.annotate(
+                f"({x_val:.1f}, {y_val:.1f})",
+                (x_val, y_val),
+                fontsize=10,
+                xytext=(0, 10),
+                textcoords="offset points",
+                ha="center",
+                va="bottom",
+            )
+
         return fig, axe_list
 
     def multiple_line_roc_plot(
@@ -297,6 +320,9 @@ class ROCVisualizer(EfficiencyAnalysis):
         max_threshold: float = 100.0,
         threshold_step: float = 1.0,
         threshold_metric: JobEfficiencyMetricsEnum = JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY,
+        proportion_metric: Literal[
+            ROCProportionMetricsEnum.JOB_HOURS, ROCProportionMetricsEnum.JOBS
+        ] = ROCProportionMetricsEnum.JOBS,
         plot_percentage: bool = True,
     ) -> None:
         """
@@ -359,18 +385,16 @@ class ROCVisualizer(EfficiencyAnalysis):
         for target in plot_object_list:
             filtered = plot_data[plot_data[object_column_type.value] == target].copy()
             proportion_data = self._roc_calculate_proportion(
-                filtered, ROCProportionMetricsEnum.JOBS, thresholds_arr, threshold_metric, plot_percentage=False
+                filtered, proportion_metric, thresholds_arr, threshold_metric, plot_percentage=False
             )
             axe.plot(thresholds_arr, proportion_data, label=f"{target}")
 
         if title is None:
             title = (
                 f"Multple line ROC plot for {'proportion' if plot_percentage else 'amounts'} of "
-                f"{ROCProportionMetricsEnum.JOBS.value} by threshold {threshold_metric.value}"
+                f"{proportion_metric.value} by threshold {threshold_metric.value}"
             )
-        y_label = (
-            f"{'Percentage' if plot_percentage else 'Count'} of {ROCProportionMetricsEnum.JOBS.value} below threshold"
-        )
+        y_label = f"{'Percentage' if plot_percentage else 'Count'} of {proportion_metric.value} below threshold"
         axe.set_title(title)
         axe.set_ylabel(y_label)
         axe.set_xlabel(f"Threshold values ({threshold_metric.value})")
