@@ -202,11 +202,9 @@ def _get_approx_allocated_vram(
         return total_vram
 
     if isinstance(gpu_types, dict):
-        print("[Preprocessing] Running with new database format: GPU types as dictionary.")
         total_vram = _calculate_allocated_vram_new_format(gpu_types, node_list, gpu_mem_usage)
         return total_vram
 
-    print("[Preprocessing] Running with old database format: GPU types as list.")
     # Calculate allocated VRAM when there are multiple GPU types in a job
     if len(gpu_types) == gpu_count:
         total_vram = 0
@@ -389,6 +387,13 @@ def preprocess_data(
     ].copy()
 
     _fill_missing(res)
+
+    first_non_null = res["GPUType"].dropna().iloc[0]
+    if isinstance(first_non_null, dict):
+        print("[Preprocessing] Running with new database format: GPU types as dictionary.")
+    elif isinstance(first_non_null, list):
+        print("[Preprocessing] Running with old database format: GPU types as list.")
+
     # Type casting for columns involving time
     time_columns = ["StartTime", "SubmitTime"]
     for col in time_columns:
