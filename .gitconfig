@@ -2,16 +2,17 @@
 clean = jupyter nbconvert --ClearOutputPreprocessor.enabled=True --ClearMetadataPreprocessor.enabled=True --to=notebook --stdin --stdout --log-level=ERROR
 
 [difftool "nbdime"]
-cmd = git-nbdifftool diff "$LOCAL" "$REMOTE"
+cmd = nbdiff-web "$LOCAL" "$REMOTE"
 trustExitCode = false
 
-[mergetool "nbdime"]
-cmd = git-nbmergetool "$BASE" "$LOCAL" "$REMOTE" "$MERGED"
-trustExitCode = false
-
-[diff "ipynb"]
+[diff "nbdime"]
+name = "jupyter notebook diff"
 textconv = jupyter nbconvert --to=script --stdout
 
-[merge "ipynb"]
-name = "jupyter notebook merge"
+[merge "nbdime"]
+name = "Jupyter Notebook nbdime merge"
 driver = git-nbmergedriver merge %O %A %B %A
+
+[mergetool "nbdime"]
+cmd = nbmerge-web "$BASE" "$LOCAL" "$REMOTE" "$MERGED"
+trustExitCode = false
