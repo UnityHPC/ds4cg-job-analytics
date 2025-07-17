@@ -12,7 +12,7 @@ from ..config.constants import (
 from ..config.enum_constants import StatusEnum, AdminsAccountEnum, PartitionEnum, QOSEnum
 
 
-def _get_vram_from_node(gpu_type: str, node: str) -> int:
+def _get_multivalent_vram_based_on_node(gpu_type: str, node: str) -> int:
     """
     Calculate specific VRAM based on a node name for GPUs with multiple VRAM sizes.
 
@@ -110,7 +110,7 @@ def _calculate_approx_vram_single_gpu_type(
     Args:
         gpu_types:
             - list[str]: list containing a single GPU type used in the job.
-            - dict[str, int]: dictionary with the count of the GPU type used in the job.
+            - dict[str, int]: dictionary of GPU types and the count of GPUs of each type used in the job.
         node_list (list[str]): List of nodes where the job ran.
         gpu_count (int): Number of GPUs requested by the job.
         gpu_mem_usage (int): GPU memory usage in bytes.
@@ -137,13 +137,13 @@ def _calculate_approx_vram_single_gpu_type(
     # if all GPUs are on the same node, multiply the VRAM of that node by the number of GPUs
     if len(node_list) == 1:
         node = node_list[0]
-        total_vram = _get_vram_from_node(gpu, node) * gpu_count
+        total_vram = _get_multivalent_vram_based_on_node(gpu, node) * gpu_count
 
     # if all GPUs are on different nodes, sum the VRAM of each node
     # and return the total VRAM
     elif len(node_list) == gpu_count:
         for node in node_list:
-            total_vram += _get_vram_from_node(gpu, node)
+            total_vram += _get_multivalent_vram_based_on_node(gpu, node)
 
     # if there are multiple nodes, but not all GPUs are on different nodes
     # we need to calculate the total VRAM based on the minimum VRAM of the nodes
@@ -151,9 +151,9 @@ def _calculate_approx_vram_single_gpu_type(
         # calculate all VRAM for all nodes in the node_list
         node_values = set()  # to avoid duplicates
         for node in node_list:
-            node_vram = _get_vram_from_node(gpu, node)
+            node_vram = _get_multivalent_vram_based_on_node(gpu, node)
             if node_vram != 0:  # only consider nodes with non-zero VRAM
-                node_values.add(_get_vram_from_node(gpu, node))
+                node_values.add(_get_multivalent_vram_based_on_node(gpu, node))
 
         if not node_values:
             raise ValueError(f"No valid nodes found for multivalent GPU type '{gpu}' in node list: {node_list}")
@@ -167,79 +167,28 @@ def _calculate_approx_vram_single_gpu_type(
     return total_vram
 
 
-def _get_approx_allocated_vram(
-    gpu_types: list[str] | dict[str, int], node_list: list[str], gpu_count: int, gpu_mem_usage: int
-) -> int:
+def _get_multivalent_gpu_node_count(node_list: list[str]) -> int:
     """
-    Get the total allocated VRAM for a job based on its GPU type and node list.
-
-    This function estimates the total VRAM allocated for a job based on the GPU types used
-    and the nodes where the job ran.
+    Get the number of nodes in the node list that have multivalent GPUs.
 
     Args:
-        gpu_types:
-            List of GPU types used in the job. This could be a list of strings (if using the old
-            database format) or a dictionary with GPU types as keys and their counts as values
-            (if using the new database format).
-            - list[str]: List containing the types of GPUs used in the job.
-            - dict[str, int]: Dictionary with the type of GPUs and the exact count used in the job.
         node_list (list[str]): List of nodes where the job ran.
-        gpu_count (int): Number of GPUs requested by the job.
-        gpu_mem_usage (int): GPU memory usage in bytes.
 
     Returns:
-        int: Total allocated (estimate) VRAM for the job in GiB (gibibyte).
-
-    Notes:
-        - When `gpu_types` is a dictionary, the function calculates VRAM based on the counts of each GPU type.
-        - For multivalent GPUs, the VRAM is determined based on the nodes where the GPUs are located.
-        - If the exact number of GPUs is not known, the function uses the minimum VRAM value among the available GPUs.
+        int: Number of nodes in the node list that have multivalent GPUs.
     """
-
-    # one type of GPU
-    if len(gpu_types) == 1:
-        total_vram = _calculate_approx_vram_single_gpu_type(gpu_types, node_list, gpu_count, gpu_mem_usage)
-        return total_vram
-
-    # Use helper function to calculate VRAM usage for new GPUType format
-    if isinstance(gpu_types, dict):
-        total_vram = _calculate_allocated_vram_new_format(gpu_types, node_list, gpu_mem_usage)
-        return total_vram
-
-    # Calculate allocated VRAM when there are multiple GPU types in a job
-    if len(gpu_types) == gpu_count:
-        total_vram = 0
-        for gpu in gpu_types:
-            if gpu in MULTIVALENT_GPUS:
-                for node in node_list:
-                    total_vram += _get_vram_from_node(gpu, node)
-            else:
-                total_vram += VRAM_VALUES[gpu]
-        return total_vram
-
-    # estimate VRAM for multiple GPUs where exact number isn't known
-    # TODO (Ayush): update this based on the updated GPU types which specify exact number of GPUs
-    allocated_vrams = set()
-    for gpu in gpu_types:
-        if gpu in MULTIVALENT_GPUS:
-            for node in node_list:
-                node_vram = _get_vram_from_node(gpu, node)
-                if node_vram != 0:
-                    allocated_vrams.add(_get_vram_from_node(gpu, node))
-        else:
-            allocated_vrams.add(VRAM_VALUES[gpu])
-
-    vram_values = sorted(list(allocated_vrams))
-    total_vram = vram_values.pop(0) * gpu_count  # use the GPU with the minimum VRAM value
-    # if the total VRAM is less than the GPU memory usage, use the VRAM from the next smallest GPU
-    while total_vram < (gpu_mem_usage / 2**30) and vram_values:
-        total_vram = vram_values.pop(0) * gpu_count
-    return total_vram
+    count = 0
+    for node in node_list:
+        if any(_get_multivalent_vram_based_on_node(gpu, node) > 0 for gpu in MULTIVALENT_GPUS):
+            count += 1
+    return count
 
 
-def _calculate_allocated_vram_new_format(gpu_types: dict[str, int], node_list: list[str], gpu_mem_usage: int) -> int:
+def _calculate_alloc_vram_multiple_gpu_types_with_count(
+    gpu_types: dict[str, int], node_list: list[str], gpu_mem_usage: int
+) -> int:
     """
-    Calculate the total VRAM for jobs using the new database format (gpu_types as a dictionary).
+    Calculate the total VRAM for a job given the exact types and counts of GPUs used.
 
     Args:
         gpu_types (dict[str, int]): Dictionary with GPU types as keys and their counts as values.
@@ -264,13 +213,20 @@ def _calculate_allocated_vram_new_format(gpu_types: dict[str, int], node_list: l
     # Case 2: All GPUs multivalent
     if len(non_multivalent) == 0:
         total_count = sum(multivalent.values())
-        if total_count == len(node_list):
+        # Case 2.1: The number of GPUs is less equal to the number of GPU nodes in the job.
+        num_gpu_nodes = _get_multivalent_gpu_node_count(node_list)
+        if total_count == num_gpu_nodes:
             # Assign each GPU to a node
-            idx = 0
             for gpu, count in multivalent.items():
+                gpu_total = 0
+                # for each instance of the GPU, check and assign a node to it
                 for _ in range(count):
-                    allocated_vram += _get_vram_from_node(gpu, node_list[idx])
-                    idx += 1
+                    for node in node_list:
+                        node_vram = _get_multivalent_vram_based_on_node(gpu, node)
+                        if allocated_vram > 0:
+                            gpu_total += node_vram
+            allocated_vram += gpu_total
+        # Case 2.2: The number of GPUs is greater than the number of nodes.
         else:
             # Not enough distinct nodes, use min VRAM for each GPU
             for gpu, count in multivalent.items():
@@ -279,16 +235,16 @@ def _calculate_allocated_vram_new_format(gpu_types: dict[str, int], node_list: l
 
     # Case 3: Mixed multivalent and non-multivalent GPUs
 
-    # First, add non-multivalent GPUs
+    # Case 3.1: add non-multivalent GPUs
     for gpu, count in non_multivalent.items():
         allocated_vram += VRAM_VALUES[gpu] * count
 
-    # Then, assign nodes to multivalent GPUs if possible
+    # Case 3.2: assign nodes to multivalent GPUs if possible
     node_idx = 0
     for gpu, count in multivalent.items():
         for _ in range(count):
             if node_idx < len(node_list):
-                allocated_vram += _get_vram_from_node(gpu, node_list[node_idx])
+                allocated_vram += _get_multivalent_vram_based_on_node(gpu, node_list[node_idx])
                 node_idx += 1
             else:
                 allocated_vram += min(MULTIVALENT_GPUS[gpu])
@@ -305,6 +261,75 @@ def _calculate_allocated_vram_new_format(gpu_types: dict[str, int], node_list: l
             gpu_count -= 1
 
     return allocated_vram
+
+
+def _get_approx_allocated_vram(
+    gpu_types: list[str] | dict[str, int], node_list: list[str], gpu_count: int, gpu_mem_usage: int
+) -> int:
+    """
+    Get the total allocated VRAM for a job based on its GPU type and node list.
+
+    This function estimates the total VRAM allocated for a job based on the GPU types used
+    and the nodes where the job ran.
+
+    Args:
+        gpu_types:
+            This could be a list of strings (if using the old database format) or a dictionary with GPU types as keys
+            and their counts as values (if using the new database format).
+            - list[str]: List containing the types of GPUs used in the job.
+            - dict[str, int]: Dictionary with the type of GPUs and the exact count used in the job.
+        node_list (list[str]): List of nodes where the job ran.
+        gpu_count (int): Number of GPUs requested by the job.
+        gpu_mem_usage (int): GPU memory usage in bytes.
+
+    Returns:
+        int: Total allocated (estimate) VRAM for the job in GiB (gibibyte).
+
+    Notes:
+        - When `gpu_types` is a dictionary, the function calculates VRAM based on the counts of each GPU type.
+        - For multivalent GPUs, the VRAM is determined based on the nodes where the GPUs are located.
+        - If the exact number of GPUs is not known, the function uses the minimum VRAM value among the available GPUs.
+    """
+
+    # one type of GPU
+    if len(gpu_types) == 1:
+        total_vram = _calculate_approx_vram_single_gpu_type(gpu_types, node_list, gpu_count, gpu_mem_usage)
+        return total_vram
+
+    # Use helper function to calculate VRAM usage for new GPUType format
+    if isinstance(gpu_types, dict):
+        total_vram = _calculate_alloc_vram_multiple_gpu_types_with_count(gpu_types, node_list, gpu_mem_usage)
+        return total_vram
+
+    # Calculate allocated VRAM when there are multiple GPU types in a job
+    if len(gpu_types) == gpu_count:
+        total_vram = 0
+        for gpu in gpu_types:
+            if gpu in MULTIVALENT_GPUS:
+                for node in node_list:
+                    total_vram += _get_multivalent_vram_based_on_node(gpu, node)
+            else:
+                total_vram += VRAM_VALUES[gpu]
+        return total_vram
+
+    # estimate VRAM for multiple GPUs where exact number isn't known
+    # TODO (Ayush): update this based on the updated GPU types which specify exact number of GPUs
+    allocated_vrams = set()
+    for gpu in gpu_types:
+        if gpu in MULTIVALENT_GPUS:
+            for node in node_list:
+                node_vram = _get_multivalent_vram_based_on_node(gpu, node)
+                if node_vram != 0:
+                    allocated_vrams.add(_get_multivalent_vram_based_on_node(gpu, node))
+        else:
+            allocated_vrams.add(VRAM_VALUES[gpu])
+
+    vram_values = sorted(list(allocated_vrams))
+    total_vram = vram_values.pop(0) * gpu_count  # use the GPU with the minimum VRAM value
+    # if the total VRAM is less than the GPU memory usage, use the VRAM from the next smallest GPU
+    while total_vram < (gpu_mem_usage / 2**30) and vram_values:
+        total_vram = vram_values.pop(0) * gpu_count
+    return total_vram
 
 
 def _fill_missing(res: pd.DataFrame) -> None:
