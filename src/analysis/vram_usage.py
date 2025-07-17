@@ -655,7 +655,7 @@ class EfficiencyAnalysis:
         days_back: int | None = None,
         time_unit: str | TimeUnitEnum = TimeUnitEnum.MONTHS.value,
         remove_zero_values: bool = True,
-        max_points: int = 12,
+        max_points: int = 100,
         annotation_style: str = "hover",  # "hover", "combined", "table", "none"
         show_secondary_y: bool = False,  # Show job counts on secondary y-axis
         exclude_fields: list[str] | None = None,  # List of fields to exclude from annotation text box
@@ -703,90 +703,82 @@ class EfficiencyAnalysis:
         if exclude_fields is None:
             exclude_fields = []
 
-        for idx, user in enumerate(users):
-            # Filter data for the specific user
+        # Determine all time groups to show on x-axis: union of all non-empty periods for selected users
+        user_time_groups = set()
+        user_time_groups_map = {}
+        for user in users:
             user_data = data[data["User"] == user]
+            user_time_groups_map[user] = set(user_data["TimeGroup"].dropna().unique())
+            user_time_groups.update(user_time_groups_map[user])
+        all_time_groups = sorted(user_time_groups)
+        all_time_groups_str = [str(tg) for tg in all_time_groups]
 
+        user_dfs = []
+        any_nonzero_efficiency = False
+        for user in users:
+            user_data = data[data["User"] == user]
             if user_data.empty:
+                user_dfs.append(pd.DataFrame())
                 continue
-
-            # Calculate efficiency metrics grouped by time unit
             grouped_efficiency = []
             grouped_hours = []
             grouped_job_counts = []
-            time_groups = []
-
-            for time_group, group_data in user_data.groupby("TimeGroup"):
-                user_gpu_hours = group_data["job_hours"].sum()
+            for time_group in all_time_groups:
+                group_data = user_data[user_data["TimeGroup"] == time_group]
+                user_gpu_hours = group_data["job_hours"].sum() if not group_data.empty else 0
                 total_gpu_hours = data[data["TimeGroup"] == time_group]["job_hours"].sum()
-
-                if total_gpu_hours > 0:
+                if total_gpu_hours > 0 and not group_data.empty:
                     efficiency = (group_data["alloc_vram_efficiency"] * user_gpu_hours / total_gpu_hours).mean()
                 else:
                     efficiency = 0
                 grouped_efficiency.append(efficiency)
                 grouped_hours.append(user_gpu_hours)
-                grouped_job_counts.append(group_data["JobID"].count())
-                time_groups.append(time_group)
-
-            # Create DataFrame for easier manipulation
+                grouped_job_counts.append(group_data["JobID"].count() if not group_data.empty else 0)
             user_df = pd.DataFrame(
                 {
-                    "TimeGroup": time_groups,
+                    "TimeGroup": all_time_groups,
+                    "TimeGroup_Str": all_time_groups_str,
                     "Efficiency": grouped_efficiency,
                     "GPU_Hours": grouped_hours,
                     "Job_Count": grouped_job_counts,
                 }
             )
-
-            # Remove zero values if specified
             if remove_zero_values:
                 user_df = user_df[user_df["Efficiency"] > 0]
+            if not user_df.empty:
+                any_nonzero_efficiency = True
+            user_dfs.append(user_df)
 
-            # If all efficiency values are zero or removed, plot VRAM Hours instead
-            plot_vram_hours = False
-            if user_df.empty:
-                # Try plotting VRAM Hours if efficiency is always zero
-                user_df = pd.DataFrame(
-                    {"TimeGroup": time_groups, "VRAM_Hours": grouped_hours, "Job_Count": grouped_job_counts}
-                )
-                user_df = user_df[user_df["VRAM_Hours"] > 0]
-                plot_vram_hours = True
+        # If all users have zero efficiency, plot VRAM Hours instead
+        if not any_nonzero_efficiency:
+            print("All users have zero efficiency. Plotting VRAM Hours instead.")
+            return self.plot_vram_hours(
+                users=users,
+                start_date=start_date,
+                end_date=end_date,
+                days_back=days_back,
+                time_unit=time_unit,
+                remove_zero_values=remove_zero_values,
+                max_points=max_points,
+                show_secondary_y=show_secondary_y,
+                exclude_fields=exclude_fields,
+                annotation_style=annotation_style,
+            )
 
-            # Limit the number of points to plot
-            if len(user_df) > max_points:
-                user_df = user_df.iloc[-max_points:]  # Take most recent points
+        for idx, user_df in enumerate(user_dfs):
             if user_df.empty:
                 continue
-
-            # Convert time groups to string for plotting
-            user_df["TimeGroup_Str"] = user_df["TimeGroup"].astype(str)
+            user = users[idx]
             x_positions = range(len(user_df))
-
-            if not plot_vram_hours:
-                # Plot efficiency on primary axis
-                ax1.plot(
-                    x_positions,
-                    user_df["Efficiency"],
-                    marker="o",
-                    label=f"{user} (Efficiency)",
-                    color=colors[idx],
-                    linewidth=2,
-                    markersize=6,
-                )
-            else:
-                # Plot VRAM Hours on primary axis
-                ax1.plot(
-                    x_positions,
-                    user_df["VRAM_Hours"],
-                    marker="o",
-                    label=f"{user} (VRAM Hours)",
-                    color=colors[idx],
-                    linewidth=2,
-                    markersize=6,
-                )
-
-            # Plot job counts on secondary axis if enabled
+            ax1.plot(
+                x_positions,
+                user_df["Efficiency"],
+                marker="o",
+                label=f"{user} (Efficiency)",
+                color=colors[idx],
+                linewidth=2,
+                markersize=6,
+            )
             if show_secondary_y:
                 ax2.plot(
                     x_positions,
@@ -798,32 +790,21 @@ class EfficiencyAnalysis:
                     linestyle="--",
                     markersize=4,
                 )
-
-            # Handle annotations based on style
             for i, (_, row) in enumerate(user_df.iterrows()):
                 annotation_fields = {
                     "User": user,
                     "Time": row["TimeGroup_Str"],
+                    "Efficiency": f"{row['Efficiency']:.3f}",
+                    "GPU_Hours": f"{row.get('GPU_Hours', 0):.1f}",
+                    "Job_Count": row["Job_Count"],
                 }
-                if not plot_vram_hours:
-                    annotation_fields["Efficiency"] = f"{row['Efficiency']:.3f}"
-                if "GPU_Hours" in row:
-                    annotation_fields["GPU_Hours"] = f"{row.get('GPU_Hours', row.get('VRAM_Hours', 0)):.1f}"
-                if "VRAM_Hours" in row:
-                    annotation_fields["VRAM_Hours"] = f"{row['VRAM_Hours']:.1f}"
-                annotation_fields["Job_Count"] = row["Job_Count"]
-
-                # Remove excluded fields
                 for field in exclude_fields:
                     annotation_fields.pop(field, None)
-
-                # Build annotation text
                 annotation_text = "\n".join([f"{k}: {v}" for k, v in annotation_fields.items()])
-
                 if annotation_style == "hover":
                     ax1.annotate(
                         annotation_text,
-                        (i, row["Efficiency"] if not plot_vram_hours else row["VRAM_Hours"]),
+                        (i, row["Efficiency"]),
                         xytext=(5, 5),
                         textcoords="offset points",
                         fontsize=8,
@@ -833,39 +814,28 @@ class EfficiencyAnalysis:
                 elif annotation_style == "combined":
                     ax1.annotate(
                         annotation_text,
-                        (i, row["Efficiency"] if not plot_vram_hours else row["VRAM_Hours"]),
+                        (i, row["Efficiency"]),
                         xytext=(0, 10),
                         textcoords="offset points",
                         fontsize=7,
                         ha="center",
                         bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8),
                     )
-
-                # Store data for table display
                 annotation_data.append(annotation_fields)
 
-        # Set labels and title
         ax1.set_xlabel(f"Time Period ({time_unit})")
         ax1.set_ylabel("Average VRAM Efficiency")
         ax1.set_title(f"VRAM Efficiency Over Time ({time_unit})")
-
-        # Set x-axis labels if we have data
-        if "user_df" in locals() and len(user_df) > 0:
-            ax1.set_xticks(range(len(user_df)))
-            ax1.set_xticklabels(user_df["TimeGroup_Str"], rotation=45, ha="right")
-
-        # Add legends
+        ax1.set_xticks(range(len(all_time_groups_str)))
+        ax1.set_xticklabels(all_time_groups_str, rotation=45, ha="right")
         lines1, labels1 = ax1.get_legend_handles_labels()
         if show_secondary_y:
             lines2, labels2 = ax2.get_legend_handles_labels()
             ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper left", bbox_to_anchor=(1.05, 1))
         else:
             ax1.legend(loc="upper left", bbox_to_anchor=(1.05, 1))
-
         plt.tight_layout()
         plt.show()
-
-        # Display annotation table if requested
         if annotation_style == "table" and annotation_data:
             print("\n" + "=" * 80)
             print("DETAILED METRICS TABLE")
@@ -874,7 +844,164 @@ class EfficiencyAnalysis:
             if not table_df.empty:
                 print(table_df.to_string(index=False))
             print("=" * 80)
+        return fig
 
+    def plot_vram_hours(
+        self,
+        users: list[str],
+        start_date: str | None = None,
+        end_date: str | None = None,
+        days_back: int | None = None,
+        time_unit: str | TimeUnitEnum = TimeUnitEnum.MONTHS.value,
+        remove_zero_values: bool = True,
+        max_points: int = 100,
+        show_secondary_y: bool = False,
+        exclude_fields: list[str] | None = None,
+        annotation_style: str = "hover",
+    ):
+        """
+        Plot VRAM Hours over time for specific users (non-interactive version).
+
+        Args:
+            users (list[str]): List of user names to plot.
+            start_date (str, optional): Start date in 'YYYY-MM-DD' format.
+            end_date (str, optional): End date in 'YYYY-MM-DD' format.
+            days_back (int, optional): Number of days back from today to filter jobs.
+            time_unit (str or TimeUnitEnum, optional): Time unit to group by ('Month', 'Week', 'Day').
+            remove_zero_values (bool, optional): Whether to remove zero VRAM hours from the plot.
+            max_points (int, optional): Maximum number of points to plot to avoid memory issues.
+            show_secondary_y (bool, optional): Whether to show job counts on secondary y-axis.
+            exclude_fields (list[str], optional): List of fields to exclude from annotation text box.
+            annotation_style (str, optional): Style for annotations ("hover", "combined", "table", "none").
+
+        Returns:
+            None: Generates the time-based plot.
+        """
+
+        data = self.filter_jobs_by_date_range(start_date=start_date, end_date=end_date, days_back=days_back)
+        data = self.group_jobs_by_time(data, time_unit)
+
+        fig, ax1 = plt.subplots(figsize=(12, 8))
+        if show_secondary_y:
+            ax2 = ax1.twinx()
+            ax2.set_ylabel("Job Count", color="tab:gray")
+            ax2.tick_params(axis="y", labelcolor="tab:gray")
+
+        annotation_data = []
+        cmap = plt.get_cmap("tab10")
+        colors = [cmap(i % 10) for i in range(len(users))]
+        if exclude_fields is None:
+            exclude_fields = []
+
+        # Determine all time groups to show on x-axis: union of all non-empty periods for selected users
+        user_time_groups = set()
+        user_time_groups_map = {}
+        for user in users:
+            user_data = data[data["User"] == user]
+            user_time_groups_map[user] = set(user_data["TimeGroup"].dropna().unique())
+            user_time_groups.update(user_time_groups_map[user])
+        all_time_groups = sorted(user_time_groups)
+        all_time_groups_str = [str(tg) for tg in all_time_groups]
+
+        for idx, user in enumerate(users):
+            user_data = data[data["User"] == user]
+            if user_data.empty:
+                continue
+            grouped_hours = []
+            grouped_job_counts = []
+            for time_group in all_time_groups:
+                group_data = user_data[user_data["TimeGroup"] == time_group]
+                user_gpu_hours = group_data["job_hours"].sum() if not group_data.empty else 0
+                grouped_hours.append(user_gpu_hours)
+                grouped_job_counts.append(group_data["JobID"].count() if not group_data.empty else 0)
+            user_df = pd.DataFrame(
+                {
+                    "TimeGroup": all_time_groups,
+                    "TimeGroup_Str": all_time_groups_str,
+                    "VRAM_Hours": grouped_hours,
+                    "Job_Count": grouped_job_counts,
+                }
+            )
+            if remove_zero_values:
+                user_df = user_df[user_df["VRAM_Hours"] > 0]
+            if len(user_df) > max_points:
+                user_df = user_df.iloc[-max_points:]
+            if user_df.empty:
+                continue
+            x_positions = range(len(user_df))
+            ax1.plot(
+                x_positions,
+                user_df["VRAM_Hours"],
+                marker="o",
+                label=f"{user} (VRAM Hours)",
+                color=colors[idx],
+                linewidth=2,
+                markersize=6,
+            )
+            if show_secondary_y:
+                ax2.plot(
+                    x_positions,
+                    user_df["Job_Count"],
+                    marker="s",
+                    label=f"{user} (Jobs)",
+                    color=colors[idx],
+                    alpha=0.6,
+                    linestyle="--",
+                    markersize=4,
+                )
+            for i, (_, row) in enumerate(user_df.iterrows()):
+                annotation_fields = {
+                    "User": user,
+                    "Time": row["TimeGroup_Str"],
+                    "VRAM_Hours": f"{row['VRAM_Hours']:.1f}",
+                    "Job_Count": row["Job_Count"],
+                }
+                for field in exclude_fields:
+                    annotation_fields.pop(field, None)
+                annotation_text = "\n".join([f"{k}: {v}" for k, v in annotation_fields.items()])
+                if annotation_style == "hover":
+                    ax1.annotate(
+                        annotation_text,
+                        (i, row["VRAM_Hours"]),
+                        xytext=(5, 5),
+                        textcoords="offset points",
+                        fontsize=8,
+                        alpha=0.7,
+                        bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.7),
+                    )
+                elif annotation_style == "combined":
+                    ax1.annotate(
+                        annotation_text,
+                        (i, row["VRAM_Hours"]),
+                        xytext=(0, 10),
+                        textcoords="offset points",
+                        fontsize=7,
+                        ha="center",
+                        bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8),
+                    )
+                annotation_data.append(annotation_fields)
+
+        ax1.set_xlabel(f"Time Period ({time_unit})")
+        ax1.set_ylabel("VRAM Hours")
+        ax1.set_title(f"VRAM Hours Over Time ({time_unit})")
+        ax1.set_xticks(range(len(all_time_groups_str)))
+        ax1.set_xticklabels(all_time_groups_str, rotation=45, ha="right")
+        lines1, labels1 = ax1.get_legend_handles_labels()
+        if show_secondary_y:
+            lines2, labels2 = ax2.get_legend_handles_labels()
+            ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper left", bbox_to_anchor=(1.05, 1))
+        else:
+            ax1.legend(loc="upper left", bbox_to_anchor=(1.05, 1))
+        plt.tight_layout()
+        plt.show()
+        if annotation_style == "table" and annotation_data:
+            print("\n" + "=" * 80)
+            print("DETAILED METRICS TABLE")
+            print("=" * 80)
+            table_df = pd.DataFrame(annotation_data)
+            if not table_df.empty:
+                print(table_df.to_string(index=False))
+            print("=" * 80)
         return fig
 
     def _add_user_time_series_traces(
@@ -946,7 +1073,7 @@ class EfficiencyAnalysis:
         days_back: int | None = None,
         time_unit: TimeUnitEnum | str = TimeUnitEnum.MONTHS.value,
         remove_zero_values: bool = True,
-        max_points: int = 12,
+        max_points: int = 100,
         exclude_fields: list[str] | None = None,
         job_count_trace: bool = False,
     ):
@@ -1134,7 +1261,7 @@ class EfficiencyAnalysis:
         end_date: str | None = None,
         days_back: int | None = None,
         time_unit: TimeUnitEnum | str = TimeUnitEnum.MONTHS.value,
-        max_points: int = 12,
+        max_points: int = 100,
         exclude_fields: list[str] | None = None,
         job_count_trace: bool = False,
     ):
