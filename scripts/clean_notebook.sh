@@ -45,10 +45,5 @@ else
         echo "Error: nbconvert failed for $fname" >&2
         exit 4
     fi
-    # Ensure notebook-level metadata is empty and cell-level metadata only has tags if metadata is not empty
-    if ! jq '.cells |= map(if .metadata? and (.metadata | length > 0) then .metadata = (if .metadata.tags then {tags: .metadata.tags} else {} end) else . end)' "$tmpnotebook" > "$tmpfinal"; then
-        echo "Error: jq failed to clear notebook/cell metadata for $fname" >&2
-        exit 5
-    fi
-    cat "$tmpfinal"
+    cat "$tmpnotebook"
 fi
