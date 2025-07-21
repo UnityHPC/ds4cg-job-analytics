@@ -1476,13 +1476,13 @@ class EfficiencyAnalysis:
 
         any_nonzero_efficiency = False
         user_dfs = []
-        hover_texts = []
+        hover_texts: list[list[str]] = []
 
         for user in users:
             user_df = user_dfs_dict.get(user, pd.DataFrame())
 
             if user_df.empty:
-                user_dfs.append(None)
+                user_dfs.append(pd.DataFrame())
                 hover_texts.append([])
                 continue
 
@@ -1493,13 +1493,9 @@ class EfficiencyAnalysis:
             # Filter for remove_zero_values and max_points
             if remove_zero_values:
                 user_df = user_df[user_df["Efficiency"] > 0]
+
             if len(user_df) > max_points:
                 user_df = user_df.iloc[-max_points:]
-
-            if user_df.empty:
-                user_dfs.append(None)
-                hover_texts.append([])
-                continue
 
             user_dfs.append(user_df)
 
@@ -1622,24 +1618,19 @@ class EfficiencyAnalysis:
         ]
 
         user_dfs = []
-        hover_texts = []
+        hover_texts: list[list[str]] = []
 
         for user in users:
             user_df = user_dfs_dict.get(user, pd.DataFrame())
 
             if user_df.empty:
-                user_dfs.append(None)
+                user_dfs.append(pd.DataFrame())
                 hover_texts.append([])
                 continue
 
             # Limit the number of points to plot
             if len(user_df) > max_points:
                 user_df = user_df.iloc[-max_points:]
-
-            if user_df.empty:
-                user_dfs.append(None)
-                hover_texts.append([])
-                continue
 
             user_dfs.append(user_df)
 
@@ -1685,7 +1676,7 @@ def filter_zero_vram_requested_with_gpu_allocated(df, requested_vram=0, gpus_min
     """
     Return jobs where requested_vram is greater than or equal to a value (default 0) and GPUs >= gpus_min (default 1).
 
-    Args:
+    Args:pd.DataFrame()
         df (pd.DataFrame): The jobs DataFrame.
         requested_vram (int, float): Value to filter requested_vram
         gpus_min (int): Minimum number of GPUs allocated
