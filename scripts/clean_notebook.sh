@@ -24,7 +24,7 @@ else
     fi
     # Convert notebook to JSON and assign sequential cell IDs with jq (array-safe)
     if ! cat "$fname" | \
-        jq 'if .cells then .cells |= [ range(0; length) as $i | .[$i] as $cell | ($cell + {id: ($i+1|tostring), metadata: ($cell.metadata + {id: ($i+1|tostring)})}) ] else . end' > "$tmpjson"; then
+        jq 'if .cells then .cells |= [ range(0; length) as $i | .[$i] as $cell | ($cell + {id: ($i|tostring)}) ] else . end' > "$tmpjson"; then
         echo "Error: jq failed for $fname" >&2
         exit 2
     fi
