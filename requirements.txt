@@ -6,3 +6,4 @@ tabulate
 matplotlib
 seaborn
 jupyterlab
+jq
