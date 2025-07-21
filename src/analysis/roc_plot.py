@@ -1,22 +1,9 @@
 """
-Design template for ROC:
-
-Chris's code very useful. Generally, I can follow the format of 2 functions like that.
-But I just need to validate it, raise error properly, and make sure it can work with multiple other columns.
-Also need to handle the NULL values properly and optimize Chris codes
-
-Actions item:
-- Bring the 2 functions in Chris's code to this class DONE
-- Refactor the calculate effciency threshold function DONE
-- For the plot(), don't focus on group by for now, implement validation, errors raise, null handling for columns DONE
-- how can we also allow options for filtering  -> allow passing filtered dataframe. DONE
-- Extend the plot() to accept some other columns (vram_hours, users) DONE
-- Need another function that have multiple plot lines, for example for different users or pi_group DONE
-
 TODO (Tan): consider writing tests for validate_input function
-- For each some threshold, can plot the data of y axis on the plot
-- explore group by option
-- can try to integrate the aggregation metrics (in case we want to group by)
+Actions item:
+- For each some threshold, can plot the data of y axis on the plot DONE
+- Add argument to allow calculate the proportional (percentage) either based on the whole data or filtered data.
+- explore group by option + aggregation metrics
 - refactor roc_plot to use less arguments, consider printing out statistics info of thresholds
 """
 
@@ -163,6 +150,7 @@ class ROCVisualizer(EfficiencyAnalysis):
             thresholds_arr (np.ndarray[float]): List of predefined threshold values.
             threshold_metric (EfficiencyMetricsJobsEnum): The specific efficiency metric used as thresholds_arr.
             plot_percentage (bool): Whether to return the proportion as percentage or as raw value. Defaults to True.
+
         Returns:
             np.ndarray[float]: List of proportions corresponding to each threshold.
 
@@ -221,6 +209,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         In case where threshold_metric is ALLOC_VRAM_EFFICIENCY_SCORE:
             - Filter out entries where the threshold_metric is -inf.
             - If min_threshold is not provided or is 0, set min_threshold to the minimum value of the threshold_metric.
+        If plot by percentage, percentage will be based on the filtered data, not the original data.
 
         Args:
             dataframe (pd.DataFrame or None): The data to plot. If None, uses the instance's job_metrics dataframe.
@@ -234,6 +223,9 @@ class ROCVisualizer(EfficiencyAnalysis):
 
         Returns:
             tuple[Figure, list[Axes]]: A tuple containing the figure, list of axes.
+
+        Raises:
+            ValueError: If no data is available for the specified threshold metric.
 
         """
 
@@ -251,6 +243,7 @@ class ROCVisualizer(EfficiencyAnalysis):
             proportion_metric,
         )
 
+        # handle filtering null values
         plot_data: pd.DataFrame = data[data[threshold_metric.value].notna()].copy()
 
         if plot_data.empty:
@@ -260,6 +253,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         if null_data_length:
             print(f"Amount of entries whose {threshold_metric.value} is null: {null_data_length}")
 
+        # handle filtering -inf score
         if threshold_metric == JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE:
             prev_length = len(plot_data)
             plot_data = plot_data[plot_data[threshold_metric.value] != -np.inf].copy()
@@ -269,7 +263,7 @@ class ROCVisualizer(EfficiencyAnalysis):
                 print(f"Setting min_threshold to {min_threshold} based on data.")
 
         thresholds_arr: np.ndarray = np.arange(min_threshold, max_threshold + threshold_step, threshold_step)
-        fig, axe = plt.subplots(1, 1, figsize=(16, 6))
+        fig, axe = plt.subplots(1, 1, figsize=(16, 7))
         axe_list = [axe]
         # plotting
         proportions_data = self._roc_calculate_proportion(
@@ -331,9 +325,14 @@ class ROCVisualizer(EfficiencyAnalysis):
         This function will plot an ROC curve for each object, with proportion metrics is count of jobs.
 
         Before plotting, this will filter out entries whose threshold_metric is NaN.
+
         In case where threshold_metric is ALLOC_VRAM_EFFICIENCY_SCORE:
             - Filter out entries where the threshold_metric is -inf.
             - If min_threshold is not provided or is 0, set min_threshold to the minimum value of the threshold_metric.
+
+        If plot ```proportion_metric``` by percentage, percentage will be calculated based on the total data per object
+        (user/ pi_group) after filtering out invalid data, not by the whole database.
+
 
         Args:
             plot_object_list (list[ROCProportionMetricsEnum.USER] or list[ROCProportionMetricsEnum.PI_GROUP]): List
@@ -348,6 +347,9 @@ class ROCVisualizer(EfficiencyAnalysis):
 
         Returns:
             tuple[Figure, list[Axes]]: A tuple containing the figure, list of axes.
+
+        Raises:
+            ValueError: If no data is available for the specified threshold metric.
         """
         data = self.jobs_with_efficiency_metrics
         if input_df is not None:
@@ -385,13 +387,14 @@ class ROCVisualizer(EfficiencyAnalysis):
         for target in plot_object_list:
             filtered = plot_data[plot_data[object_column_type.value] == target].copy()
             proportion_data = self._roc_calculate_proportion(
-                filtered, proportion_metric, thresholds_arr, threshold_metric, plot_percentage=False
+                filtered, proportion_metric, thresholds_arr, threshold_metric, plot_percentage
             )
             axe.plot(thresholds_arr, proportion_data, label=f"{target}")
 
         if title is None:
             title = (
-                f"Multple line ROC plot for {'proportion' if plot_percentage else 'amounts'} of "
+                f"Multple line ROC plot ({object_column_type.value}) for "
+                f"{'proportion' if plot_percentage else 'amounts'} of "
                 f"{proportion_metric.value} by threshold {threshold_metric.value}"
             )
         y_label = f"{'Percentage' if plot_percentage else 'Count'} of {proportion_metric.value} below threshold"
