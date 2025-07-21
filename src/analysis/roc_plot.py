@@ -1,5 +1,6 @@
 """
 TODO (Tan): consider writing tests for validate_input function
+
 Actions item:
 - For each some threshold, can plot the data of y axis on the plot DONE
 - Add argument to allow calculate the proportional (percentage) either based on the whole data or filtered data.
@@ -188,7 +189,6 @@ class ROCVisualizer(EfficiencyAnalysis):
                         metric_values[mask].sum() / total_sum * 100 if plot_percentage else metric_values[mask].sum()
                     )
                     proportions.append(proportion)
-        print(proportions[-1])
         return np.array(proportions)
 
     def plot_roc(
