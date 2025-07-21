@@ -2,17 +2,36 @@
 clean = scripts/clean_notebook.sh %f
 
 [difftool "jupyternotebook"]
-cmd = bash -c 'git show "$LOCAL" > /tmp/local.ipynb && git show "$REMOTE" > /tmp/remote.ipynb && scripts/clean_notebook.sh /tmp/local.ipynb > /tmp/local_clean.ipynb && scripts/clean_notebook.sh /tmp/remote.ipynb > /tmp/remote_clean.ipynb && git-nbdiffdriver diff /tmp/local_clean.ipynb /tmp/remote_clean.ipynb; rm -f /tmp/local.ipynb /tmp/remote.ipynb /tmp/local_clean.ipynb /tmp/remote_clean.ipynb'
+cmd = bash -c "\
+    git show "$LOCAL" > /tmp/local.ipynb && \
+    git show "$REMOTE" > /tmp/remote.ipynb && \
+    scripts/clean_notebook.sh /tmp/local.ipynb > /tmp/local_clean.ipynb && \
+    scripts/clean_notebook.sh /tmp/remote.ipynb > /tmp/remote_clean.ipynb && \
+    git-nbdiffdriver diff /tmp/local_clean.ipynb /tmp/remote_clean.ipynb; \
+    rm -f /tmp/local.ipynb /tmp/remote.ipynb /tmp/local_clean.ipynb /tmp/remote_clean.ipynb"
 trustExitCode = false
 
 [diff "jupyternotebook"]
 name = "jupyter notebook diff"
-command = bash -c 'scripts/clean_notebook.sh "$1" > /tmp/clean1.ipynb && scripts/clean_notebook.sh "$2" > /tmp/clean2.ipynb && nbdiff /tmp/clean1.ipynb /tmp/clean2.ipynb; rm -f /tmp/clean1.ipynb /tmp/clean2.ipynb'
+cmd = bash -c "scripts/clean_notebook.sh \"$0\" > /tmp/clean1.ipynb && \
+    scripts/clean_notebook.sh \"$1\" > /tmp/clean2.ipynb && \
+    nbdiff /tmp/clean1.ipynb /tmp/clean2.ipynb; \
+    rm -f /tmp/clean1.ipynb /tmp/clean2.ipynb"
 
 [merge "jupyternotebook"]
 name = "Jupyter Notebook nbdime merge"
-driver = bash -c 'scripts/clean_notebook.sh %O > /tmp/base_clean.ipynb && scripts/clean_notebook.sh %A > /tmp/local_clean.ipynb && scripts/clean_notebook.sh %B > /tmp/remote_clean.ipynb && git-nbmergedriver merge /tmp/base_clean.ipynb /tmp/local_clean.ipynb /tmp/remote_clean.ipynb %A; rm -f /tmp/base_clean.ipynb /tmp/local_clean.ipynb /tmp/remote_clean.ipynb'
+driver = bash -c "\
+    scripts/clean_notebook.sh %O > /tmp/base_clean.ipynb && \
+    scripts/clean_notebook.sh %A > /tmp/local_clean.ipynb && \
+    scripts/clean_notebook.sh %B > /tmp/remote_clean.ipynb && \
+    git-nbmergedriver merge /tmp/base_clean.ipynb /tmp/local_clean.ipynb /tmp/remote_clean.ipynb %A; \
+    rm -f /tmp/base_clean.ipynb /tmp/local_clean.ipynb /tmp/remote_clean.ipynb"
 
 [mergetool "jupyternotebook"]
-cmd = bash -c 'scripts/clean_notebook.sh "$BASE" > /tmp/base_clean.ipynb && scripts/clean_notebook.sh "$LOCAL" > /tmp/local_clean.ipynb && scripts/clean_notebook.sh "$REMOTE" > /tmp/remote_clean.ipynb && nbmerge-web /tmp/base_clean.ipyqnb /tmp/local_clean.ipynb /tmp/remote_clean.ipynb "$MERGED"; rm -f /tmp/base_clean.ipynb /tmp/local_clean.ipynb /tmp/remote_clean.ipynb'
+cmd = bash -c "\
+    scripts/clean_notebook.sh "$BASE" > /tmp/base_clean.ipynb && \
+    scripts/clean_notebook.sh "$LOCAL" > /tmp/local_clean.ipynb && \
+    scripts/clean_notebook.sh "$REMOTE" > /tmp/remote_clean.ipynb && \
+    nbmerge-web /tmp/base_clean.ipynb /tmp/local_clean.ipynb /tmp/remote_clean.ipynb "$MERGED"; \
+    rm -f /tmp/base_clean.ipynb /tmp/local_clean.ipynb /tmp/remote_clean.ipynb"
 trustExitCode = false
