@@ -2,9 +2,10 @@
 Declaration of some enum class such as constants values of categorical types.
 """
 
-from enum import Enum
+from enum import Enum, unique, auto
 
 
+@unique
 class InteractiveEnum(Enum):
     NON_INTERACTIVE = "non-interactive"
     SHELL = "shell"
@@ -14,6 +15,7 @@ class InteractiveEnum(Enum):
     DESKTOP = "bc_desktop"
 
 
+@unique
 class QOSEnum(Enum):
     NORMAL = "normal"
     UPDATES = "updates"
@@ -21,6 +23,7 @@ class QOSEnum(Enum):
     LONG = "long"
 
 
+@unique
 class StatusEnum(Enum):
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
@@ -32,16 +35,19 @@ class StatusEnum(Enum):
     NODE_FAIL = "NODE_FAIL"
 
 
+@unique
 class ExitCodeEnum(Enum):
     SUCCESS = "SUCCESS"
     ERROR = "ERROR"
     SIGNALED = "SIGNALED"
 
 
+@unique
 class AdminsAccountEnum(Enum):
     ROOT = "root"
 
 
+@unique
 class PartitionEnum(Enum):
     BUILDING = "building"
     ARM_GPU = "arm-gpu"
@@ -81,13 +87,42 @@ class PartitionEnum(Enum):
     ZHOULIN_CPU = "zhoulin-cpu"
 
 
+@unique
 class FilterTypeEnum(Enum):
-    DICTIONARY = "dictionary"
-    LIST = "list"
-    SET = "set"
-    TUPLE = "tuple"
-    SCALAR = "scalar"
-    PD_NA = "pd_na"
+    """
+    An enumeration representing different types of filterable data structures.
+
+    Attributes:
+        DICTIONARY: Represents a Python dictionary type.
+        LIST: Represents a Python list type.
+        SET: Represents a Python set type.
+        TUPLE: Represents a Python tuple type.
+        SCALAR: Represents a scalar value (e.g., int, float, str).
+        PD_NA: Represents a pandas 'NA' value for missing data.
+    """
+
+    DICTIONARY = auto()
+    LIST = auto()
+    SET = auto()
+    TUPLE = auto()
+    NUMERIC_SCALAR = auto()
+    PD_NA = auto()
+
+
+@unique
+class MetricsDataFrameNameEnum(Enum):
+    """
+    An enumeration representing the names of DataFrames containing efficiency metrics.
+
+    Attributes:
+        JOBS: DataFrame name for jobs with efficiency metrics.
+        USERS: DataFrame name for users with efficiency metrics.
+        PI_GROUPS: DataFrame name for PI accounts/groups with efficiency metrics.
+    """
+
+    JOBS = "jobs_with_efficiency_metrics"
+    USERS = "users_with_efficiency_metrics"
+    PI_GROUPS = "pi_accounts_with_efficiency_metrics"
 
 
 class ROCProportionMetricsEnum(Enum):

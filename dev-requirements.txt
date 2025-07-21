@@ -13,3 +13,4 @@ types-seaborn
 jupyterlab
 nbconvert
 nbdime
+jq

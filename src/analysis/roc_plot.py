@@ -30,12 +30,8 @@ class ROCVisualizer(EfficiencyAnalysis):
 
     """
 
-    def __init__(
-        self,
-        db_path: str | Path,
-        table_name: str = "Jobs",
-    ) -> None:
-        super().__init__(db_path, table_name)
+    def __init__(self, jobs_df: pd.DataFrame) -> None:
+        super().__init__(jobs_df)
         # if self.jobs_with_efficiency_metrics is None:
         self.calculate_job_efficiency_metrics(self.jobs_df)
 
