@@ -135,10 +135,10 @@ class ROCVisualizer(EfficiencyAnalysis):
         self,
         plot_data_frame: pd.DataFrame,
         proportion_metric: ROCProportionMetricsEnum,
-        thresholds_arr: np.ndarray[float],
+        thresholds_arr: np.ndarray,
         threshold_metric: JobEfficiencyMetricsEnum,
         plot_percentage: bool = True,
-    ) -> np.ndarray[float]:
+    ) -> np.ndarray:
         """
         Calculate the proportion of data that meet the alloc_vram_efficiency threshold for each threshold value.
 
@@ -148,15 +148,15 @@ class ROCVisualizer(EfficiencyAnalysis):
         Args:
             plot_data_frame (pd.DataFrame): DataFrame containing the data to plot.
             proportion_metric (ROCMetricsEnum): The metric to calculate proportions for.
-            thresholds_arr (np.ndarray[float]): List of predefined threshold values.
+            thresholds_arr (np.ndarray): List of predefined threshold values.
             threshold_metric (EfficiencyMetricsJobsEnum): The specific efficiency metric used as thresholds_arr.
             plot_percentage (bool): Whether to return the proportion as percentage or as raw value. Defaults to True.
 
         Returns:
-            np.ndarray[float]: List of proportions corresponding to each threshold.
+            np.ndarray: List of proportions corresponding to each threshold.
 
         """
-        threshold_values = plot_data_frame[threshold_metric.value].to_numpy()
+        threshold_values = plot_data_frame[threshold_metric.value].to_numpy(dtype=float)
         if proportion_metric == ROCProportionMetricsEnum.JOBS:
             total_count = len(plot_data_frame)
             if plot_percentage:
@@ -167,7 +167,7 @@ class ROCVisualizer(EfficiencyAnalysis):
                 proportions = [(threshold_values <= threshold).sum() for threshold in thresholds_arr]
         else:
             proportions = []
-            metric_values = plot_data_frame[proportion_metric.value].to_numpy()
+            metric_values = plot_data_frame[proportion_metric.value].to_numpy(dtype=float)
             count_unique_proportion_metric = {ROCProportionMetricsEnum.USER, ROCProportionMetricsEnum.PI_GROUP}
             # check if we are dealing with USER metrics
             if proportion_metric in count_unique_proportion_metric:
@@ -181,7 +181,7 @@ class ROCVisualizer(EfficiencyAnalysis):
                 total_sum = metric_values.sum()
 
                 if total_sum == 0:
-                    return np.zeros(len(thresholds_arr))
+                    return np.zeros(len(thresholds_arr), dtype=float)
 
                 for threshold in thresholds_arr:
                     mask = threshold_values <= threshold
@@ -189,7 +189,7 @@ class ROCVisualizer(EfficiencyAnalysis):
                         metric_values[mask].sum() / total_sum * 100 if plot_percentage else metric_values[mask].sum()
                     )
                     proportions.append(proportion)
-        return np.array(proportions)
+        return np.array(proportions, dtype=float)
 
     def plot_roc(
         self,
@@ -318,7 +318,7 @@ class ROCVisualizer(EfficiencyAnalysis):
             ROCProportionMetricsEnum.JOB_HOURS, ROCProportionMetricsEnum.JOBS
         ] = ROCProportionMetricsEnum.JOBS,
         plot_percentage: bool = True,
-    ) -> None:
+    ) -> tuple[Figure, list[Axes]]:
         """
         Plot ROC curve for User/ Pi group given threshold_metrics.
 
