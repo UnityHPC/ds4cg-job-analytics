@@ -167,21 +167,89 @@ def _calculate_approx_vram_single_gpu_type(
     return total_vram
 
 
-def _get_multivalent_gpu_node_count(node_list: list[str]) -> int:
+def _adjust_vram_for_multivalent_gpus(multivalent: dict, allocated_vram: int, gpu_mem_usage: int | float) -> int:
     """
-    Get the number of nodes in the node list that have multivalent GPUs.
+    Adjust the allocated VRAM for multivalent GPUs to meet or exceed the GPU memory usage.
+
+    This function increases the allocated VRAM by adding the minimum VRAM for each multivalent GPU
+    until the total allocated VRAM is at least as large as the required GPU memory usage.
 
     Args:
-        node_list (list[str]): List of nodes where the job ran.
+        multivalent (dict): Dictionary of GPU types (str) to counts (int) for multivalent GPUs.
+        allocated_vram (int): Current total allocated VRAM in GiB.
+        gpu_mem_usage (int | float): GPU memory usage in bytes.
 
     Returns:
-        int: Number of nodes in the node list that have multivalent GPUs.
+        int: Adjusted total allocated VRAM in GiB.
     """
-    count = 0
+    # TODO (Ayush): Estimate based on a better algorithm
+
+    # Assume they wanted the bigger VRAM variant for each GPU until the condition is satisfied
+    for gpu, gpu_count in multivalent.items():
+        while gpu_count > 0 and allocated_vram < (gpu_mem_usage / 2**30):
+            allocated_vram += min(MULTIVALENT_GPUS[gpu])
+            gpu_count -= 1
+
+    return allocated_vram
+
+
+def _get_matching_vrams_for_gpu(gpu: str, node_list: list[str]) -> list[int]:
+    """
+    Return all non-zero VRAM values for a given GPU type across a list of nodes.
+
+    Args:
+        gpu (str): The GPU type (e.g., "a100", "v100").
+        node_list (list[str]): List of node names where the job ran.
+
+    Returns:
+        list[int]: List of non-zero VRAM values for the given GPU across nodes.
+    """
+
+    matching_vrams = []
     for node in node_list:
-        if any(_get_multivalent_vram_based_on_node(gpu, node) > 0 for gpu in MULTIVALENT_GPUS):
-            count += 1
-    return count
+        vram = _get_multivalent_vram_based_on_node(gpu, node)
+        if vram in MULTIVALENT_GPUS[gpu]:  # if it matches a node for the given GPU
+            matching_vrams.append(vram)
+    return matching_vrams
+
+
+def _can_calculate_perfectly(gpu: str, count: int, node_list: list[str]) -> bool:
+    """
+    Determine whether VRAM can be calculated precisely for a GPU type based on matching nodes.
+
+    Args:
+        gpu (str): The GPU type (e.g., "a100", "v100").
+        count (int): Number of GPUs of this type.
+        node_list (list[str]): List of node names where the job ran.
+
+    Returns:
+        bool: True if all matching VRAM values are the same or if there are enough distinct nodes for the GPU.
+    """
+    matching_vrams = _get_matching_vrams_for_gpu(gpu, node_list)
+    return len(matching_vrams) == count or len(set(matching_vrams)) == 1
+
+
+def _calculate_precise_vram(gpu: str, count: int, node_list: list[str]) -> int:
+    """
+    Calculate total VRAM for a GPU type precisely.
+
+    This can be done when all matched nodes have consistent VRAM configuration or enough distinct nodes exist.
+
+    Args:
+        gpu (str): The GPU type (e.g., "a100", "v100").
+        count (int): The number of GPUs of this type used in the job.
+        node_list (list[str]): List of node names where the job ran.
+
+    Returns:
+        int: Total VRAM in GiB for the given GPU type.
+    """
+    matching_vrams = _get_matching_vrams_for_gpu(gpu, node_list)
+    # If all matching VRAM values are the same, return that value multiplied by the count
+    if len(set(matching_vrams)) == 1:
+        return matching_vrams[0] * count
+
+    # Otherwise, return the sum of all matching VRAM values
+    return sum(matching_vrams)
 
 
 def _calculate_alloc_vram_multiple_gpu_types_with_count(
@@ -204,50 +272,54 @@ def _calculate_alloc_vram_multiple_gpu_types_with_count(
 
     allocated_vram = 0
 
-    # Case 1: All GPUs are non-multivalent
+    # Case 1: All GPUs are not multivalent so we know their exact VRAM only based on the GPUType.
     if len(multivalent) == 0:
         for gpu, count in non_multivalent.items():
             allocated_vram += VRAM_VALUES[gpu] * count
         return allocated_vram
 
-    # Case 2: All GPUs multivalent
+    # Case 2: All GPUs multivalent. Number of GPUs is either equal or more than the number of GPU nodes.
     if len(non_multivalent) == 0:
-        total_count = sum(multivalent.values())
-        # Case 2.1: The number of GPUs is less equal to the number of GPU nodes in the job.
-        num_gpu_nodes = _get_multivalent_gpu_node_count(node_list)
-        if total_count == num_gpu_nodes:
-            # Assign each GPU to a node
-            for gpu, count in multivalent.items():
-                gpu_total = 0
-                # for each instance of the GPU, check and assign a node to it
-                for _ in range(count):
-                    for node in node_list:
-                        node_vram = _get_multivalent_vram_based_on_node(gpu, node)
-                        if allocated_vram > 0:
-                            gpu_total += node_vram
-            allocated_vram += gpu_total
-        # Case 2.2: The number of GPUs is greater than the number of nodes.
-        else:
-            # Not enough distinct nodes, use min VRAM for each GPU
-            for gpu, count in multivalent.items():
-                allocated_vram += min(MULTIVALENT_GPUS[gpu]) * count
-            
-            # if the estimate is less than the usage, update it
-            if allocated_vram < gpu_mem_usage / 2**30:
-                for gpu, gpu_count in multivalent.items():
-                    while gpu_count > 0 and allocated_vram < (gpu_mem_usage / 2**30):
-                        allocated_vram += min(MULTIVALENT_GPUS[gpu])
-                        gpu_count -= 1
+        gpus_with_exact_values = dict()  # to keep track of GPUs for which we can calculate exact VRAM
 
+        for gpu, count in multivalent.items():
+            if _can_calculate_perfectly(gpu, count, node_list):
+                print(gpu, count, node_list)
+                # If we can calculate perfectly, use the VRAM from the matching nodes
+                vram_value = _calculate_precise_vram(gpu, count, node_list)
+                allocated_vram += vram_value
+                gpus_with_exact_values[gpu] = vram_value
+
+            else:
+                # Estimate using the minimum VRAM for multivalent GPUs
+                allocated_vram += min(MULTIVALENT_GPUS[gpu]) * count
+
+        # if the estimate is less than the usage and not all GPU VRAMs were calculated exactly, update it
+        if allocated_vram < gpu_mem_usage / 2**30 and len(gpus_with_exact_values) < len(multivalent):
+            # Only adjust for GPUs not already calculated exactly
+            filtered_multivalent = {
+                gpu: count for gpu, count in multivalent.items() if gpu not in gpus_with_exact_values
+            }
+
+            exact_allocated_vram = sum(gpus_with_exact_values.values())
+
+            remaining_usage = (gpu_mem_usage / 2**30 - exact_allocated_vram) * (
+                2**30
+            )  # only allocate the remaining usage (bytes)
+            print(allocated_vram, allocated_vram - exact_allocated_vram, remaining_usage)
+
+            allocated_vram = exact_allocated_vram + _adjust_vram_for_multivalent_gpus(
+                filtered_multivalent, allocated_vram - exact_allocated_vram, remaining_usage
+            )
         return allocated_vram
 
     # Case 3: Mixed multivalent and non-multivalent GPUs
 
-    # Case 3.1: add non-multivalent GPUs
+    # Add VRAM for non-multivalent GPUs
     for gpu, count in non_multivalent.items():
         allocated_vram += VRAM_VALUES[gpu] * count
 
-    # Case 3.2: assign nodes to multivalent GPUs if possible
+    # for each multivalent GPU, find its corresponding node and calculate its VRAM
     node_idx = 0
     for gpu, count in multivalent.items():
         for _ in range(count):
@@ -262,12 +334,7 @@ def _calculate_alloc_vram_multiple_gpu_types_with_count(
         return allocated_vram
 
     # If the allocated VRAM is still less than the GPU memory usage, adjust the VRAM
-    # Assume they wanted the bigger VRAM variant for each GPU until the condition is satisfied
-    for gpu, gpu_count in multivalent.items():
-        while gpu_count > 0 and allocated_vram < (gpu_mem_usage / 2**30):
-            allocated_vram += min(MULTIVALENT_GPUS[gpu])
-            gpu_count -= 1
-
+    allocated_vram = _adjust_vram_for_multivalent_gpus(multivalent, allocated_vram, gpu_mem_usage)
     return allocated_vram
 
 
@@ -299,7 +366,7 @@ def _get_approx_allocated_vram(
         - If the exact number of GPUs is not known, the function uses the minimum VRAM value among the available GPUs.
     """
 
-    # one type of GPU
+    # Handle cases with one type of GPU
     if len(gpu_types) == 1:
         total_vram = _calculate_approx_vram_single_gpu_type(gpu_types, node_list, gpu_count, gpu_mem_usage)
         return total_vram
@@ -321,7 +388,6 @@ def _get_approx_allocated_vram(
         return total_vram
 
     # estimate VRAM for multiple GPUs where exact number isn't known
-    # TODO (Ayush): update this based on the updated GPU types which specify exact number of GPUs
     allocated_vrams = set()
     for gpu in gpu_types:
         if gpu in MULTIVALENT_GPUS:
