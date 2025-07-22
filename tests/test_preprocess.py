@@ -8,7 +8,6 @@ from src.config.enum_constants import (
     PartitionEnum,
     AdminsAccountEnum,
 )
-
 import pytest
 
 
