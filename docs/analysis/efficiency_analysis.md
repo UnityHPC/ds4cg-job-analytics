@@ -1,4 +1,4 @@
 ---
 title: Efficiency Analysis
 ---
-::: src.analysis.vram_usage
+::: src.analysis.efficiency_analysis
