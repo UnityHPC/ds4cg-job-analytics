@@ -310,20 +310,20 @@ class EfficiencyAnalysis:
         )
 
         # Calculate vram_constraint_efficiency score
-        vram_constraint_eff = filtered_jobs["vram_constraint_efficiency"]
+        vram_constraint_eff = filtered_jobs[JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY.value]
         # Avoid log(0) and propagate pd.NA: if NA, score is NA; if 0, score is -np.inf
         score = pd.Series(pd.NA, index=filtered_jobs.index, dtype=pd.Float64Dtype())
         mask_valid = vram_constraint_eff.notna() & (vram_constraint_eff > 0)
         mask_zero = vram_constraint_eff.notna() & (vram_constraint_eff == 0)
         score[mask_valid] = np.log(vram_constraint_eff[mask_valid]) * filtered_jobs.loc[mask_valid, vram_hour_col_name]
         score[mask_zero] = -np.inf
-        filtered_jobs.loc[:, "vram_constraint_efficiency_score"] = score
+        filtered_jobs.loc[:, JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY_SCORE.value] = score
 
         # Add CPU memory metrics if available
         if "CPUMemUsage" in self.jobs_df.columns and "Memory" in self.jobs_df.columns:
             filtered_jobs.loc[:, "used_cpu_mem_gib"] = filtered_jobs["CPUMemUsage"] / (2**30)
             filtered_jobs.loc[:, "allocated_cpu_mem_gib"] = filtered_jobs["Memory"] / (2**10)  # Memory is in MiB
-            filtered_jobs.loc[:, "cpu_mem_efficiency"] = (
+            filtered_jobs.loc[:, JobEfficiencyMetricsEnum.CPU_MEM_EFFICIENCY.value] = (
                 filtered_jobs["used_cpu_mem_gib"] / filtered_jobs["allocated_cpu_mem_gib"]
             )
             filtered_jobs = filtered_jobs.drop(columns=["CPUMemUsage", "Memory"])
@@ -388,7 +388,7 @@ class EfficiencyAnalysis:
         )
 
         self.jobs_with_efficiency_metrics.loc[:, "weighted_vram_constraint_efficiency"] = (
-            self.jobs_with_efficiency_metrics["vram_constraint_efficiency"]
+            self.jobs_with_efficiency_metrics[JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY.value]
             * self.jobs_with_efficiency_metrics["vram_hours"]
             / user_job_hours_per_job
         ).astype(pd.Float64Dtype())
