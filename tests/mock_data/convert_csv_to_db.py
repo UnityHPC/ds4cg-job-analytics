@@ -25,7 +25,7 @@ def convert_csv_to_db(path_to_csv: str, path_to_db: str):
             df_mock[col] = pd.to_datetime(df_mock[col], format="%m/%d/%y %H:%M")
             df_mock[col] = df_mock[col].astype("datetime64[ns]")
 
-        for col in ["CPUMemUsage", "GPUComputeUsage", "CPUMemUsage", "CPUComputeUsage"]:
+        for col in ["GPUMemUsage", "GPUComputeUsage", "CPUMemUsage", "CPUComputeUsage"]:
             df_mock[col] = pd.to_numeric(df_mock[col], errors="coerce")
             df_mock[col] = df_mock[col].astype("float64")
 
@@ -57,9 +57,9 @@ def convert_csv_to_db(path_to_csv: str, path_to_db: str):
                 Memory INTEGER,
                 GPUs SMALLINT,
                 GPUType VARCHAR[],
-                GPUMemUsage BIGINT,
+                GPUMemUsage FLOAT,
                 GPUComputeUsage FLOAT,
-                CPUMemUsage BIGINT,
+                CPUMemUsage FLOAT,
                 CPUComputeUsage FLOAT
             );"""
         )

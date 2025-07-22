@@ -4,7 +4,7 @@ import tempfile
 import shutil
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def temp_file_db():
     """
     Create a temporary file-based database for testing.
@@ -12,10 +12,10 @@ def temp_file_db():
     Yields:
         DatabaseConnection: A connected temporary database instance for testing.
     """
-    temp_db_dir = tempfile.mkdtemp()
-    temp_db_path = f"{temp_db_dir}/mock_database.db"
-    mem_db = None
     try:
+        mem_db = None
+        temp_db_dir = tempfile.mkdtemp()
+        temp_db_path = f"{temp_db_dir}/mock_database.db"
         mem_db = DatabaseConnection(db_url=temp_db_path)
         schema_sql = """
         CREATE TABLE Jobs (
@@ -84,10 +84,10 @@ def temp_file_db():
 
         yield mem_db
     except Exception as e:
-        raise Exception("Exception at mock data from test_database_connection") from e
+        raise e
     finally:
         if mem_db is not None:
-            mem_db.disconnect()
+            del mem_db
         shutil.rmtree(temp_db_dir)
 
 
