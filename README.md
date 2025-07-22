@@ -16,6 +16,15 @@ The following guidelines may prove helpful in maximizing the utility of this rep
 
 You'll need to first install a few dependencies, which include DuckDB, Pandas, and some plotting libraries. More details for running the project will need be added here later.
 
+### Version Control
+To provide the path of the git configuration file of this project to git, run:
+
+    git config --local include.path ../.gitconfig
+
+To ensure consistent LF line endings across all platforms, run the following command when developing on Windows machines:
+
+    git config --local core.autocrlf input
+
 ### Jupyter notebooks
 
 You can run Jupyter notebooks on Unity through the OpenOnDemand portal. To make your environment 
@@ -24,6 +33,11 @@ visible in Jupyter, run
     python -m ipykernel install --user --name "Duck DB"
 
 from within the environment. This will add "Duck DB" as a kernel option in the dropdown.
+
+By default, Jupyter Notebook outoputs are removed via a git filter before the notebook is committed to git. To add an exception and keep the output of a notebook, add the following line to [notebooks/.gitattributes](```notebooks/.gitattributes```):
+
+    <NOTEBOOK_NAME>.ipynb !filter=strip-notebook-output
+
 
 ## Development Environment
 
