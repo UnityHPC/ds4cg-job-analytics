@@ -25,10 +25,7 @@ import warnings
 
 class ROCVisualizer(EfficiencyAnalysis):
     """
-    A class for visualizing pairs of columns in a DataFrame, inheriting from EfficiencyAnalysis.
-
-    TODO(Tan) : need to implement a validate function that makes sure whatever metrics used is calculated
-
+    A class for visualizing ROC plots, inheriting from EfficiencyAnalysis.
     """
 
     def __init__(self, jobs_df: pd.DataFrame) -> None:
