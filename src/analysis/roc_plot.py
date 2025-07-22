@@ -32,8 +32,7 @@ class ROCVisualizer(EfficiencyAnalysis):
 
     def __init__(self, jobs_df: pd.DataFrame) -> None:
         super().__init__(jobs_df)
-        # if self.jobs_with_efficiency_metrics is None:
-        self.calculate_job_efficiency_metrics(self.jobs_df)
+        self.calculate_all_efficiency_metrics(self.jobs_df)
 
     def _validate_inputs(
         self,
@@ -163,7 +162,7 @@ class ROCVisualizer(EfficiencyAnalysis):
                 proportions = [(threshold_values <= threshold).sum() for threshold in thresholds_arr]
         else:
             proportions = []
-            metric_values = plot_data_frame[proportion_metric.value].to_numpy(dtype=float)
+            metric_values = plot_data_frame[proportion_metric.value].to_numpy()
             count_unique_proportion_metric = {ROCProportionMetricsEnum.USER, ROCProportionMetricsEnum.PI_GROUP}
             # check if we are dealing with USER metrics
             if proportion_metric in count_unique_proportion_metric:
@@ -189,7 +188,6 @@ class ROCVisualizer(EfficiencyAnalysis):
 
     def plot_roc(
         self,
-        input_df: pd.DataFrame | None = None,
         title: str | None = None,
         min_threshold: float = 0.0,
         max_threshold: float = 100.0,
@@ -208,7 +206,6 @@ class ROCVisualizer(EfficiencyAnalysis):
         If plot by percentage, percentage will be based on the filtered data, not the original data.
 
         Args:
-            dataframe (pd.DataFrame or None): The data to plot. If None, uses the instance's job_metrics dataframe.
             title (str or None): Title of the plot. Defaults to None.
             min_threshold (float): Minimum threshold value. Defaults to 0.0.
             max_threshold (float): Maximum threshold value. Defaults to 100.0.
@@ -226,8 +223,6 @@ class ROCVisualizer(EfficiencyAnalysis):
         """
 
         data = self.jobs_with_efficiency_metrics
-        if input_df is not None:
-            data = input_df
 
         # Validate inputs
         self._validate_inputs(
@@ -304,7 +299,6 @@ class ROCVisualizer(EfficiencyAnalysis):
         self,
         plot_object_list: list[str],
         object_column_type: Literal[ROCProportionMetricsEnum.USER, ROCProportionMetricsEnum.PI_GROUP],
-        input_df: pd.DataFrame | None = None,
         title: str | None = None,
         min_threshold: float = 0.0,
         max_threshold: float = 100.0,
@@ -348,8 +342,6 @@ class ROCVisualizer(EfficiencyAnalysis):
             ValueError: If no data is available for the specified threshold metric.
         """
         data = self.jobs_with_efficiency_metrics
-        if input_df is not None:
-            data = input_df
 
         # Validate inputs
         self._validate_inputs(
@@ -358,7 +350,7 @@ class ROCVisualizer(EfficiencyAnalysis):
             max_threshold,
             threshold_step,
             threshold_metric,
-            proportion_metric=None,
+            proportion_metric,
         )
 
         plot_data: pd.DataFrame = data[data[threshold_metric.value].notna()].copy()

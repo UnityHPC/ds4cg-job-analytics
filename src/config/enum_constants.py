@@ -125,6 +125,7 @@ class MetricsDataFrameNameEnum(Enum):
     PI_GROUPS = "pi_accounts_with_efficiency_metrics"
 
 
+@unique
 class ROCProportionMetricsEnum(Enum):
     """
     Contains metrics for calculating proportion of data on ROC plot (y-axis)
