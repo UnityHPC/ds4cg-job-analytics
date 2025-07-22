@@ -296,21 +296,8 @@ def _calculate_alloc_vram_multiple_gpu_types_with_count(
 
         # if the estimate is less than the usage and not all GPU VRAMs were calculated exactly, update it
         if allocated_vram < gpu_mem_usage / 2**30 and len(gpus_with_exact_values) < len(multivalent):
-            # Only adjust for GPUs not already calculated exactly
-            filtered_multivalent = {
-                gpu: count for gpu, count in multivalent.items() if gpu not in gpus_with_exact_values
-            }
+            allocated_vram = _adjust_vram_for_multivalent_gpus(multivalent, allocated_vram, gpu_mem_usage)
 
-            exact_allocated_vram = sum(gpus_with_exact_values.values())
-
-            remaining_usage = (gpu_mem_usage / 2**30 - exact_allocated_vram) * (
-                2**30
-            )  # only allocate the remaining usage (bytes)
-            print(allocated_vram, allocated_vram - exact_allocated_vram, remaining_usage)
-
-            allocated_vram = exact_allocated_vram + _adjust_vram_for_multivalent_gpus(
-                filtered_multivalent, allocated_vram - exact_allocated_vram, remaining_usage
-            )
         return allocated_vram
 
     # Case 3: Mixed multivalent and non-multivalent GPUs
