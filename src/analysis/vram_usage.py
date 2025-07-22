@@ -11,7 +11,12 @@ from pathlib import Path
 from src.preprocess.preprocess import preprocess_data
 from src.database import DatabaseConnection
 from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
-from src.config.enum_constants import FilterTypeEnum, MetricsDataFrameNameEnum, JobEfficiencyMetricsEnum
+from src.config.enum_constants import (
+    FilterTypeEnum,
+    MetricsDataFrameNameEnum,
+    JobEfficiencyMetricsEnum,
+    ProportionMetricsEnum,
+)
 
 
 def load_preprocessed_jobs_dataframe_from_duckdb(
@@ -275,14 +280,17 @@ class EfficiencyAnalysis:
             pd.DataFrame: Jobs with efficiency metrics added
         """
 
+        vram_hour_col_name = ProportionMetricsEnum.VRAM_HOURS.value
+        job_hour_col_name = ProportionMetricsEnum.JOB_HOURS.value
+
         # rename GPUs to gpu_count for clarity
         filtered_jobs = filtered_jobs.rename(columns={"GPUs": "gpu_count"})
 
         # Calculate job efficiency metrics
-        filtered_jobs.loc[:, "job_hours"] = (
+        filtered_jobs.loc[:, job_hour_col_name] = (
             filtered_jobs["Elapsed"].dt.total_seconds() * filtered_jobs["gpu_count"] / 3600
         )
-        filtered_jobs.loc[:, "vram_hours"] = filtered_jobs["allocated_vram"] * filtered_jobs["job_hours"]
+        filtered_jobs.loc[:, vram_hour_col_name] = filtered_jobs["allocated_vram"] * filtered_jobs[job_hour_col_name]
         filtered_jobs.loc[:, "used_vram_gib"] = filtered_jobs["GPUMemUsage"] / (2**30)
         # Compute alloc_vram_efficiency, a float in the range [0, 1].
         filtered_jobs.loc[:, JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY.value] = (
@@ -298,7 +306,7 @@ class EfficiencyAnalysis:
         # This is a log-transformed score that penalizes low efficiency and longer vram_hours
         alloc_vram_eff = filtered_jobs[JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY.value]
         filtered_jobs.loc[:, JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE.value] = np.where(
-            alloc_vram_eff > 0, np.log(alloc_vram_eff) * filtered_jobs["vram_hours"], -np.inf
+            alloc_vram_eff > 0, np.log(alloc_vram_eff) * filtered_jobs[vram_hour_col_name], -np.inf
         )
 
         # Calculate vram_constraint_efficiency score
@@ -307,7 +315,7 @@ class EfficiencyAnalysis:
         score = pd.Series(pd.NA, index=filtered_jobs.index, dtype=pd.Float64Dtype())
         mask_valid = vram_constraint_eff.notna() & (vram_constraint_eff > 0)
         mask_zero = vram_constraint_eff.notna() & (vram_constraint_eff == 0)
-        score[mask_valid] = np.log(vram_constraint_eff[mask_valid]) * filtered_jobs.loc[mask_valid, "vram_hours"]
+        score[mask_valid] = np.log(vram_constraint_eff[mask_valid]) * filtered_jobs.loc[mask_valid, vram_hour_col_name]
         score[mask_zero] = -np.inf
         filtered_jobs.loc[:, "vram_constraint_efficiency_score"] = score
 

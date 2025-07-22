@@ -126,22 +126,26 @@ class MetricsDataFrameNameEnum(Enum):
 
 
 @unique
-class ROCProportionMetricsEnum(Enum):
+class ProportionMetricsEnum(Enum):
     """
-    Contains metrics for calculating proportion of data on ROC plot (y-axis)
+    Contains metrics for calculating proportion of data on ROC plot (y-axis).
+
+    JOB_HOURS and JOBS elements are both used for y-axis ROC plot and as metrics in EfficiencyAnalysis class.
     """
 
     JOB_HOURS = "job_hours"
+    VRAM_HOURS = "vram_hours"
     JOBS = "jobs"
     USER = "User"
     PI_GROUP = "Account"
 
 
+@unique
 class JobEfficiencyMetricsEnum(Enum):
     """
-    Contains efficiency metrics for calculating efficiency of jobs
+    Contains efficiency metrics for calculating efficiency of jobs.
 
-    These are used in the jobs metrics calculation and also in the ROC plot as x-axis.
+    These are used as jobs metrics (in EfficiencyAnalysis class) and also metrics for x-axis in ROC Plot.
     """
 
     ALLOC_VRAM_EFFICIENCY = "alloc_vram_efficiency"
