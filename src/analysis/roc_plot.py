@@ -15,7 +15,7 @@ from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 import numpy as np
 import sys
-from .vram_usage import EfficiencyAnalysis
+from .efficiency_analysis import EfficiencyAnalysis
 from typing import Literal
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))  # Adjust path to include src directory

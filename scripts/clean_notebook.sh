@@ -13,6 +13,9 @@ fname="$1"
 tmpjson=$(mktemp)
 tmpnotebook=$(mktemp)
 
+# Ensure temp files are cleaned up on exit or error
+trap 'rm -f "$tmpjson" "$tmpnotebook"' EXIT
+
 # Check if the notebook is in the exclude list
 if grep -Fxq "$(basename "$fname")" "$EXCLUDE_FILE" 2>/dev/null; then
     cat "$fname"
