@@ -691,7 +691,7 @@ class EfficiencyAnalysis:
         Sort and filter records based on specified criteria.
 
         Args:
-            efficiency_metric_var (str): The variable name for the efficiency metric DataFrame to use
+            metrics_df_name_enum (MetricsDataFrameNameEnum): The type of metrics DataFrame to use.
             sorting_key (str): Column name to sort the results by
             ascending (bool): Whether to sort in ascending order
             filter_criteria (dict[str, int | float | dict | pd.NA]): Dictionary of filter criteria to apply.

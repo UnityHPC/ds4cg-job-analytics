@@ -28,9 +28,11 @@ nav:
     - 'preprocess.md'
   - Analysis:
     - 'analysis/efficiency_analysis.md'
-    - 'analysis/visualization.md'
+  - Visualization:
+    - 'visualization/visualization.md'
+    - 'visualization/visualize_columns.md'
   - MVP Scripts:
-    - 'mvp_scripts/cpu_metrics.md'
-    - 'mvp_scripts/gpu_metrics.md'
-    - 'mvp_scripts/zero_gpu_usage.md'
+    - 'mvp-scripts/cpu_metrics.md'
+    - 'mvp-scripts/gpu_metrics.md'
+    - 'mvp-scripts/zero_gpu_usage.md'
 
