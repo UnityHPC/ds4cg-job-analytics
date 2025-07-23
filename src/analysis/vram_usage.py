@@ -78,6 +78,17 @@ class EfficiencyAnalysis:
         """
         try:
             self.jobs_df = load_jobs_dataframe_from_duckdb(db_path, table_name, sample_size, random_state, query=query)
+            unique_gpu_types = (
+                self.jobs_df["GPUType"]
+                .dropna()
+                .explode()
+                .astype(str)
+                .str.strip()
+                .str.lower()
+                .unique()
+            )
+            self.query = query
+            print(f"Unique GPU types found for debugging purposes: {unique_gpu_types}, {query}")
             # Initialize efficiency metric class attributes to None
             for var in self._efficiency_metric_vars:
                 setattr(self, var, None)
@@ -620,23 +631,23 @@ class EfficiencyAnalysis:
         # Sort by the metric descending (higher is worse)
         inefficient_pi_accounts = inefficient_pi_accounts.sort_values("pi_acc_vram_hours", ascending=False)
         return inefficient_pi_accounts
-    def aggregate_gpu_metrics_by_query(self, query):
+    def aggregate_gpu_metrics_by_query(self) -> pd.DataFrame:
         """
         Aggregate and display metrics for each GPU type for jobs matching a SQL query.
+
         Args:
             query (str): SQL query to select jobs.
-            show_matplotlib_tables (bool): Whether to display the summary table using matplotlib.
+
         Returns:
-            None
+            pd.DataFrame: Aggregated metrics by GPU type
         """
-        # Load jobs matching the query
-        if self.jobs_df.empty:
-            print(f"No jobs found for query: {query}")
-            return
-        self.calculate_job_efficiency_metrics(filtered_jobs=self.jobs_df)
-        # Get unique GPU types in the filtered jobs
+        
+
+       
+
+        # Get unique GPU types
         unique_gpu_types = (
-            self.jobs_df['GPUType']
+            self.jobs_df["GPUType"]
             .dropna()
             .explode()
             .astype(str)
@@ -645,38 +656,49 @@ class EfficiencyAnalysis:
             .value_counts()
             .index
         )
-        if not unique_gpu_types.any():
-            print(f"No GPU types found for query: {query}")
-            return
-        print("printing unique gpu types", unique_gpu_types)
+        print(f"Unique GPU types found: {unique_gpu_types}")
+
+        # Define metric names and what they represent
         metrics = [
-            "Mean GPU Memory Used (GB)",
-            "Median GPU Memory Used (GB)",
-            "Mean VRAM Efficiency",
-            "Median VRAM Efficiency",
-            "Total User GPU Hours",
+            "Mean Used GPU Memory (GiB)",
+            "Median Used GPU Memory (GiB)",
+            "Mean Requested VRAM Efficiency",
+            "Median Requested VRAM Efficiency",
+            "Mean Allocated VRAM Efficiency",
+            "Median Allocated VRAM Efficiency",
+            "Total GPU Hours",
             "Mean Weighted VRAM Efficiency",
             "Median Weighted VRAM Efficiency"
         ]
+        job_efficiency_metrics = self.calculate_job_efficiency_metrics(self.jobs_df)
         results = {gpu_type.upper(): [] for gpu_type in unique_gpu_types}
         for gpu_type in unique_gpu_types:
-            gpu_jobs = self.jobs_df[self.jobs_df['GPUType'].apply(
-                lambda x, gpu_type=gpu_type: gpu_type in [str(g).strip().lower() for g in (x if isinstance(x, list | np.ndarray) else [x])]
-            )]
+            # Filter rows with this GPU type
+            gpu_jobs = job_efficiency_metrics[job_efficiency_metrics['GPUType'].apply(lambda x: isinstance(x, dict) and gpu_type in x)]
+
+
             if gpu_jobs.empty:
                 results[gpu_type.upper()] = [None] * len(metrics)
                 continue
             results[gpu_type.upper()] = [
-                round(gpu_jobs["gpu_memory_used_gb"].mean(), 2),
-                round(gpu_jobs["gpu_memory_used_gb"].median(), 2),
-                round(gpu_jobs["vram_efficiency"].mean(), 3),
-                round(gpu_jobs["vram_efficiency"].median(), 3),
-                round(gpu_jobs["gpu_hours"].sum(), 2),
-                round(gpu_jobs["user_weighted_vram_efficiency"].mean(), 3),
-                round(gpu_jobs["user_weighted_vram_efficiency"].median(), 3)
+                gpu_jobs["GPUMemUsage"].mean() / (2**30),  # Mean Used GPU Memory in GiB
+                gpu_jobs["GPUMemUsage"].median() / (2**30),  # Median Used GPU Memory in GiB
+                gpu_jobs["vram_constraint_efficiency"].mean(),  # Mean VRAM Efficiency
+                gpu_jobs["vram_constraint_efficiency"].median(),  # Median VRAM Efficiency
+                gpu_jobs["alloc_vram_efficiency"].mean(),  # Mean VRAM Efficiency
+                gpu_jobs["alloc_vram_efficiency"].median(),  # Median VRAM Efficiency
+
+                gpu_jobs["job_hours"].sum(),  # Total GPU Hours
+                (gpu_jobs["alloc_vram_efficiency"] * gpu_jobs["job_hours"]).sum() / gpu_jobs["job_hours"].sum(),  # Mean Weighted VRAM Efficiency
+                (gpu_jobs["alloc_vram_efficiency"] * gpu_jobs["job_hours"]).median() / gpu_jobs["job_hours"].median()  # Median Weighted VRAM Efficiency
+                
+            
             ]
+
+        # Create summary DataFrame
         summary_df = pd.DataFrame(results, index=metrics)
         return summary_df
+
     def additional_metrics(self, jobs_df=None):
         """
         Add additional VRAM allocation/request metrics and categories to a jobs DataFrame.
@@ -687,42 +709,40 @@ class EfficiencyAnalysis:
         Returns:
             pd.DataFrame: DataFrame with additional metrics columns.
         """
-        if jobs_df is None:
-            jobs_df = self.efficiency_df
-        metrics = jobs_df.copy()
-        metrics["gpu_memory_used_gb"] = metrics['GPUMemUsage'] / (2**30)
-        metrics['num_jobs'] = len(metrics)
-        metrics['vram_wasted'] = metrics["allocated_vram"] - metrics["gpu_memory_used_gb"]
-        metrics["request_accuracy"] = metrics["gpu_memory_used_gb"] / metrics["requested_vram"]
-        metrics = metrics[metrics['request_accuracy'].notna() &
-    np.isfinite(metrics['request_accuracy'])
-]
+        metrics = jobs_df if jobs_df is not None else self.jobs_with_efficiency_metrics
 
-        metrics["allocation_accuracy"] = metrics["gpu_memory_used_gb"] / metrics["allocated_vram"]
-        metrics["request_to_allocation_ratio"] = metrics["allocated_vram"] / metrics["requested_vram"]
+        # Normalize GPU memory usage to GiB
+        metrics["used_vram_gib"] = metrics["GPUMemUsage"] / (2**30)
 
+        # Compute waste and ratios
+        metrics["vram_wasted_gib"] = metrics["allocated_vram"] - metrics["used_vram_gib"]
+        metrics["request_accuracy"] = metrics["used_vram_gib"] / metrics["vram_constraint"]
+        metrics["allocation_accuracy"] = metrics["used_vram_gib"] / metrics["allocated_vram"]
+
+        # Clean invalid values (e.g., division by zero, NaNs, or infs)
+        metrics = metrics.replace([np.inf, -np.inf], np.nan)
+        metrics = metrics.dropna(subset=["request_accuracy", "allocation_accuracy", "request_to_allocation_ratio"])
+
+        # Categorical Binning
         metrics['allocation_efficiency_category'] = pd.cut(
             metrics['allocation_accuracy'],
             bins=[0, 0.2, 0.5, 0.8, 1.0],
             labels=['Very Poor (<20%)', 'Poor (20-50%)', 'Fair (50-80%)', 'Good (80-100%)']
         )
+
         metrics['request_accuracy_category'] = pd.cut(
             metrics['request_accuracy'],
-            bins=[0, 0.5, 0.8, 1.2, 2.0, float('inf')],
-            labels = ['<20%', '20-50%', '50-80%', '80-100%', '>100%']
+            bins=[0, 0.2, 0.5, 0.8, 1.0, float('inf')],
+            labels=['<20%', '20-50%', '50-80%', '80-100%', '>100%']
         )
-        metrics['allocation_type'] = pd.cut(
-            metrics['request_to_allocation_ratio'],
-            bins=[0, 0.8, 1.0, 1.5, 2.0, float('inf')],
-            labels=['Under-allocated (<80%)', 'Exact allocation (80-100%)',
-                    'Moderate over-allocation (100-150%)', 'High over-allocation (150-200%)',
-                    'Extreme over-allocation (>200%)']
-        )
+
+
         metrics['request_size_category'] = pd.cut(
             metrics['requested_vram'],
             bins=[0, 8, 16, 32, 64, float('inf')],
             labels=['Small (≤8GB)', 'Medium (8-16GB)', 'Large (16-32GB)',
                     'Very Large (32-64GB)', 'Extreme (>64GB)']
         )
+
         self.efficiency_df = metrics
         return metrics
