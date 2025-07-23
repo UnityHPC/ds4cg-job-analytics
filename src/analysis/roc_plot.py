@@ -1,9 +1,16 @@
 """
 TODO (Tan): consider writing tests for validate_input function
 
+Note somewhere: if we want to look at a user but with proportion metrics as some jobb metrics (jobs, job_hours),
+then we shuould use the multiple line plot job since that still calculate the job metrics but per user/ pi_group.
+THe group by thing for user and pi group maybe used for only number. of user/ pi_group metrics to inspect
+    aggregated score.
+
 Actions item:
-- For each some threshold, can plot the data of y axis on the plot DONE
-- Add argument to allow calculate the proportional (percentage) either based on the whole data or filtered data.
+- Your way of calculation for proportion is correct, but should retain information about how much records are left
+    (number and percentage) on the dataframe. DONE
+- Also when plot by percentage, print out the total number on y-axis at the 100%. DONE
+- Also should allow job_hours, vram_hours on x-axis (in this case, y-axis should be job_count)
 - explore group by option + aggregation metrics
 - refactor roc_plot to use less arguments, consider printing out statistics info of thresholds
 """
@@ -18,7 +25,7 @@ import sys
 from .efficiency_analysis import EfficiencyAnalysis
 from typing import Literal
 
-sys.path.append(str(Path(__file__).resolve().parents[2]))  # Adjust path to include src directory
+sys.path.append(str(Path(__file__).resolve().parents[2]))
 from src.config.enum_constants import ProportionMetricsEnum, JobEfficiencyMetricsEnum
 import warnings
 
@@ -30,7 +37,24 @@ class ROCVisualizer(EfficiencyAnalysis):
 
     def __init__(self, jobs_df: pd.DataFrame) -> None:
         super().__init__(jobs_df)
-        self.calculate_all_efficiency_metrics(self.jobs_df)
+
+    def _format_number_for_display(self, value: float) -> str:
+        """
+        Format a number for display, using scientific notation for large values.
+
+        Args:
+            value (float): The number to format.
+
+        Returns:
+            str: The formatted number as a string.
+        """
+
+        if abs(value) >= 1e6:
+            return f"{value:.1e}"
+        elif abs(value) >= 1000:
+            return f"{value:.0f}"
+        else:
+            return f"{value:.1f}"
 
     def _validate_inputs(
         self,
@@ -218,13 +242,18 @@ class ROCVisualizer(EfficiencyAnalysis):
             tuple[Figure, list[Axes]]: A tuple containing the figure, list of axes.
 
         Raises:
+            ValueError: if dataframe jobs_with_efficiency_metrics is not calculated yet.
             ValueError: If no data is available for the specified threshold metric.
 
         Warnings:
             UserWarning: if threshold_metric is ALLOC_VRAM_EFFICIENCY_SCORE and minimum value is
                 too high in comparison to threshold_step
         """
-
+        if self.jobs_with_efficiency_metrics is None:
+            raise ValueError(
+                "Attribute jobs_with_efficiency_metrics is not calculated, "
+                "use calculate_all_efficiency_metrics() to calculate the dataframe before plotting."
+            )
         data = self.jobs_with_efficiency_metrics
 
         # Validate inputs
@@ -239,12 +268,13 @@ class ROCVisualizer(EfficiencyAnalysis):
 
         # handle filtering null values
         plot_data: pd.DataFrame = data[data[threshold_metric.value].notna()].copy()
-
+        filtered_out_records = 0
         if plot_data.empty:
             raise ValueError("No data available for the specified threshold metric.")
 
         null_data_length = len(data) - len(plot_data)
         if null_data_length:
+            filtered_out_records += null_data_length
             print(f"Amount of entries whose {threshold_metric.value} is null: {null_data_length}")
 
         # handle filtering -inf score
@@ -252,6 +282,7 @@ class ROCVisualizer(EfficiencyAnalysis):
             prev_length = len(plot_data)
             plot_data = plot_data[plot_data[threshold_metric.value] != -np.inf].copy()
             print(f"Amount of entries whose {threshold_metric.value} is -inf : {prev_length - len(plot_data)}")
+            filtered_out_records += prev_length - len(plot_data)
             if min_threshold >= 0.0:
                 min_threshold = plot_data[threshold_metric.value].min()
                 if threshold_step / abs(min_threshold) <= 10 ** (-6):
@@ -266,13 +297,31 @@ class ROCVisualizer(EfficiencyAnalysis):
                     )
                 print(f"Setting min_threshold to {min_threshold} based on data.")
 
+        # calculate percentage of plot_data in comparison to total dataset
+        remain_percentage = (len(data) - filtered_out_records) / len(data) * 100
+
+        # calculate threshold
         thresholds_arr: np.ndarray = np.arange(min_threshold, max_threshold + threshold_step, threshold_step)
         fig, axe = plt.subplots(1, 1, figsize=(16, 7))
         axe_list = [axe]
-        # plotting
+        # calculate proportion for each threshold
         proportions_data = self._roc_calculate_proportion(
             plot_data, proportion_metric, thresholds_arr, threshold_metric, plot_percentage
         )
+
+        # Create label with total count and percentage of plot_data for legend
+        if proportion_metric == ProportionMetricsEnum.JOBS:
+            total_raw_value = len(plot_data)
+        elif proportion_metric in {ProportionMetricsEnum.USER, ProportionMetricsEnum.PI_GROUP}:
+            total_raw_value = len(np.unique(plot_data[proportion_metric.value]))
+        else:
+            total_raw_value = plot_data[proportion_metric.value].sum()
+
+        plot_label = (
+            f"{proportion_metric.value} (Total: {self._format_number_for_display(total_raw_value)}"
+            f"{f', account for {remain_percentage:.2f}% of dataset)' if remain_percentage < 100.0 else ')'}"
+        )
+
         if title is None:
             title = (
                 f"ROC plot for {'proportion' if plot_percentage else 'amounts'} of "
@@ -282,7 +331,8 @@ class ROCVisualizer(EfficiencyAnalysis):
         axe.set_title(title)
         axe.set_ylabel(y_label)
         axe.set_xlabel(f"Threshold values ({threshold_metric.value})")
-        axe.plot(thresholds_arr, proportions_data)
+        axe.plot(thresholds_arr, proportions_data, label=plot_label)
+        axe.legend()
 
         # Add markers for some data points
         num_markers = 10
@@ -295,9 +345,13 @@ class ROCVisualizer(EfficiencyAnalysis):
             # Add marker
             axe.plot(x_val, y_val, "go", markersize=5, zorder=5)
 
+            # custom format string
+            x_formatted = self._format_number_for_display(x_val)
+            y_formatted = self._format_number_for_display(y_val)
+
             # Add text label showing (x, y) values
             axe.annotate(
-                f"({x_val:.1f}, {y_val:.1f})",
+                f"({x_formatted}, {y_formatted})",
                 (x_val, y_val),
                 fontsize=10,
                 xytext=(0, 10),
@@ -352,8 +406,15 @@ class ROCVisualizer(EfficiencyAnalysis):
             tuple[Figure, list[Axes]]: A tuple containing the figure, list of axes.
 
         Raises:
+            ValueError: if dataframe jobs_with_efficiency_metrics is not calculated yet.
             ValueError: If no data is available for the specified threshold metric.
         """
+        if self.jobs_with_efficiency_metrics is None:
+            raise ValueError(
+                "Attribute jobs_with_efficiency_metrics is not calculated, "
+                "use calculate_all_efficiency_metrics() to calculate the dataframe before plotting."
+            )
+
         data = self.jobs_with_efficiency_metrics
 
         # Validate inputs
