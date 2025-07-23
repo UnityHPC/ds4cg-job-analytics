@@ -290,7 +290,7 @@ class ROCVisualizer(EfficiencyAnalysis):
                     warnings.warn(
                         (
                             f"Minimum threshold value is {min_threshold}, but step size is {threshold_step}. "
-                            "This can lead to high computational cost and time"
+                            "May lead to high computational cost and time"
                         ),
                         stacklevel=2,
                         category=UserWarning,

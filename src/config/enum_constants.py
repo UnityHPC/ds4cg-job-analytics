@@ -153,3 +153,5 @@ class JobEfficiencyMetricsEnum(Enum):
     VRAM_CONSTRAINT_EFFICIENCY_SCORE = "vram_constraint_efficiency_score"
     ALLOC_VRAM_EFFICIENCY_SCORE = "alloc_vram_efficiency_score"
     CPU_MEM_EFFICIENCY = "cpu_mem_efficiency"
+    JOB_HOURS = "job_hours"
+    VRAM_HOURS = "vram_hours"

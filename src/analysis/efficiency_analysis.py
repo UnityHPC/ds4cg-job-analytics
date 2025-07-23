@@ -15,7 +15,6 @@ from src.config.enum_constants import (
     FilterTypeEnum,
     MetricsDataFrameNameEnum,
     JobEfficiencyMetricsEnum,
-    ProportionMetricsEnum,
 )
 
 
@@ -280,8 +279,8 @@ class EfficiencyAnalysis:
             pd.DataFrame: Jobs with efficiency metrics added
         """
 
-        vram_hour_col_name = ProportionMetricsEnum.VRAM_HOURS.value
-        job_hour_col_name = ProportionMetricsEnum.JOB_HOURS.value
+        vram_hour_col_name = JobEfficiencyMetricsEnum.VRAM_HOURS.value
+        job_hour_col_name = JobEfficiencyMetricsEnum.JOB_HOURS.value
 
         # rename GPUs to gpu_count for clarity
         filtered_jobs = filtered_jobs.rename(columns={"GPUs": "gpu_count"})
