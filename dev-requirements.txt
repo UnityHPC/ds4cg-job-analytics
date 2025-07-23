@@ -14,3 +14,4 @@ jupyterlab
 nbconvert
 nbdime
 jq
+pydantic

@@ -5,6 +5,7 @@ Provides a function to visualize and summarize each column of a DataFrame, inclu
 plots and statistics for numeric and categorical columns.
 """
 
+from abc import ABC, abstractmethod
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.container import BarContainer
@@ -17,10 +18,14 @@ from matplotlib.patches import Patch
 from ..config.constants import VRAM_CATEGORIES
 import textwrap
 import re
+from typing import Any, NamedTuple 
+from pydantic import BaseModel, ValidationError, ConfigDict
 
 
-class DataVisualizer:
-    """A class for visualizing and summarizing columns of pre-processed data in a DataFrame."""
+class DataVisualizer(ABC):
+    """
+    Base class for visualizing and summarizing pre-processed data.
+    """
 
     def __init__(self, df: pd.DataFrame) -> None:
         """Initialize the DataVisualizer.
@@ -39,7 +44,7 @@ class DataVisualizer:
             self.df = df.copy()
         else:
             raise ValueError("Must provide a DataFrame.")
-
+        
     def validate_dataframe(self) -> pd.DataFrame:
         """Validate that the DataFrame is not empty and has columns.
 
@@ -54,9 +59,10 @@ class DataVisualizer:
         if self.df.columns.empty:
             raise ValueError("DataFrame has no columns.")
         return self.df
-
+    
+    @staticmethod
     def validate_sampling_arguments(
-        self, sample_size: int | None, random_seed: int | None
+        sample_size: int | None, random_seed: int | None
     ) -> tuple[int | None, int | None]:
         """Validate the sample size and random seed for visualization.
 
@@ -76,25 +82,18 @@ class DataVisualizer:
             raise ValueError("Random seed must be an integer.")
         return sample_size, random_seed
 
-    def validate_columns(self, columns: list[str]) -> list[str]:
-        """Validate the provided columns against the DataFrame.
+    @staticmethod
+    def validate_figsize(figsize: tuple[float | int, float | int]) -> tuple[float | int, float | int]:
+        if not (
+            isinstance(figsize, tuple)
+            and len(figsize) == 2
+            and all(isinstance(x, (float, int)) for x in figsize)
+        ):
+            raise TypeError("'figsize' must be a tuple of two numbers (float or int)")
+        return figsize
 
-        Args:
-            columns (list[str]): List of column names to validate.
-
-        Raises:
-            ValueError: If any column is not present in the DataFrame.
-
-        Returns:
-            list[str]: Validated list of column names.
-        """
-        if not isinstance(columns, list) or not all(isinstance(col, str) for col in columns):
-            raise ValueError("Columns must be a list of strings.")
-        if self.df is not None and not all(col in self.df.columns for col in columns):
-            raise ValueError("One or more specified columns are not present in the DataFrame.")
-        return columns
-
-    def validate_output_dir(self, output_dir_path: Path | None) -> Path | None:
+    @staticmethod
+    def validate_output_dir(output_dir_path: Path | None) -> Path | None:
         """Validate the output directory for saving plots.
 
         Args:
@@ -115,23 +114,24 @@ class DataVisualizer:
             if not os.access(output_dir_path, os.W_OK):
                 raise PermissionError(f"Output directory {output_dir_path} is not writable.")
         return output_dir_path
-
+    
+    @staticmethod
     def _generate_summary_stats(
-        self, jobs_df: pd.DataFrame, output_dir_path: Path | None, summary_file_name: str
+        jobs_df: pd.DataFrame, validated_output_dir_path: Path | None, summary_file_name: str
     ) -> None:
         """Generate summary statistics for each column.
 
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
-            output_dir_path (Path | None): The directory to save the summary file.
-            summary_file_name (str): The name of the summary file.
+            validated_output_dir_path (Path | None): The directory to save the summary file.
+            summary_file_name (str): The name of the summary file. If it already exists, it's overwritten.
 
         Returns:
             None
         """
-        if output_dir_path is not None:
+        if validated_output_dir_path is not None:
             # create text file to save column summary statistics
-            summary_file = output_dir_path / summary_file_name
+            summary_file = validated_output_dir_path / summary_file_name
             if summary_file.exists():
                 print(f"Summary file already exists. Overwriting {summary_file.name}")
 
@@ -148,17 +148,81 @@ class DataVisualizer:
                 print(f"Column: {col}")
                 print("-" * 50)
                 print(jobs_df[col].describe(include="all"))
+    
+    @staticmethod
+    def pie_chart_autopct_func(p: float, threshold_pct: int = 5) -> str:
+        """Format the percentage for pie chart labels.
+
+        Args:
+            p (float): The percentage value to format.
+            threshold_pct (int): The threshold percentage below which labels are not shown.
+
+        Returns:
+            str: Formatted percentage string or empty string if below threshold.
+        """
+        return f"{p:.1f}%" if p >= threshold_pct else ""
+
+    @abstractmethod
+    def validate_visualize_kwargs(
+        self,
+        kwargs: dict[str, Any],
+        validated_jobs_df: pd.DataFrame,
+    ) -> BaseModel:
+        """
+        Validate the keyword arguments for the visualize method.
+
+        Args:
+            kwargs (dict[str, Any]): The keyword arguments to validate.
+            validated_jobs_df (pd.DataFrame): The validated DataFrame to use for visualization.
+        
+        Returns:
+            BaseModel: The validated keyword arguments as a BaseModel.
+        """
+        pass
+
+    @abstractmethod
+    def visualize(
+        self,
+        output_dir_path: Path | None = None,
+        **kwargs: dict[str, Any]
+    ) -> None:
+        """Visualize the data in the DataFrame.
+        
+        Args:
+            output_dir_path (Path | None): Directory to save plots and summaries.
+            **kwargs: Additional keyword arguments for flexibility, such as columns to visualize,
+                      sample size, random seed, summary file name, and figure size.
+
+        Raises:
+            ValueError: If any of the provided arguments are invalid.
+        
+        Returns:
+            None
+        """
+        pass
+
+
+class ColumnVisualizer(DataVisualizer):
+    """A class for visualizing and summarizing columns of pre-processed data in a DataFrame."""
 
     def _generate_boolean_bar_plot(
-        self, jobs_df: pd.DataFrame, col: str, title: str, output_dir_path: Path | None = None
-    ):
-        """Generate a bar plot for boolean columns.
+        self,
+        jobs_df: pd.DataFrame,
+        col: str,
+        title: str,
+        output_dir_path: Path | None = None,
+    ) -> None:
+        """
+        Generate a bar plot for boolean columns.
 
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
             title (str): The title of the plot.
             output_dir_path (Path | None): The directory to save the plot.
+
+        Returns:
+            None
         """
         col_data = jobs_df[col]
         # All nans should be False, so convert to bool
@@ -175,8 +239,9 @@ class DataVisualizer:
             plt.savefig(output_dir_path / f"{col}_barplot.png")
         plt.show()
 
-    def _plot_duration_histogram(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
-        """Plot histogram of durations in minutes, hours, days.
+    def _plot_duration_histogram(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None) -> None:
+        """
+        Plot histogram of durations in minutes, hours, days.
 
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
@@ -229,11 +294,13 @@ class DataVisualizer:
         widths = [w / total_width for w in widths]
         width_minutes, width_hours, width_days = widths
 
-        def pct(n, total_count=total_count):
+        def pct(n: int, total_count: int = total_count) -> str:
             return f"{(n / total_count * 100):.1f}%" if total_count > 0 else "0.0%"
 
         # Helper to reduce xticks and rotate if width is small
-        def choose_ticks_and_rotation(ticks, width, max_labels=3):
+        def choose_ticks_and_rotation(
+            ticks: list[int], width: float, max_labels: int = 3
+        ) -> tuple[list[int], int]:
             # Always include first and last tick, and always have at least 4 ticks
             if width < min_width and len(ticks) > max_labels:
                 # Always include first and last, and evenly space the rest
@@ -382,8 +449,9 @@ class DataVisualizer:
         col: str,
         output_dir_path: Path | None = None,
         timestamp_range: tuple[pd.Timestamp, pd.Timestamp] | None = None,
-    ):
-        """Generate a histogram of job start times, either by day or by hour.
+    ) -> None:
+        """
+        Generate a histogram of job start times, either by day or by hour.
 
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
@@ -470,7 +538,12 @@ class DataVisualizer:
                 plt.savefig(output_dir_path / f"{col}_hourly_lineplot.png", bbox_inches="tight")
         plt.show()
 
-    def _generate_interactive_pie_chart(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
+    def _generate_interactive_pie_chart(
+        self,
+        jobs_df: pd.DataFrame,
+        col: str,
+        output_dir_path: Path | None = None,
+    ) -> None:
         """Generate a pie chart for interactive vs non-interactive jobs.
 
         Args:
@@ -512,13 +585,10 @@ class DataVisualizer:
         ax_pie = fig.add_subplot(gs[1])
         ax_legend = fig.add_subplot(gs[2])
 
-        def autopct_func(p, threshold_pct=threshold_pct):
-            return f"{p:.1f}%" if p >= threshold_pct else ""
-
         wedges, *_ = ax_pie.pie(
             counts,
             labels=labels,
-            autopct=autopct_func,
+            autopct=self.pie_chart_autopct_func,
             startangle=0,
             colors=sns.color_palette("pastel")[0 : len(counts)],
             explode=explode,
@@ -556,7 +626,7 @@ class DataVisualizer:
             plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
         plt.show()
 
-    def _generate_status_pie_chart(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
+    def _generate_status_pie_chart(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None) -> None:
         """Generate a pie chart for job statuses.
 
         Args:
@@ -606,13 +676,10 @@ class DataVisualizer:
         ax_pie = fig.add_subplot(gs[1])
         ax_legend = fig.add_subplot(gs[2])
 
-        def autopct_func(p, threshold_pct=threshold_pct):
-            return f"{p:.1f}%" if p >= threshold_pct else ""
-
         wedges, *_ = ax_pie.pie(
             exit_code_counts,
             labels=labels,
-            autopct=autopct_func,
+            autopct=self.pie_chart_autopct_func,
             startangle=0,
             colors=sns.color_palette("pastel")[0 : len(exit_code_counts)],
             explode=explode,
@@ -647,8 +714,16 @@ class DataVisualizer:
             plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
         plt.show()
 
-    def _generate_gpu_type_bar_plot(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
-        """Generate a bar plot for GPU types (GPUType column) and show number of jobs with more than one GPU type.
+    # TODO (Arda): Add support for new GPUType column format (dictionary)
+
+    def _generate_gpu_type_bar_plot(
+        self,
+        jobs_df: pd.DataFrame,
+        col: str,
+        output_dir_path: Path | None = None,
+    ) -> None:
+        """
+        Generate a bar plot for GPU types (GPUType column) and show number of jobs with more than one GPU type.
 
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
@@ -661,7 +736,6 @@ class DataVisualizer:
         Returns:
             None
         """
-        # TODO (Arda): Add support for new GPUType column format (dictionary)
 
         # GPUType should be a numpy array or list-like per row
         # Check if all non-null entries are numpy arrays
@@ -731,8 +805,9 @@ class DataVisualizer:
             plt.savefig(output_dir_path / f"{col}_barplot.png")
         plt.show()
 
-    def _generate_qos_pie_chart(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
-        """Generate a pie chart for QoS (Quality of Service) distribution.
+    def _generate_qos_pie_chart(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None) -> None:
+        """
+        Generate a pie chart for QoS (Quality of Service) distribution.
 
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
@@ -780,13 +855,10 @@ class DataVisualizer:
         ax_pie = fig.add_subplot(gs[1])
         ax_legend = fig.add_subplot(gs[2])
 
-        def autopct_func(p, threshold_pct=threshold_pct):
-            return f"{p:.1f}%" if p >= threshold_pct else ""
-
         wedges, *_ = ax_pie.pie(
             qos_counts,
             labels=labels,
-            autopct=autopct_func,
+            autopct=self.pie_chart_autopct_func,
             startangle=0,
             colors=sns.color_palette("pastel")[0 : len(qos_counts)],
             explode=explode,
@@ -821,8 +893,14 @@ class DataVisualizer:
             plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
         plt.show()
 
-    def _generate_gpu_count_pie_chart(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
-        """Generate a pie chart for GPU counts.
+    def _generate_gpu_count_pie_chart(
+        self,
+        jobs_df: pd.DataFrame,
+        col: str,
+        output_dir_path: Path | None = None,
+    ) -> None:
+        """
+        Generate a pie chart for GPU counts.
 
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
@@ -871,15 +949,12 @@ class DataVisualizer:
         ax_pie = fig.add_subplot(gs[1])
         ax_legend = fig.add_subplot(gs[2])
 
-        def autopct_func(p, threshold_pct=threshold_pct):
-            return f"{p:.1f}%" if p >= threshold_pct else ""
-
         # Format labels as "x GPU(s)" for each wedge
         formatted_labels = [f"{label} GPU{'s' if int(label) != 1 else ''}" if label != "" else "" for label in labels]
         wedges, *_ = ax_pie.pie(
             gpu_counts,
             labels=formatted_labels,
-            autopct=autopct_func,
+            autopct=self.pie_chart_autopct_func,
             startangle=0,
             colors=sns.color_palette("pastel")[0 : len(gpu_counts)],
             explode=explode,
@@ -917,7 +992,7 @@ class DataVisualizer:
         col: str,
         output_dir_path: Path | None = None,
         figsize: tuple[float, float] = (7, 4),
-    ):
+    ) -> None:
         """Generate a bar plot for node lists, combining trailing digits before counting.
 
         This function combines nodes with the same prefix (e.g., "gpu010" and "gpu053" become "gpu").
@@ -1046,8 +1121,12 @@ class DataVisualizer:
         plt.show()
 
     def _generate_partition_bar_plot(
-        self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None, figsize=(9, 4)
-    ):
+        self,
+        jobs_df: pd.DataFrame,
+        col: str,
+        output_dir_path: Path | None = None,
+        figsize: tuple[float, float] = (9, 4),
+    ) -> None:
         """Generate a bar plot for job partitions.
 
         Args:
@@ -1097,7 +1176,12 @@ class DataVisualizer:
             plt.savefig(output_dir_path / f"{col}_barplot.png", bbox_inches="tight")
         plt.show()
 
-    def _generate_constraints_bar_plot(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
+    def _generate_constraints_bar_plot(
+        self,
+        jobs_df: pd.DataFrame,
+        col: str,
+        output_dir_path: Path | None = None,
+    ) -> None:
         """Generate a bar plot for job constraints.
 
         Args:
@@ -1217,8 +1301,12 @@ class DataVisualizer:
         plt.show()
 
     def _generate_gpu_memory_usage_histogram_categorical_bins(
-        self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None, figsize=(7, 4)
-    ):
+        self,
+        jobs_df: pd.DataFrame,
+        col: str,
+        output_dir_path: Path | None = None,
+        figsize: tuple[float, float] = (7, 4),
+    ) -> None:
         """Generate a bar plot for GPU memory usage categorized by GPU type.
 
         Args:
@@ -1320,9 +1408,10 @@ class DataVisualizer:
         col: str,
         column_unit: str,
         output_dir_path: Path | None = None,
-        figsize=(7, 4),
-    ):
-        """Generate a histogram for non-GPU memory usage
+        figsize: tuple[float, float] = (7, 4),
+    ) -> None:
+        """
+        Generate a histogram for non-GPU memory usage
 
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
@@ -1389,8 +1478,14 @@ class DataVisualizer:
             plt.savefig(output_dir_path / f"{col}_hist.png", bbox_inches="tight")
         plt.show()
 
-    def _generate_exit_code_pie_chart(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
-        """Generate a pie chart for job exit codes.
+    def _generate_exit_code_pie_chart(
+        self,
+        jobs_df: pd.DataFrame,
+        col: str,
+        output_dir_path: Path | None = None,
+    ) -> None:
+        """
+        Generate a pie chart for job exit codes.
 
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
@@ -1439,13 +1534,10 @@ class DataVisualizer:
         ax_pie = fig.add_subplot(gs[1])
         ax_legend = fig.add_subplot(gs[2])
 
-        def autopct_func(p, threshold_pct=threshold_pct):
-            return f"{p:.1f}%" if p >= threshold_pct else ""
-
         wedges, *_ = ax_pie.pie(
             exit_code_counts,
             labels=labels,
-            autopct=autopct_func,
+            autopct=self.pie_chart_autopct_func,
             startangle=0,
             colors=sns.color_palette("pastel")[0 : len(exit_code_counts)],
             explode=explode,
@@ -1480,24 +1572,99 @@ class DataVisualizer:
             plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
         plt.show()
 
-    def visualize_columns(
+    @staticmethod
+    def validate_columns_argument(columns: list[str] | None, jobs_df: pd.DataFrame) -> list[str] | None:
+        """Validate the provided columns against the DataFrame.
+
+        Args:
+            columns (list[str]): List of column names to validate.
+
+        Raises:
+            TypeError: If 'columns' is not a list of strings or None.
+            ValueError: If any column is not present in the DataFrame.
+
+        Returns:
+            list[str]: Validated list of column names.
+        """
+
+        if columns is not None and (not isinstance(columns, list) or not all(isinstance(x, str) for x in columns)):
+            raise TypeError("'columns' must be a list of strings or None")
+
+        if columns is not None and jobs_df is not None and not all(col in jobs_df.columns for col in columns):
+            raise ValueError("One or more specified columns are not present in the DataFrame.")
+        return columns
+
+    class ColumnKwargsTuple(NamedTuple):
+        columns: list[str] | None = None
+        sample_size: int | None = None
+        random_seed: int | None = None
+        summary_file_name: str = "columns_stats_summary.txt"
+        figsize: tuple[int | float, int | float] = (7, 4)
+    
+    class ColumnKwargsModel(BaseModel):
+        model_config = ConfigDict(strict=True, extra='forbid')
+        columns: list[str] | None = None
+        sample_size: int | None = None
+        random_seed: int | None = None
+        summary_file_name: str = "columns_stats_summary.txt"
+        figsize: tuple[int | float, int | float] = (7, 4)
+
+    def validate_visualize_kwargs(
         self,
-        columns=None,
-        sample_size: int | None = None,
-        random_seed: int | None = None,
+        kwargs: dict[str, Any],
+        validated_jobs_df: pd.DataFrame,
+    ) -> ColumnKwargsModel:
+        """Validate the keyword arguments for the visualize method.
+        
+        Args:
+            kwargs (dict[str, Any]): Keyword arguments to validate.
+            validated_jobs_df (pd.DataFrame): The DataFrame to validate against.
+
+        Raises:
+            TypeError: If any keyword argument has an incorrect type.
+
+        Returns:
+            ColumnKwargsModel: A tuple with validated keyword arguments.
+        """
+        try:
+            # Validate the kwargs using Pydantic model
+            col_kwargs = self.ColumnKwargsModel(**kwargs)
+        except ValidationError as e:
+            allowed_fields = {
+                name: str(field.annotation)
+                for name, field in self.ColumnKwargsModel.model_fields.items()
+            }
+            allowed_fields_str = "\n".join(f"  {k}: {v}" for k, v in allowed_fields.items())
+            raise TypeError(
+                f"Invalid visualize kwargs: {e.json(indent=2)}\n"
+                f"Allowed fields and types:\n{allowed_fields_str}"
+            ) from e
+
+        self.validate_columns_argument(col_kwargs.columns, validated_jobs_df)
+        self.validate_figsize(col_kwargs.figsize)
+        self.validate_sampling_arguments(
+            col_kwargs.sample_size,
+            col_kwargs.random_seed,
+        )
+        return col_kwargs
+
+    def visualize(
+        self,
         output_dir_path: Path | None = None,
-        summary_file_name: str = "columns_stats_summary.txt",
-        figsize: tuple[int, int] = (7, 4),
+        **kwargs: dict[str, Any]
     ) -> None:
         """Visualize and summarize specified columns of the data.
 
         Args:
-            columns (list[str], optional): Columns to visualize. If None, all columns are used.
-            sample_size (int, optional): Number of rows to sample. If None, uses all rows.
-            random_seed (int, optional): Seed for reproducible sampling.
             output_dir_path (Path, optional): Directory to save plots. If None, plots are displayed.
-            summary_file_name (str): Name of the text file to save column summaries in the output directory.
-            figsize (tuple[int, int]): Size of the figure for plots.
+            kwargs (dict[str, Any]): Keyword arguments for visualization options.
+                This can include:
+                - columns (list[str], optional): Columns to visualize. If None, all columns are used.
+                - sample_size (int, optional): Number of rows to sample. If None, uses all rows.
+                - random_seed (int, optional): Seed for reproducible sampling.
+                - summary_file_name (str): Name of the text file to save column summaries in the output
+                    directory. If it already exists, the file is overwritten.
+                - figsize (tuple[int, int]): Size of the figure for plots.
 
         Raises:
             ValueError: On invalid DataFrame, sample size, random seed, or columns.
@@ -1506,9 +1673,13 @@ class DataVisualizer:
             None
         """
         jobs_df = self.validate_dataframe()
-        self.validate_sampling_arguments(sample_size, random_seed)
-        self.validate_columns(columns if columns is not None else jobs_df.columns.tolist())
-        self.validate_output_dir(output_dir_path)
+        validated_kwargs = self.validate_visualize_kwargs(kwargs, jobs_df)
+        columns = validated_kwargs.columns
+        sample_size = validated_kwargs.sample_size
+        random_seed = validated_kwargs.random_seed
+        summary_file_name = validated_kwargs.summary_file_name
+        figsize = validated_kwargs.figsize
+        output_dir_path = self.validate_output_dir(output_dir_path)
 
         jobs_df = jobs_df.copy()
 

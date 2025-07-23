@@ -1,4 +1,4 @@
-from .visualize_columns import DataVisualizer as DataVisualizer
+from .visualize_columns import ColumnVisualizer as ColumnVisualizer
 from .efficiency_analysis import EfficiencyAnalysis as EfficiencyAnalysis
 from .efficiency_analysis import (
 	load_preprocessed_jobs_dataframe_from_duckdb as load_preprocessed_jobs_dataframe_from_duckdb
