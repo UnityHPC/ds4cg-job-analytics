@@ -284,7 +284,6 @@ def _calculate_alloc_vram_multiple_gpu_types_with_count(
 
         for gpu, count in multivalent.items():
             if _can_calculate_perfectly(gpu, count, node_list):
-                print(gpu, count, node_list)
                 # If we can calculate perfectly, use the VRAM from the matching nodes
                 vram_value = _calculate_precise_vram(gpu, count, node_list)
                 allocated_vram += vram_value
