@@ -100,6 +100,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         Filter out invalid records from the DataFrame based on the threshold metric.
 
         Currently invalid records are those with NaN or -inf values in the threshold metric column.
+        Intended to be used after validating dataframe by _validate_inputs() only.
 
         Args:
             plot_data_frame (pd.DataFrame): The DataFrame to filter.
@@ -107,6 +108,7 @@ class ROCVisualizer(EfficiencyAnalysis):
 
         Returns:
             pd.DataFrame: The filtered DataFrame.
+
         """
         # contain all metrics we want to filter out invalid record
         metric_to_filters = {
@@ -117,9 +119,10 @@ class ROCVisualizer(EfficiencyAnalysis):
         # no filter needed
         if threshold_metric not in metric_to_filters:
             return plot_data_frame
-        mask = pd.Series([True] * len(plot_data_frame))
-        mask &= plot_data_frame[threshold_metric.value].notna()
-        mask &= plot_data_frame[threshold_metric.value] != -np.inf
+        col = plot_data_frame[threshold_metric.value]
+        mask = pd.Series([True] * len(col), index=col.index)
+        mask &= col.notna()
+        mask &= col != -np.inf
 
         return plot_data_frame[mask].copy()
 
@@ -346,35 +349,29 @@ class ROCVisualizer(EfficiencyAnalysis):
         )
 
         # handle filtering null values
-        plot_data: pd.DataFrame = data[data[threshold_metric.value].notna()].copy()
-        filtered_out_records = 0
+        plot_data: pd.DataFrame = self._filter_invalid_records(data, threshold_metric)
         if plot_data.empty:
             raise ValueError("No data available for the specified threshold metric.")
 
-        null_data_length = len(data) - len(plot_data)
-        if null_data_length:
-            filtered_out_records += null_data_length
-            print(f"Amount of entries whose {threshold_metric.value} is null: {null_data_length}")
-
-        # handle filtering -inf score
-        if threshold_metric == JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE:
-            prev_length = len(plot_data)
-            plot_data = plot_data[plot_data[threshold_metric.value] != -np.inf].copy()
-            print(f"Amount of entries whose {threshold_metric.value} is -inf : {prev_length - len(plot_data)}")
-            filtered_out_records += prev_length - len(plot_data)
-            if min_threshold >= 0.0:
-                min_threshold = plot_data[threshold_metric.value].min()
-                if threshold_step / abs(min_threshold) <= 10 ** (-6):
-                    # raise warning if threshold_step is too small in comparison to min_threshold
-                    warnings.warn(
-                        (
-                            f"Minimum threshold value is {min_threshold}, but step size is {threshold_step}. "
-                            "May lead to high computational cost and time."
-                        ),
-                        stacklevel=2,
-                        category=UserWarning,
-                    )
-                print(f"Setting min_threshold to {min_threshold} based on data.")
+        filtered_out_records = len(data) - len(plot_data)
+        if filtered_out_records:
+            print(
+                f"Filtered out {filtered_out_records} records with NaN or -inf values based on "
+                f"{threshold_metric.value} column."
+            )
+        if threshold_metric == JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE and min_threshold >= 0.0:
+            min_threshold = plot_data[threshold_metric.value].min()
+            print(f"Setting min_threshold to {min_threshold} based on data.")
+            if threshold_step / abs(min_threshold) <= 10 ** (-6):
+                # raise warning if threshold_step is too small in comparison to min_threshold
+                warnings.warn(
+                    (
+                        f"Minimum threshold value is {min_threshold}, but step size is {threshold_step}. "
+                        "This may lead to high computational cost and time."
+                    ),
+                    stacklevel=2,
+                    category=UserWarning,
+                )
 
         # calculate percentage of plot_data in comparison to total dataset
         remain_percentage = (len(data) - filtered_out_records) / len(data) * 100
