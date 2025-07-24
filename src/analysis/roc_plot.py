@@ -93,6 +93,36 @@ class ROCVisualizer(EfficiencyAnalysis):
         if min_threshold > max_threshold:
             raise ValueError("min_threshold cannot be greater than max_threshold.")
 
+    def _filter_invalid_records(
+        self, plot_data_frame: pd.DataFrame, threshold_metric: JobEfficiencyMetricsEnum
+    ) -> pd.DataFrame:
+        """
+        Filter out invalid records from the DataFrame based on the threshold metric.
+
+        Currently invalid records are those with NaN or -inf values in the threshold metric column.
+
+        Args:
+            plot_data_frame (pd.DataFrame): The DataFrame to filter.
+            threshold_metric (JobEfficiencyMetricsEnum): The metric used for filtering.
+
+        Returns:
+            pd.DataFrame: The filtered DataFrame.
+        """
+        # contain all metrics we want to filter out invalid record
+        metric_to_filters = {
+            JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY,
+            JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE,
+        }
+
+        # no filter needed
+        if threshold_metric not in metric_to_filters:
+            return plot_data_frame
+        mask = pd.Series([True] * len(plot_data_frame))
+        mask &= plot_data_frame[threshold_metric.value].notna()
+        mask &= plot_data_frame[threshold_metric.value] != -np.inf
+
+        return plot_data_frame[mask].copy()
+
     def _generate_num_marker(
         self,
         axe: Axes,
@@ -256,7 +286,7 @@ class ROCVisualizer(EfficiencyAnalysis):
                     proportions.append(proportion)
         return np.array(proportions, dtype=float)
 
-    def plot_roc(
+    def plot_roc_jobs(
         self,
         title: str | None = None,
         min_threshold: float = 0.0,
@@ -339,7 +369,7 @@ class ROCVisualizer(EfficiencyAnalysis):
                     warnings.warn(
                         (
                             f"Minimum threshold value is {min_threshold}, but step size is {threshold_step}. "
-                            "May lead to high computational cost and time"
+                            "May lead to high computational cost and time."
                         ),
                         stacklevel=2,
                         category=UserWarning,
@@ -441,7 +471,7 @@ class ROCVisualizer(EfficiencyAnalysis):
             )
 
         data = self.jobs_with_efficiency_metrics
-
+        filtered_out_records = 0
         # Validate inputs
         self._validate_inputs(
             data,
@@ -459,15 +489,30 @@ class ROCVisualizer(EfficiencyAnalysis):
 
         null_data_length = len(data) - len(plot_data)
         if null_data_length:
+            filtered_out_records += null_data_length
             print(f"Amount of entries whose {threshold_metric.value} is null: {null_data_length}")
 
         if threshold_metric == JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE:
             prev_length = len(plot_data)
             plot_data = plot_data[plot_data[threshold_metric.value] != -np.inf].copy()
             print(f"Amount of entries whose {threshold_metric.value} is -inf : {prev_length - len(plot_data)}")
+            filtered_out_records += prev_length - len(plot_data)
             if min_threshold >= 0.0:
                 min_threshold = plot_data[threshold_metric.value].min()
+                if threshold_step / abs(min_threshold) <= 10 ** (-6):
+                    # raise warning if threshold_step is too small in comparison to min_threshold
+                    warnings.warn(
+                        (
+                            f"Minimum threshold value is {min_threshold}, but step size is {threshold_step}. "
+                            "May lead to high computational cost and time."
+                        ),
+                        stacklevel=2,
+                        category=UserWarning,
+                    )
                 print(f"Setting min_threshold to {min_threshold} based on data.")
+
+        # caculate percentage of plot_data in comparison to total dataset
+        remain_percentage = (len(data) - filtered_out_records) / len(data) * 100
 
         thresholds_arr: np.ndarray = np.arange(min_threshold, max_threshold + threshold_step, threshold_step)
         fig, axe = plt.subplots(1, 1, figsize=(16, 6))
