@@ -70,6 +70,19 @@ class DataVisualizer(Generic[KwargsModelType], ABC):
 
     @staticmethod
     def validate_figsize(figsize: tuple[float | int, float | int]) -> tuple[float | int, float | int]:
+        """Validate the figure size for visualization.
+
+        Args:
+            figsize (tuple[float | int, float | int]): Size of the figure.
+        
+        Raises:
+
+            TypeError: If figsize is not a tuple of two numbers (float or int).
+        
+        Returns:
+            tuple[float | int, float | int]: Validated figure size.
+        """
+        
         if not (
             isinstance(figsize, tuple)
             and len(figsize) == 2

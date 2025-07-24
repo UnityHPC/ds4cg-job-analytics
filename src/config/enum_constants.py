@@ -7,6 +7,16 @@ from enum import Enum, unique, auto
 
 @unique
 class InteractiveEnum(Enum):
+    """An enumeration representing different interactive job types.
+
+    Attributes:
+        NON_INTERACTIVE: Represents non-interactive jobs.
+        SHELL: Represents shell jobs.
+        JUPYTER: Represents Jupyter notebook jobs.
+        MATLAB: Represents MATLAB jobs.
+        RSTUDIO: Represents RStudio jobs.
+        DESKTOP: Represents desktop jobs.
+    """
     NON_INTERACTIVE = "non-interactive"
     SHELL = "shell"
     JUPYTER = "bc_jupyter"
@@ -17,6 +27,14 @@ class InteractiveEnum(Enum):
 
 @unique
 class QOSEnum(Enum):
+    """An enumeration representing a non-exhaustive Quality of Service (QoS) types.
+
+    Attributes:
+        NORMAL: Represents normal QoS.
+        UPDATES: Represents update QoS.
+        SHORT: Represents short QoS.
+        LONG: Represents long QoS.
+    """
     NORMAL = "normal"
     UPDATES = "updates"
     SHORT = "short"
@@ -25,6 +43,18 @@ class QOSEnum(Enum):
 
 @unique
 class StatusEnum(Enum):
+    """An enumeration representing different job statuses.
+
+    Attributes:
+        COMPLETED: Represents jobs that have completed successfully.
+        FAILED: Represents jobs that have failed.
+        CANCELLED: Represents jobs that have been cancelled.
+        TIMEOUT: Represents jobs that have timed out.
+        PREEMPTED: Represents jobs that have been preempted.
+        OUT_OF_MEMORY: Represents jobs that have run out of memory.
+        PENDING: Represents jobs that are pending.
+        NODE_FAIL: Represents jobs that have failed due to node issues.
+    """
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
@@ -37,6 +67,13 @@ class StatusEnum(Enum):
 
 @unique
 class ExitCodeEnum(Enum):
+    """An enumeration representing different job exit codes.
+
+    Attributes:
+        SUCCESS: Represents a successful job exit.
+        ERROR: Represents an error during job execution.
+        SIGNALED: Represents a job that was signaled to terminate.
+    """
     SUCCESS = "SUCCESS"
     ERROR = "ERROR"
     SIGNALED = "SIGNALED"
@@ -44,11 +81,17 @@ class ExitCodeEnum(Enum):
 
 @unique
 class AdminsAccountEnum(Enum):
+    """An enumeration representing important admin accounts.
+
+    Attributes:
+        ROOT: Represents the root admin account.
+    """
     ROOT = "root"
 
 
 @unique
 class PartitionEnum(Enum):
+    """An enumeration representing different partitions on Unity."""
     BUILDING = "building"
     ARM_GPU = "arm-gpu"
     ARM_PREEMPT = "arm-preempt"

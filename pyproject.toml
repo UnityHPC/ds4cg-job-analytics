@@ -53,7 +53,10 @@ select = [
     "D404",
     # pydocstyle: D
     # Missing blank line after docstring section: D410
-    "D410"
+    "D410",
+    # pydocstyle: D
+    # Undocumented public method and public class: D102, D101
+    "D102", "D101"
 ]
 ignore = [
     # Ignore use ternary operator in if statements

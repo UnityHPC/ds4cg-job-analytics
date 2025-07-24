@@ -59,6 +59,10 @@ class EfficiencyMetricsVisualizer(DataVisualizer[EfficiencyMetricsKwargsModel]):
 
 
 class JobsWithMetricsVisualizer(EfficiencyMetricsVisualizer):
+    """ Visualizer for jobs with efficiency metrics.
+
+    Visualizes jobs ranked by selected efficiency metric.
+    """
     def __init__(self, data: pd.DataFrame) -> None:
         super().__init__(data)
 
@@ -138,6 +142,10 @@ class JobsWithMetricsVisualizer(EfficiencyMetricsVisualizer):
 
 
 class UsersWithMetricsVisualizer(EfficiencyMetricsVisualizer):
+    """ Visualizer for users with efficiency metrics.
+    
+    Visualizes users ranked by selected efficiency metric.
+    """
     def __init__(self, data: pd.DataFrame) -> None:
         super().__init__(data)
 
