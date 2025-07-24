@@ -17,20 +17,12 @@ from ..config.constants import VRAM_CATEGORIES
 import textwrap
 import re
 from typing import Any 
-from pydantic import BaseModel, ValidationError, ConfigDict
+from pydantic import ValidationError
 from .visualization import DataVisualizer
+from models import ColumnVisualizationKwargsModel
 
 
-class ColumnKwargsModel(BaseModel):
-    model_config = ConfigDict(strict=True, extra='forbid')
-    columns: list[str] | None = None
-    sample_size: int | None = None
-    random_seed: int | None = None
-    summary_file_name: str = "columns_stats_summary.txt"
-    figsize: tuple[int | float, int | float] = (7, 4)
-
-
-class ColumnVisualizer(DataVisualizer[ColumnKwargsModel]):
+class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
     """A class for visualizing and summarizing columns of pre-processed data in a DataFrame."""
 
     def _generate_boolean_bar_plot(
@@ -1429,8 +1421,8 @@ class ColumnVisualizer(DataVisualizer[ColumnKwargsModel]):
         self,
         kwargs: dict[str, Any],
         validated_jobs_df: pd.DataFrame,
-        kwargs_model: type[ColumnKwargsModel]
-    ) -> ColumnKwargsModel:
+        kwargs_model: type[ColumnVisualizationKwargsModel]
+    ) -> ColumnVisualizationKwargsModel:
         """Validate the keyword arguments for the visualize method.
         
         Args:
@@ -1490,7 +1482,7 @@ class ColumnVisualizer(DataVisualizer[ColumnKwargsModel]):
             None
         """
         jobs_df = self.validate_dataframe()
-        validated_kwargs = self.validate_visualize_kwargs(kwargs, jobs_df, ColumnKwargsModel)
+        validated_kwargs = self.validate_visualize_kwargs(kwargs, jobs_df, ColumnVisualizationKwargsModel)
         columns = validated_kwargs.columns
         sample_size = validated_kwargs.sample_size
         random_seed = validated_kwargs.random_seed

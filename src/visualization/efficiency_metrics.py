@@ -3,19 +3,13 @@ Module with utilities for visualizing efficiency metrics.
 """
 
 from .visualization import DataVisualizer
-from pydantic import BaseModel, Field, ValidationError, ConfigDict
+from pydantic import ValidationError
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
 from typing import Any
 from pathlib import Path
-
-
-class EfficiencyMetricsKwargsModel(BaseModel):
-    model_config = ConfigDict(strict=True, extra='forbid')
-    column: str
-    bar_label_columns: list[str] | None
-    figsize: tuple[int | float, int | float] = Field(default=(8, 10))
+from models import EfficiencyMetricsKwargsModel, UsersWithMetricsKwargsModel
 
 
 class EfficiencyMetricsVisualizer(DataVisualizer[EfficiencyMetricsKwargsModel]):
@@ -128,13 +122,6 @@ class JobsWithMetricsVisualizer(EfficiencyMetricsVisualizer):
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"jobs_ranked_by_{column}_barplot.png", bbox_inches="tight")
         plt.show()
-
-
-class UsersWithMetricsKwargsModel(EfficiencyMetricsKwargsModel):
-    model_config = ConfigDict(strict=True, extra='forbid')
-    column: str
-    bar_label_columns: list[str] | None
-    figsize: tuple[int | float, int | float] = Field(default=(8, 8))
 
 
 class UsersWithMetricsVisualizer(EfficiencyMetricsVisualizer):

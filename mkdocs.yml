@@ -30,7 +30,9 @@ nav:
     - 'analysis/efficiency_analysis.md'
   - Visualization:
     - 'visualization/visualization.md'
-    - 'visualization/visualize_columns.md'
+    - 'visualization/columns.md'
+    - 'visualization/efficiency_metrics.md'
+    - 'visualization/models.md'
   - MVP Scripts:
     - 'mvp-scripts/cpu_metrics.md'
     - 'mvp-scripts/gpu_metrics.md'
