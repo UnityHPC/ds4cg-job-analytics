@@ -63,6 +63,19 @@ class JobsWithMetricsVisualizer(EfficiencyMetricsVisualizer):
         super().__init__(data)
 
     def visualize(self, output_dir_path: Path | None = None, **kwargs: dict[str, Any]) -> None:
+        """ Visualize the efficiency metrics for jobs.
+
+        Args:
+            output_dir_path (Path | None): Path to save the output plot.
+            **kwargs (dict[str, Any]): Keyword arguments for visualization.
+                This can include:
+                - column (str): The efficiency metric to visualize.
+                - bar_label_columns (list[str] | None): Columns to use for bar labels.
+                - figsize (tuple[int | float, int | float]): Size of the figure.
+
+        Returns:
+            None: Displays the bar plot of jobs ranked by the specified efficiency metric.
+        """
         jobs_with_metrics_df = self.validate_dataframe()
         validated_kwargs = self.validate_visualize_kwargs(kwargs, jobs_with_metrics_df, EfficiencyMetricsKwargsModel)
         column = validated_kwargs.column
@@ -129,6 +142,19 @@ class UsersWithMetricsVisualizer(EfficiencyMetricsVisualizer):
         super().__init__(data)
 
     def visualize(self, output_dir_path: Path | None = None, **kwargs: dict[str, Any]) -> None:
+        """ Visualize the efficiency metrics for users.
+
+        Args:
+            output_dir_path (Path | None): Path to save the output plot.
+            **kwargs (dict[str, Any]): Keyword arguments for visualization.
+                This can include:
+                - column (str): The efficiency metric to visualize.
+                - bar_label_columns (list[str] | None): Columns to use for bar labels.
+                - figsize (tuple[int | float, int | float]): Size of the figure.
+
+        Returns:
+            None: Displays the bar plot of users ranked by the specified efficiency metric.
+        """
         users_with_metrics_df = self.validate_dataframe()
         validated_kwargs = self.validate_visualize_kwargs(kwargs, users_with_metrics_df, UsersWithMetricsKwargsModel)
         column = validated_kwargs.column
