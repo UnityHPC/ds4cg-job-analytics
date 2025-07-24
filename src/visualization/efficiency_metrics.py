@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, ValidationError, ConfigDict
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
-from typing import Any, TypeVar
+from typing import Any
 from pathlib import Path
 
 
