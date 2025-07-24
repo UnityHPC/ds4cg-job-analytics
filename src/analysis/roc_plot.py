@@ -10,7 +10,7 @@ Actions item:
 - Your way of calculation for proportion is correct, but should retain information about how much records are left
     (number and percentage) on the dataframe. DONE
 - Also when plot by percentage, print out the total number on y-axis at the 100%. DONE
-- Also should allow job_hours, vram_hours on x-axis (in this case, y-axis should be job_count)
+- Also should allow job_hours, vram_hours on x-axis (in this case, y-axis should be job_count) DONE
 - explore group by option + aggregation metrics
 - refactor roc_plot to use less arguments, consider printing out statistics info of thresholds
 """
@@ -92,6 +92,54 @@ class ROCVisualizer(EfficiencyAnalysis):
             raise ValueError("Threshold step must be a positive number.")
         if min_threshold > max_threshold:
             raise ValueError("min_threshold cannot be greater than max_threshold.")
+
+    def _generate_num_marker(
+        self,
+        axe: Axes,
+        thresholds_arr: np.ndarray,
+        proportions_data: np.ndarray,
+        num_markers: int,
+    ) -> None:
+        """
+        Generate markers on the ROC plot at specified intervals.
+
+        Args:
+            axe (Axes): The axes on which to plot the markers.
+            thresholds_arr (np.ndarray): Array of threshold values (x-axis).
+            proportions_data (np.ndarray): Array of proportion values (y-axis).
+            num_markers (int): Number of markers to generate.
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: if num_markers provided is negative
+        """
+        if num_markers < 0:
+            raise ValueError("Invalid num_marker parameter")
+        step = len(thresholds_arr) / num_markers
+        marker_indices = [int(i * step) for i in range(num_markers)]
+        for idx in marker_indices:
+            x_val = thresholds_arr[idx]
+            y_val = proportions_data[idx]
+
+            # Add marker
+            axe.plot(x_val, y_val, "go", markersize=5, zorder=5)
+
+            # custom format string
+            x_formatted = self._format_number_for_display(x_val)
+            y_formatted = self._format_number_for_display(y_val)
+
+            # Add text label showing (x, y) values
+            axe.annotate(
+                f"({x_formatted}, {y_formatted})",
+                (x_val, y_val),
+                fontsize=10,
+                xytext=(0, 10),
+                textcoords="offset points",
+                ha="center",
+                va="bottom",
+            )
 
     # TODO (Tan): fixed the vectorized version commented below, currently an issue when run alloc_vram_efficiency_score
     # def _roc_calculate_proportion(
@@ -217,6 +265,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         threshold_metric: JobEfficiencyMetricsEnum = JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY,
         proportion_metric: ProportionMetricsEnum = ProportionMetricsEnum.JOBS,
         plot_percentage: bool = True,
+        num_markers: int = 10,
     ) -> tuple[Figure, list[Axes]]:
         """
         Plot the ROC curve based on the specified threshold and proportion metrics.
@@ -319,7 +368,7 @@ class ROCVisualizer(EfficiencyAnalysis):
 
         plot_label = (
             f"{proportion_metric.value} (Total: {self._format_number_for_display(total_raw_value)}"
-            f"{f', account for {remain_percentage:.2f}% of dataset)' if remain_percentage < 100.0 else ')'}"
+            f"{f', in {remain_percentage:.2f}% of dataset)' if remain_percentage < 100.0 else ')'}"
         )
 
         if title is None:
@@ -334,31 +383,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         axe.plot(thresholds_arr, proportions_data, label=plot_label)
         axe.legend()
 
-        # Add markers for some data points
-        num_markers = 10
-        step = len(thresholds_arr) / num_markers
-        marker_indices = [int(i * step) for i in range(num_markers)]
-        for idx in marker_indices:
-            x_val = thresholds_arr[idx]
-            y_val = proportions_data[idx]
-
-            # Add marker
-            axe.plot(x_val, y_val, "go", markersize=5, zorder=5)
-
-            # custom format string
-            x_formatted = self._format_number_for_display(x_val)
-            y_formatted = self._format_number_for_display(y_val)
-
-            # Add text label showing (x, y) values
-            axe.annotate(
-                f"({x_formatted}, {y_formatted})",
-                (x_val, y_val),
-                fontsize=10,
-                xytext=(0, 10),
-                textcoords="offset points",
-                ha="center",
-                va="bottom",
-            )
+        self._generate_num_marker(axe, thresholds_arr, proportions_data, num_markers)
 
         return fig, axe_list
 
