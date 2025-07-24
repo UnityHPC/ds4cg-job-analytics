@@ -21,7 +21,16 @@ from pydantic import BaseModel, ValidationError, ConfigDict
 from .visualization import DataVisualizer
 
 
-class ColumnVisualizer(DataVisualizer):
+class ColumnKwargsModel(BaseModel):
+    model_config = ConfigDict(strict=True, extra='forbid')
+    columns: list[str] | None = None
+    sample_size: int | None = None
+    random_seed: int | None = None
+    summary_file_name: str = "columns_stats_summary.txt"
+    figsize: tuple[int | float, int | float] = (7, 4)
+
+
+class ColumnVisualizer(DataVisualizer[ColumnKwargsModel]):
     """A class for visualizing and summarizing columns of pre-processed data in a DataFrame."""
 
     def _generate_boolean_bar_plot(
@@ -1400,31 +1409,27 @@ class ColumnVisualizer(DataVisualizer):
 
         Raises:
             TypeError: If 'columns' is not a list of strings or None.
-            ValueError: If any column is not present in the DataFrame.
+            ValueError: If any column is not present in the DataFrame or if 'columns' is an empty list.
 
         Returns:
             list[str]: Validated list of column names.
         """
 
-        if columns is not None and (not isinstance(columns, list) or not all(isinstance(x, str) for x in columns)):
+        if columns is not None and (not all(isinstance(x, str) for x in columns)):
             raise TypeError("'columns' must be a list of strings or None")
+        
+        if columns is not None and len(columns) == 0:
+            raise ValueError("'columns' cannot be an empty list. 'columns' must be a list of strings or None")
 
         if columns is not None and jobs_df is not None and not all(col in jobs_df.columns for col in columns):
             raise ValueError("One or more specified columns are not present in the DataFrame.")
         return columns
-    
-    class ColumnKwargsModel(BaseModel):
-        model_config = ConfigDict(strict=True, extra='forbid')
-        columns: list[str] | None = None
-        sample_size: int | None = None
-        random_seed: int | None = None
-        summary_file_name: str = "columns_stats_summary.txt"
-        figsize: tuple[int | float, int | float] = (7, 4)
 
     def validate_visualize_kwargs(
         self,
         kwargs: dict[str, Any],
         validated_jobs_df: pd.DataFrame,
+        kwargs_model: type[ColumnKwargsModel]
     ) -> ColumnKwargsModel:
         """Validate the keyword arguments for the visualize method.
         
@@ -1440,11 +1445,11 @@ class ColumnVisualizer(DataVisualizer):
         """
         try:
             # Validate the kwargs using Pydantic model
-            col_kwargs = self.ColumnKwargsModel(**kwargs)
+            col_kwargs = kwargs_model(**kwargs)
         except ValidationError as e:
             allowed_fields = {
                 name: str(field.annotation)
-                for name, field in self.ColumnKwargsModel.model_fields.items()
+                for name, field in kwargs_model.model_fields.items()
             }
             allowed_fields_str = "\n".join(f"  {k}: {v}" for k, v in allowed_fields.items())
             raise TypeError(
@@ -1485,7 +1490,7 @@ class ColumnVisualizer(DataVisualizer):
             None
         """
         jobs_df = self.validate_dataframe()
-        validated_kwargs = self.validate_visualize_kwargs(kwargs, jobs_df)
+        validated_kwargs = self.validate_visualize_kwargs(kwargs, jobs_df, ColumnKwargsModel)
         columns = validated_kwargs.columns
         sample_size = validated_kwargs.sample_size
         random_seed = validated_kwargs.random_seed

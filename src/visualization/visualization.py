@@ -2,11 +2,13 @@ from abc import ABC, abstractmethod
 import pandas as pd
 from pathlib import Path
 import os
-from typing import Any 
+from typing import Any, TypeVar, Generic
 from pydantic import BaseModel 
 
+KwargsModelType = TypeVar("KwargsModelType", bound=BaseModel)
 
-class DataVisualizer(ABC):
+
+class DataVisualizer(Generic[KwargsModelType], ABC):
     """
     Base class for visualizing and summarizing pre-processed data.
     """
@@ -146,12 +148,59 @@ class DataVisualizer(ABC):
         """
         return f"{p:.1f}%" if p >= threshold_pct else ""
 
+    @staticmethod
+    def validate_column_argument(column: str | None, df: pd.DataFrame) -> str | None:
+        """Validate the provided column against the DataFrame.
+
+        Args:
+            column (str | None): Column name to validate.
+
+        Raises:
+            TypeError: If 'column' is not a string or None.
+            ValueError: If the column is not present in the DataFrame.
+
+        Returns:
+            str | None: Validated column name.
+        """
+        if column is not None and not isinstance(column, str):
+            raise TypeError("'column' must be a string or None")
+
+        if column is not None and df is not None and column not in df.columns:
+            raise ValueError("The specified column is not present in the DataFrame.")
+
+        return column
+
+    @staticmethod
+    def validate_columns(columns: list[str] | None, df: pd.DataFrame) -> list[str] | None:
+        """Validate the provided columns against the DataFrame.
+
+        Args:
+            columns (list[str]): List of column names to validate.
+
+        Raises:
+            TypeError: If 'columns' is not a list of strings or None.
+            ValueError: If any column is not present in the DataFrame or if 'columns' is an empty list.
+
+        Returns:
+            list[str]: Validated list of column names.
+        """
+        if columns is not None and (not all(isinstance(x, str) for x in columns)):
+            raise TypeError("'columns' must be a list of strings or None")
+        
+        if columns is not None and len(columns) == 0:
+            raise ValueError("'columns' cannot be an empty list. 'columns' must be a list of strings or None")
+
+        if columns is not None and df is not None and not all(col in df.columns for col in columns):
+            raise ValueError("One or more specified columns are not present in the DataFrame.")
+        return columns
+
     @abstractmethod
     def validate_visualize_kwargs(
         self,
         kwargs: dict[str, Any],
         validated_jobs_df: pd.DataFrame,
-    ) -> BaseModel:
+        kwargs_model: type[KwargsModelType],
+    ) -> KwargsModelType:
         """
         Validate the keyword arguments for the visualize method.
 
@@ -160,7 +209,7 @@ class DataVisualizer(ABC):
             validated_jobs_df (pd.DataFrame): The validated DataFrame to use for visualization.
         
         Returns:
-            BaseModel: The validated keyword arguments as a BaseModel.
+            KwargsModelType: The validated keyword arguments as a BaseModel.
         """
         pass
 
