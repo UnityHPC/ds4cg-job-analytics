@@ -377,7 +377,7 @@ class EfficiencyAnalysis:
         self.jobs_with_efficiency_metrics.loc[:, "weighted_alloc_vram_efficiency"] = (
             self.jobs_with_efficiency_metrics["alloc_vram_efficiency"]
             * self.jobs_with_efficiency_metrics["vram_hours"]
-            / user_job_hours_per_job
+            / user_job_hours_per_job  # TODO: should be divided by sum of vram_hours, not job_hours
         )
 
         users_w_efficiency_metrics.loc[:, "expected_value_alloc_vram_efficiency"] = (

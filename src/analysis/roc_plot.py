@@ -20,6 +20,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
+import matplotlib.patches as mpatches
 import numpy as np
 import sys
 from .efficiency_analysis import EfficiencyAnalysis
@@ -107,7 +108,7 @@ class ROCVisualizer(EfficiencyAnalysis):
             threshold_metric (JobEfficiencyMetricsEnum): The metric used for filtering.
 
         Returns:
-            pd.DataFrame: The filtered DataFrame.
+            pd.DataFrame: A new Dataframe that is filtered.
 
         """
         # contain all metrics we want to filter out invalid record
@@ -118,7 +119,7 @@ class ROCVisualizer(EfficiencyAnalysis):
 
         # no filter needed
         if threshold_metric not in metric_to_filters:
-            return plot_data_frame
+            return plot_data_frame.copy()
         col = plot_data_frame[threshold_metric.value]
         mask = pd.Series([True] * len(col), index=col.index)
         mask &= col.notna()
@@ -337,7 +338,6 @@ class ROCVisualizer(EfficiencyAnalysis):
                 "use calculate_all_efficiency_metrics() to calculate the dataframe before plotting."
             )
         data = self.jobs_with_efficiency_metrics
-
         # Validate inputs
         self._validate_inputs(
             data,
@@ -353,12 +353,10 @@ class ROCVisualizer(EfficiencyAnalysis):
         if plot_data.empty:
             raise ValueError("No data available for the specified threshold metric.")
 
+        # calculate number of filtered records and provide information
         filtered_out_records = len(data) - len(plot_data)
         if filtered_out_records:
-            print(
-                f"Filtered out {filtered_out_records} records with NaN or -inf values based on "
-                f"{threshold_metric.value} column."
-            )
+            print(f"Filtered out {filtered_out_records} invalid records based on {threshold_metric.value} column.")
         if threshold_metric == JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE and min_threshold >= 0.0:
             min_threshold = plot_data[threshold_metric.value].min()
             print(f"Setting min_threshold to {min_threshold} based on data.")
@@ -375,6 +373,18 @@ class ROCVisualizer(EfficiencyAnalysis):
 
         # calculate percentage of plot_data in comparison to total dataset
         remain_percentage = (len(data) - filtered_out_records) / len(data) * 100
+
+        # clip score appropriately
+        clip_score_dict = {
+            JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY: 1,
+            JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY: 1,
+            JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE: 0,
+            JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY_SCORE: 0,
+        }
+
+        if threshold_metric in clip_score_dict:
+            upper_bound = clip_score_dict[threshold_metric]
+            plot_data[threshold_metric.value] = plot_data[threshold_metric.value].clip(upper=upper_bound)
 
         # calculate threshold
         thresholds_arr: np.ndarray = np.arange(min_threshold, max_threshold + threshold_step, threshold_step)
@@ -394,7 +404,7 @@ class ROCVisualizer(EfficiencyAnalysis):
             total_raw_value = plot_data[proportion_metric.value].sum()
 
         plot_label = (
-            f"{proportion_metric.value} (Total: {self._format_number_for_display(total_raw_value)}"
+            f"{proportion_metric.value.capitalize()} (Total: {self._format_number_for_display(total_raw_value)}"
             f"{f', in {remain_percentage:.2f}% of dataset)' if remain_percentage < 100.0 else ')'}"
         )
 
@@ -407,8 +417,13 @@ class ROCVisualizer(EfficiencyAnalysis):
         axe.set_title(title)
         axe.set_ylabel(y_label)
         axe.set_xlabel(f"Threshold values ({threshold_metric.value})")
-        axe.plot(thresholds_arr, proportions_data, label=plot_label)
-        axe.legend()
+        axe.plot(thresholds_arr, proportions_data)
+
+        # add label to give information about total number of data and percentage to original dataset
+        custom_patch = mpatches.Patch(color="none", label=plot_label)
+        handles, _labels = axe.get_legend_handles_labels()
+        handles.append(custom_patch)
+        axe.legend(handles=handles)
 
         self._generate_num_marker(axe, thresholds_arr, proportions_data, num_markers)
 
