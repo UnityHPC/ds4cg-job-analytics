@@ -55,8 +55,9 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             ax.bar_label(ax.containers[0], labels=[f"{h.get_height():.1f}%" for h in ax.containers[0]])
         plt.title(title)
         plt.xticks(rotation=45, ha="right")
+        plt.tight_layout()
         if output_dir_path is not None:
-            plt.savefig(output_dir_path / f"{col}_barplot.png")
+            plt.savefig(output_dir_path / f"{col}_barplot.png", bbox_inches="tight")
         plt.show()
 
     def _plot_duration_histogram(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None) -> None:
@@ -259,6 +260,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         plt.subplots_adjust(wspace=0.0)
         fig.suptitle(f"Histogram of {col} (minutes, hours, days)", y=1.04)
 
+        plt.tight_layout()
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"{col}_hist.png", bbox_inches="tight")
         plt.show()
@@ -300,6 +302,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         total_days = (max_time - min_time).days + 1
 
         plt.figure(figsize=(7, 7))
+        plt.tight_layout()
         # If jobs span more than 2 days, plot jobs per day
         if total_days > 2:
             # Group by date, count jobs per day
@@ -353,7 +356,6 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             ax.set_xticks(tick_locs[::step])
             ax.set_xticklabels([tick_labels[i] for i in range(0, len(tick_labels), step)], rotation=45, ha="right")
 
-            plt.tight_layout()
             if output_dir_path is not None:
                 plt.savefig(output_dir_path / f"{col}_hourly_lineplot.png", bbox_inches="tight")
         plt.show()
@@ -441,7 +443,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             fontsize=10,
             title_fontsize=11,
         )
-
+        plt.tight_layout()
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
         plt.show()
@@ -530,6 +532,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             fontsize=10,
             title_fontsize=11,
         )
+        plt.tight_layout()
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
         plt.show()
@@ -620,9 +623,9 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             transform=ax.transAxes,
             zorder=10,
         )
-
+        plt.tight_layout()
         if output_dir_path is not None:
-            plt.savefig(output_dir_path / f"{col}_barplot.png")
+            plt.savefig(output_dir_path / f"{col}_barplot.png", bbox_inches="tight")
         plt.show()
 
     def _generate_qos_pie_chart(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None) -> None:
@@ -709,6 +712,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             fontsize=10,
             title_fontsize=11,
         )
+        plt.tight_layout()
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
         plt.show()
@@ -802,6 +806,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             fontsize=10,
             title_fontsize=11,
         )
+        plt.tight_layout()
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
         plt.show()
@@ -895,7 +900,6 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         xlabel = "Nodes (trailing numbers removed, e.g., gpu10,gpu50 → gpu,gpu; counts are combined)"
         plt.xlabel(xlabel)
         plt.ylabel("Number of Jobs")
-        plt.tight_layout()
         # Now wrap the xlabel based on the actual axes width in pixels
         ax = plt.gca()
         fig = plt.gcf()
@@ -935,9 +939,9 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
                 fontsize=9,
                 bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7),
             )
-
+        plt.tight_layout()
         if output_dir_path is not None:
-            plt.savefig(output_dir_path / f"{col}_barplot.png")
+            plt.savefig(output_dir_path / f"{col}_barplot.png", bbox_inches="tight")
         plt.show()
 
     def _generate_partition_bar_plot(
@@ -945,7 +949,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         jobs_df: pd.DataFrame,
         col: str,
         output_dir_path: Path | None = None,
-        figsize: tuple[float, float] = (9, 4),
+        figsize: tuple[float, float] = (12, 4),
     ) -> None:
         """Generate a bar plot for job partitions.
 
@@ -991,7 +995,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
                 fontsize=8,
                 bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7),
             )
-
+        plt.tight_layout()
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"{col}_barplot.png", bbox_inches="tight")
         plt.show()
@@ -1115,9 +1119,9 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             transform=ax.transAxes,
             zorder=10,
         )
-
+        plt.tight_layout()
         if output_dir_path is not None:
-            plt.savefig(output_dir_path / f"{col}_flat_barplot.png")
+            plt.savefig(output_dir_path / f"{col}_flat_barplot.png", bbox_inches="tight")
         plt.show()
 
     def _generate_gpu_memory_usage_histogram_categorical_bins(
@@ -1217,9 +1221,9 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             Patch(facecolor=other_color, label=">0 GiB"),
         ]
         ax.legend(handles=legend_handles, loc="upper right")
-
+        plt.tight_layout()
         if output_dir_path is not None:
-            plt.savefig(output_dir_path / f"{col}_hist.png")
+            plt.savefig(output_dir_path / f"{col}_hist.png", bbox_inches="tight")
         plt.show()
 
     def _generate_non_gpu_memory_histogram(
@@ -1293,7 +1297,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             zorder=10,
         )
         plt.grid(axis="y", linestyle="--", alpha=0.5)
-
+        plt.tight_layout()
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"{col}_hist.png", bbox_inches="tight")
         plt.show()
@@ -1388,6 +1392,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             fontsize=10,
             title_fontsize=11,
         )
+        plt.tight_layout()
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
         plt.show()
