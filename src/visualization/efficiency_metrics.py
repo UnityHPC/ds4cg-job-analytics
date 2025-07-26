@@ -108,7 +108,10 @@ class JobsWithMetricsVisualizer(EfficiencyMetricsVisualizer):
 
         ax = barplot
         xmax = jobs_with_metrics_df[column].max()
-        xlim = xmax * 1.6 if xmax > 0 else 1
+        # Set x-axis limit to 1.6 times the maximum value
+        # This ensures that the bars do not touch the right edge of the plot
+        xlim_multiplier = 1.6
+        xlim = xmax * xlim_multiplier if xmax > 0 else 1
         ax.set_xlim(0, xlim)
 
         if bar_label_columns is not None:
@@ -123,7 +126,10 @@ class JobsWithMetricsVisualizer(EfficiencyMetricsVisualizer):
                     f"{col}: {val:.2f}" for col, val in zip(bar_label_columns, label_values_columns, strict=True)
                 ]
                 label_text = "\n".join(label_lines)
-                xpos = min(column_value + xlim * 0.02, xlim * 0.98)
+                # Calculate x position for label text
+                label_offset_fraction = 0.02  # Use a small offset to avoid overlap with the bar
+                label_max_fraction = 0.98  # To prevent the text from being clipped at the right edge
+                xpos = min(column_value + xlim * label_offset_fraction, xlim * label_max_fraction)
                 ax.text(
                     xpos,
                     i,
@@ -143,7 +149,7 @@ class JobsWithMetricsVisualizer(EfficiencyMetricsVisualizer):
 
 class UsersWithMetricsVisualizer(EfficiencyMetricsVisualizer):
     """ Visualizer for users with efficiency metrics.
-    
+
     Visualizes users ranked by selected efficiency metric.
     """
     def __init__(self, data: pd.DataFrame) -> None:
@@ -183,7 +189,10 @@ class UsersWithMetricsVisualizer(EfficiencyMetricsVisualizer):
 
         ax = barplot
         xmax = users_with_metrics_df[column].max()
-        xlim = xmax * 1.6 if xmax > 0 else 1
+        # Set x-axis limit to 1.6 times the maximum value
+        # This ensures that the bars do not touch the right edge of the plot
+        xlim_multiplier = 1.6
+        xlim = xmax * xlim_multiplier if xmax > 0 else 1
         ax.set_xlim(0, xlim)
 
         if bar_label_columns is not None:
@@ -198,7 +207,10 @@ class UsersWithMetricsVisualizer(EfficiencyMetricsVisualizer):
                     f"{col}: {val:.2f}" for col, val in zip(bar_label_columns, label_values_columns, strict=True)
                 ]
                 label_text = "\n".join(label_lines)
-                xpos = min(column_value + xlim * 0.02, xlim * 0.98)
+                # Calculate x position for label text
+                label_offset_fraction = 0.02  # Use a small offset to avoid overlap with the bar
+                label_max_fraction = 0.98  # To prevent the text from being clipped at the right edge
+                xpos = min(column_value + xlim * label_offset_fraction, xlim * label_max_fraction)
                 ax.text(
                     xpos,
                     i,
