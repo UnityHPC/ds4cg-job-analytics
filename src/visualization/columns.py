@@ -378,7 +378,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             None
         """
         # Replace empty/NaN with 'non interactive', others as their type
-        interactive_col = jobs_df[col].fillna("non interactive").astype(str)
+        interactive_col = jobs_df[col].astype(str)
         counts = interactive_col.value_counts()
         plt.figure(figsize=(5, 7))
 
@@ -537,8 +537,6 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
         plt.show()
-
-    # TODO (Arda): Add support for new GPUType column format (dictionary)
 
     def _generate_gpu_type_bar_plot(
         self,
@@ -1013,11 +1011,11 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             None
         """
         # Each row is an ndarray of constraints where each constraint is a string
-        # Check if all non-null entries are ndarrays of strings
+        # Check if all non-null entries are lists or ndarray of strings
         non_null = jobs_df[col].dropna()
-        if not all(isinstance(x, np.ndarray) and all(isinstance(item, str) for item in x) for x in non_null):
+        if not all(isinstance(x, list) and all(isinstance(item, str) for item in x) for x in non_null):
             msg = (
-                f"Error: Not all entries in column '{col}' are ndarrays of strings. Example values:\n{non_null.head()}"
+                f"Error: Not all entries in column '{col}' are lists of strings."
             )
             raise ValueError(msg)
 

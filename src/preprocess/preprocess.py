@@ -229,7 +229,7 @@ def _fill_missing(res: pd.DataFrame) -> None:
     res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)
     res.loc[:, "Interactive"] = res["Interactive"].fillna("non-interactive")
     res.loc[:, "Constraints"] = (
-        res["Constraints"].fillna("").apply(lambda x: [] if isinstance(x, str) and x == "" else x)
+        res["Constraints"].fillna("").apply(lambda x: [] if isinstance(x, str) and x == "" else list(x))
     )
     res.loc[:, "GPUType"] = (
         res["GPUType"]
