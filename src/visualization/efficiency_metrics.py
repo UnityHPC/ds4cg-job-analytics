@@ -9,7 +9,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from typing import Any
 from pathlib import Path
-from models import EfficiencyMetricsKwargsModel, UsersWithMetricsKwargsModel
+from .models import EfficiencyMetricsKwargsModel, UsersWithMetricsKwargsModel
 
 
 class EfficiencyMetricsVisualizer(DataVisualizer[EfficiencyMetricsKwargsModel]):

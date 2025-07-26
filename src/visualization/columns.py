@@ -11,6 +11,7 @@ from matplotlib.container import BarContainer
 import seaborn as sns
 from pathlib import Path
 import numpy as np
+from collections import Counter
 from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Patch
 from ..config.constants import VRAM_CATEGORIES
@@ -19,7 +20,7 @@ import re
 from typing import Any 
 from pydantic import ValidationError
 from .visualization import DataVisualizer
-from models import ColumnVisualizationKwargsModel
+from .models import ColumnVisualizationKwargsModel
 
 
 class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
@@ -554,51 +555,45 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             output_dir_path (Path | None): The directory to save the plot.
 
         Raises:
-            ValueError: If the column does not contain numpy arrays or if any entry is not a numpy array.
+            ValueError: If the column does not contain lists or dictionaries.
 
         Returns:
             None
         """
 
-        # GPUType should be a numpy array or list-like per row
-        # Check if all non-null entries are numpy arrays
         col_data = jobs_df[col]
         non_null = col_data.dropna()
-        if not all(isinstance(x, np.ndarray | list) for x in non_null):
+        if not all(isinstance(x, (list, dict)) for x in non_null):
             msg = (
-                f"Error: Not all entries in column '{col}' are numpy arrays or lists. "
+                f"Error: Not all entries in column '{col}' are lists or dictionaries. "
                 f"Example values:\n{non_null.head()}"
             )
             print(msg)
             raise ValueError(msg)
 
-        # Drop NaN and flatten all GPU types (each entry is a numpy array)
-        flat_gpu_types = pd.Series(np.concatenate(non_null.values))
+        # Flatten all GPU types and count per job
+        multi_count = 0
+        single_count = 0
 
-        # Count single and multi-GPU-type jobs
-        is_multi = non_null.apply(lambda x: len(x) > 1)
-        multi_count = is_multi.sum()
-        single_count = (~is_multi).sum()
+        gpu_counts = sum((Counter(entry) for entry in non_null), Counter())
+        multi_count = sum(1 for entry in non_null if len(entry) > 1)
+        single_count = len(non_null) - multi_count
 
-        # Count occurrences of each GPU type (across all jobs)
-        gpu_counts = flat_gpu_types.value_counts()
-        gpu_percents = gpu_counts / gpu_counts.sum() * 100
-
+        gpu_percents = {k: v / sum(gpu_counts.values()) * 100 for k, v in gpu_counts.items()}
         plt.figure(figsize=(7, 4))
         ax = sns.barplot(
-            x=gpu_counts.index, y=gpu_counts.values, hue=gpu_counts.index, palette="viridis", legend=False
+            x=gpu_counts.keys(), y=gpu_counts.values(), hue=gpu_counts.keys(), palette="viridis", legend=False
         )
         plt.title(f"GPU Types ({col})")
         plt.xlabel("GPU type")
         plt.ylabel("Number of jobs using this GPU type")
         plt.xticks(rotation=45, ha="right")
 
-        # Annotate bars with counts, ensuring a gap above the tallest bar label
-        tallest = np.asarray(gpu_counts.values).max()
+        tallest = max(list(gpu_counts.values()))
         gap = max(2.5, tallest * 0.08)
         ax.set_ylim(0, tallest + gap)
-        for i, (count, percent) in enumerate(zip(gpu_counts.values, gpu_percents.values, strict=True)):
-            label_y = count + gap * 0.2  # offset above bar, proportional to gap
+        for i, (count, percent) in enumerate(zip(gpu_counts.values(), gpu_percents.values(), strict=True)):
+            label_y = count + gap * 0.2
             ax.text(
                 i,
                 label_y,
@@ -609,9 +604,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
                 bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7),
             )
 
-        # Add a text box showing number of jobs with multiple GPU types
         info_text = f"Jobs with 1 GPU type: {single_count}\nJobs with >1 GPU type: {multi_count}"
-        # Place the text box inside the axes, top right, with a small offset
         ax.text(
             0.98,
             0.98,
