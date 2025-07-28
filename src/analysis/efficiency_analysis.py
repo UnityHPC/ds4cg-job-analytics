@@ -285,9 +285,7 @@ class EfficiencyAnalysis:
         filtered_jobs.loc[:, "job_hours"] = (
             filtered_jobs["Elapsed"].dt.total_seconds() * filtered_jobs["gpu_count"] / 3600
         )
-        filtered_jobs.loc[:, "vram_hours"] = (
-            filtered_jobs["allocated_vram"] * filtered_jobs["job_hours"]
-        )
+        filtered_jobs.loc[:, "vram_hours"] = filtered_jobs["allocated_vram"] * filtered_jobs["job_hours"]
         filtered_jobs.loc[:, "used_vram_gib"] = filtered_jobs["GPUMemUsage"] / (2**30)
         # Compute alloc_vram_efficiency, a float in the range [0, 1].
         filtered_jobs.loc[:, "alloc_vram_efficiency"] = (
@@ -350,10 +348,10 @@ class EfficiencyAnalysis:
         def avg_non_inf(x: pd.Series) -> float | pd.api.typing.NAType:
             """
             Helper function to calculate the average of a Series, ignoring -np.inf values.
-            
+
             Args:
                 x (pd.Series): Series to calculate the average from.
-                
+
             Returns:
                 float: Average of the Series, ignoring -np.inf values. Returns pd.NA if no valid values.
             """
@@ -363,11 +361,11 @@ class EfficiencyAnalysis:
         users_w_efficiency_metrics = (
             self.jobs_with_efficiency_metrics.groupby("User", observed=True)
             .agg(
-            job_count=("JobID", "count"),
-            user_job_hours=("job_hours", "sum"),
-            pi_account=("Account", "first"),
-            avg_alloc_vram_efficiency_score=("alloc_vram_efficiency_score", avg_non_inf),
-            avg_vram_constraint_efficiency_score=("vram_constraint_efficiency_score", avg_non_inf),
+                job_count=("JobID", "count"),
+                user_job_hours=("job_hours", "sum"),
+                pi_account=("Account", "first"),
+                avg_alloc_vram_efficiency_score=("alloc_vram_efficiency_score", avg_non_inf),
+                avg_vram_constraint_efficiency_score=("vram_constraint_efficiency_score", avg_non_inf),
             )
             .reset_index()
         )
@@ -625,7 +623,7 @@ class EfficiencyAnalysis:
             columns=[
                 "weighted_ev_alloc_vram_efficiency",
                 "weighted_ev_vram_constraint_efficiency",
-                "weighted_ev_gpu_count"
+                "weighted_ev_gpu_count",
             ]
         )
 
@@ -688,7 +686,7 @@ class EfficiencyAnalysis:
         metrics_df_name_enum: MetricsDataFrameNameEnum,
         sorting_key: str,
         ascending: bool,
-        filter_criteria: dict[str, int | float | dict | pd.api.typing.NAType]
+        filter_criteria: dict[str, int | float | dict | pd.api.typing.NAType],
     ) -> pd.DataFrame:
         """
         Sort and filter records based on specified criteria.

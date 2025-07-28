@@ -4,7 +4,7 @@ import os
 
 class DatabaseConnection:
     """A class to manage the connection to a DuckDB database."""
-    
+
     def __init__(self, db_url: str):
         self.db_url = db_url
         self.connection = self._connect()
@@ -36,7 +36,7 @@ class DatabaseConnection:
             return self.connection.execute(query).df().columns.tolist()
         else:
             raise Exception("Not connected")
-        
+
     def get_schema(self, table_name: str = "Jobs"):
         """
         Fetch column information for the specified table (types, NULLABLE, etc.).

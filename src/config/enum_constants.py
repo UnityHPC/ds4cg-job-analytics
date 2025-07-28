@@ -17,6 +17,7 @@ class InteractiveEnum(Enum):
         RSTUDIO: Represents RStudio jobs.
         DESKTOP: Represents desktop jobs.
     """
+
     NON_INTERACTIVE = "non-interactive"
     SHELL = "shell"
     JUPYTER = "bc_jupyter"
@@ -35,6 +36,7 @@ class QOSEnum(Enum):
         SHORT: Represents short QoS.
         LONG: Represents long QoS.
     """
+
     NORMAL = "normal"
     UPDATES = "updates"
     SHORT = "short"
@@ -55,6 +57,7 @@ class StatusEnum(Enum):
         PENDING: Represents jobs that are pending.
         NODE_FAIL: Represents jobs that have failed due to node issues.
     """
+
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
@@ -74,6 +77,7 @@ class ExitCodeEnum(Enum):
         ERROR: Represents an error during job execution.
         SIGNALED: Represents a job that was signaled to terminate.
     """
+
     SUCCESS = "SUCCESS"
     ERROR = "ERROR"
     SIGNALED = "SIGNALED"
@@ -86,12 +90,14 @@ class AdminsAccountEnum(Enum):
     Attributes:
         ROOT: Represents the root admin account.
     """
+
     ROOT = "root"
 
 
 @unique
 class PartitionEnum(Enum):
     """An enumeration representing different partitions on Unity."""
+
     BUILDING = "building"
     ARM_GPU = "arm-gpu"
     ARM_PREEMPT = "arm-preempt"
@@ -143,6 +149,7 @@ class FilterTypeEnum(Enum):
         SCALAR: Represents a scalar value (e.g., int, float, str).
         PD_NA: Represents a pandas 'NA' value for missing data.
     """
+
     DICTIONARY = auto()
     LIST = auto()
     SET = auto()
@@ -161,8 +168,7 @@ class MetricsDataFrameNameEnum(Enum):
         USERS: DataFrame name for users with efficiency metrics.
         PI_GROUPS: DataFrame name for PI accounts/groups with efficiency metrics.
     """
+
     JOBS = "jobs_with_efficiency_metrics"
     USERS = "users_with_efficiency_metrics"
     PI_GROUPS = "pi_accounts_with_efficiency_metrics"
- 
-

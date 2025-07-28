@@ -17,7 +17,7 @@ from matplotlib.patches import Patch
 from ..config.constants import VRAM_CATEGORIES
 import textwrap
 import re
-from typing import Any 
+from typing import Any
 from pydantic import ValidationError
 from .visualization import DataVisualizer
 from .models import ColumnVisualizationKwargsModel
@@ -116,9 +116,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             return f"{(n / total_count * 100):.1f}%" if total_count > 0 else "0.0%"
 
         # Helper to reduce xticks and rotate if width is small
-        def choose_ticks_and_rotation(
-            ticks: list[int], width: float, max_labels: int = 3
-        ) -> tuple[list[int], int]:
+        def choose_ticks_and_rotation(ticks: list[int], width: float, max_labels: int = 3) -> tuple[list[int], int]:
             # Always include first and last tick, and always have at least 4 ticks
             if width < min_width and len(ticks) > max_labels:
                 # Always include first and last, and evenly space the rest
@@ -409,7 +407,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             labels=labels,
             autopct=self.pie_chart_autopct_func,
             startangle=0,
-            colors=sns.color_palette("pastel")[0:len(counts)],
+            colors=sns.color_palette("pastel")[0 : len(counts)],
             explode=explode,
         )
 
@@ -572,11 +570,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         plt.figure(figsize=(7, 4))
         gpu_counts = pd.Series(sum((Counter(entry) for entry in non_null), Counter())).sort_values(ascending=False)
         ax = sns.barplot(
-            x=gpu_counts.index,
-            y=gpu_counts.values,
-            hue=gpu_counts.index,
-            palette="viridis",
-            legend=False
+            x=gpu_counts.index, y=gpu_counts.values, hue=gpu_counts.index, palette="viridis", legend=False
         )
 
         plt.title(f"GPU Types ({col})")
@@ -882,9 +876,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         node_counts = flat_nodes_clean.value_counts()
         node_percents = node_counts / node_counts.sum() * 100
         plt.figure(figsize=figsize, layout="constrained")
-        sns.barplot(
-            x=node_counts.index, y=node_counts.values, hue=node_counts.index, palette="viridis", legend=False
-        )
+        sns.barplot(x=node_counts.index, y=node_counts.values, hue=node_counts.index, palette="viridis", legend=False)
         plt.title(f"{col} (nodes combined by removing trailing numbers)")
         # Set a long xlabel and wrap it to fit within the figure width
         xlabel = "Nodes (trailing numbers removed, e.g., gpu10,gpu50 → gpu,gpu; counts are combined)"
@@ -957,7 +949,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         plt.figure(figsize=figsize)
         ax = sns.barplot(
             x=partition_counts.index,
-            y=partition_counts, 
+            y=partition_counts,
             hue=partition_counts.index,
             palette="viridis",
             legend=False,
@@ -1011,9 +1003,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         # Check if all non-null entries are lists or ndarray of strings
         non_null = jobs_df[col].dropna()
         if not all(isinstance(x, list) and all(isinstance(item, str) for item in x) for x in non_null):
-            msg = (
-                f"Error: Not all entries in column '{col}' are lists of strings."
-            )
+            msg = f"Error: Not all entries in column '{col}' are lists of strings."
             raise ValueError(msg)
 
         # Remove beginning and trailing single quotes from each string
@@ -1404,7 +1394,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
 
         if columns is not None and (not all(isinstance(x, str) for x in columns)):
             raise TypeError("'columns' must be a list of strings or None")
-        
+
         if columns is not None and len(columns) == 0:
             raise ValueError("'columns' cannot be an empty list. 'columns' must be a list of strings or None")
 
@@ -1416,10 +1406,10 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         self,
         kwargs: dict[str, Any],
         validated_jobs_df: pd.DataFrame,
-        kwargs_model: type[ColumnVisualizationKwargsModel]
+        kwargs_model: type[ColumnVisualizationKwargsModel],
     ) -> ColumnVisualizationKwargsModel:
         """Validate the keyword arguments for the visualize method.
-        
+
         Args:
             kwargs (dict[str, Any]): Keyword arguments to validate.
             validated_jobs_df (pd.DataFrame): The DataFrame to validate against.
@@ -1435,14 +1425,10 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             # Validate the kwargs using Pydantic model
             col_kwargs = kwargs_model(**kwargs)
         except ValidationError as e:
-            allowed_fields = {
-                name: str(field.annotation)
-                for name, field in kwargs_model.model_fields.items()
-            }
+            allowed_fields = {name: str(field.annotation) for name, field in kwargs_model.model_fields.items()}
             allowed_fields_str = "\n".join(f"  {k}: {v}" for k, v in allowed_fields.items())
             raise TypeError(
-                f"Invalid visualize kwargs: {e.json(indent=2)}\n"
-                f"Allowed fields and types:\n{allowed_fields_str}"
+                f"Invalid visualize kwargs: {e.json(indent=2)}\nAllowed fields and types:\n{allowed_fields_str}"
             ) from e
 
         self.validate_columns_argument(col_kwargs.columns, validated_jobs_df)
@@ -1453,11 +1439,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         )
         return col_kwargs
 
-    def visualize(
-        self,
-        output_dir_path: Path | None = None,
-        **kwargs: dict[str, Any]
-    ) -> None:
+    def visualize(self, output_dir_path: Path | None = None, **kwargs: dict[str, Any]) -> None:
         """Visualize and summarize specified columns of the data.
 
         Args:
