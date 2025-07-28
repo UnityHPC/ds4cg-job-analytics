@@ -41,14 +41,6 @@ class DatabaseConnection:
         """
         return self.connection is not None
 
-    def get_connection_info(self) -> str:
-        """
-        Retrieves all information about the connection.
-
-        Returns: str:
-        """
-        return self.connection if self.is_connected() else "No active connection"
-
     def fetch_all_column_names(self, table_name: str = "Jobs"):
         """Fetch all column names from the any table. By default, it fetches from a table named 'Jobs'.
         
