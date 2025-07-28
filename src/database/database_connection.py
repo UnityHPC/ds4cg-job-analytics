@@ -3,8 +3,9 @@ import duckdb
 
 class DatabaseConnection:
     """
-    We have a class called DatabaseConnection which establishes a duckdb connection to any url ending in .db
+    A class to manage database connections using DuckDB.
 
+    This class provides methods to establish a connection to a DuckDB database using a given URL. It can be used to interact with the database and perform operations
 
     """
     def __init__(self, db_url: str):
@@ -15,8 +16,6 @@ class DatabaseConnection:
         """
         Creates a database connection and returns the connection as an object. 
 
-        Args: None
-
         Returns: duckdb.DuckDBPyConnection
         """
         self.connection = duckdb.connect(self.db_url)
@@ -25,19 +24,14 @@ class DatabaseConnection:
 
     def disconnect(self):
         """
-        Disconnects the existing connection 
+        Safely closes the database connection.
 
-        Args: None
-
-        Returns: None
         """
         self.connection.close()
 
     def is_connected(self) -> bool:
         """
         Checks if it is connected by checking if the connection is not none.
-
-        Args: None
 
         Returns: bool 
         """
@@ -47,8 +41,6 @@ class DatabaseConnection:
         """
         Retrieves all information about the connection.
 
-        Args: None
-
         Returns: str
         """
         return self.connection if self.is_connected() else "No active connection"
@@ -57,7 +49,6 @@ class DatabaseConnection:
         """Fetch all column names from the Jobs table.
         
         Args: table_name 
-
 
         Returns: None
         
@@ -92,7 +83,6 @@ class DatabaseConnection:
 
 
         Args: str 
-
 
         Returns: DataFrame 
         """
