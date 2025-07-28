@@ -2,6 +2,7 @@
 Module with utilities for visualizing efficiency metrics.
 """
 
+from abc import ABC
 from .visualization import DataVisualizer
 from pydantic import ValidationError
 import seaborn as sns
@@ -12,7 +13,7 @@ from pathlib import Path
 from .models import EfficiencyMetricsKwargsModel, UsersWithMetricsKwargsModel
 
 
-class EfficiencyMetricsVisualizer(DataVisualizer[EfficiencyMetricsKwargsModel]):
+class EfficiencyMetricsVisualizer(DataVisualizer[EfficiencyMetricsKwargsModel], ABC):
     """
     Abstract base class for visualizing efficiency metrics.
     """
@@ -31,6 +32,7 @@ class EfficiencyMetricsVisualizer(DataVisualizer[EfficiencyMetricsKwargsModel]):
         Args:
             kwargs (dict[str, Any]): Keyword arguments to validate.
             validated_jobs_df (pd.DataFrame): The DataFrame to validate against.
+            kwargs_model (type[EfficiencyMetricsKwargsModel]): Pydantic model for validation.
 
         Raises:
             TypeError: If any keyword argument has an incorrect type.

@@ -121,7 +121,10 @@ class EfficiencyAnalysis:
         if filter is not None:
             if filter is pd.NA or (isinstance(filter, float) and np.isnan(filter)):
                 if FilterTypeEnum.PD_NA not in permissible_filter_types:
-                    raise ValueError(f"{filter_name} cannot be pd.NA or <NA>.")
+                    raise ValueError(
+                        f"{filter_name} cannot be pd.NA or <NA>. "
+                        f"Permissible filter types are {permissible_filter_types}."
+                    )
                 mask &= col.isna()
             elif isinstance(filter, list | set | tuple):
                 # Check if the filter is a list, set, or tuple and if all values are numeric

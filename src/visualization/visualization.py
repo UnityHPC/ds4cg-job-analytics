@@ -167,6 +167,7 @@ class DataVisualizer(Generic[KwargsModelType], ABC):
 
         Args:
             column (str | None): Column name to validate.
+            df (pd.DataFrame): The DataFrame to check against.
 
         Raises:
             TypeError: If 'column' is not a string or None.
@@ -189,6 +190,7 @@ class DataVisualizer(Generic[KwargsModelType], ABC):
 
         Args:
             columns (list[str]): List of column names to validate.
+            df (pd.DataFrame): The DataFrame to check against.
 
         Raises:
             TypeError: If 'columns' is not a list of strings or None.
@@ -220,7 +222,8 @@ class DataVisualizer(Generic[KwargsModelType], ABC):
         Args:
             kwargs (dict[str, Any]): The keyword arguments to validate.
             validated_jobs_df (pd.DataFrame): The validated DataFrame to use for visualization.
-        
+            kwargs_model (type[KwargsModelType]): The Pydantic model to validate against.
+
         Returns:
             KwargsModelType: The validated keyword arguments as a BaseModel.
         """

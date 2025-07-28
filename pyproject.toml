@@ -43,6 +43,9 @@ select = [
     # flake8-annotations: ANN
     "ANN",
     # pydocstyle: D
+    # Undocumented public method and public class: D102, D101
+    "D102", "D101",
+    # pydocstyle: D
     # One blank line between summary and description: D205
     "D205",
     # pydocstyle: D
@@ -54,9 +57,8 @@ select = [
     # pydocstyle: D
     # Missing blank line after docstring section: D410
     "D410",
-    # pydocstyle: D
-    # Undocumented public method and public class: D102, D101
-    "D102", "D101"
+    # undocumented-param (D417)
+    "D417",
 ]
 ignore = [
     # Ignore use ternary operator in if statements
