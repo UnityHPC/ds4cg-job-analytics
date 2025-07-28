@@ -4,6 +4,7 @@ Visualization utilities for pre-processed Unity job data.
 Provides a function to visualize and summarize each column of a DataFrame, including appropriate
 plots and statistics for numeric and categorical columns.
 """
+from collections import Counter
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -640,8 +641,14 @@ class DataVisualizer:
             plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
         plt.show()
 
-    def _generate_gpu_type_bar_plot(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
-        """Generate a bar plot for GPU types (GPUType column) and show number of jobs with more than one GPU type.
+    def _generate_gpu_type_bar_plot(
+            self,
+            jobs_df: pd.DataFrame,
+            col: str,
+            output_dir_path: Path | None = None,
+    ) -> None:
+        """
+        Generate a bar plot for GPU types (GPUType column) and show number of jobs with more than one GPU type.
 
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
@@ -649,57 +656,47 @@ class DataVisualizer:
             output_dir_path (Path | None): The directory to save the plot.
 
         Raises:
-            ValueError: If the column does not contain numpy arrays or if any entry is not a numpy array.
+            ValueError: If the column does not contain lists or dictionaries.
 
         Returns:
             None
         """
 
-        # GPUType should be a numpy array or list-like per row
-        # Check if all non-null entries are numpy arrays
         col_data = jobs_df[col]
         non_null = col_data.dropna()
-        if not all(isinstance(x, np.ndarray | dict) for x in non_null):
+        if not all(isinstance(x, (list, dict)) for x in non_null):
             msg = (
-                f"Error: Not all entries in column '{col}' are numpy arrays or dictionaries. "
+                f"Error: Not all entries in column '{col}' are lists or dictionaries. "
                 f"Example values:\n{non_null.head()}"
             )
             print(msg)
             raise ValueError(msg)
 
-        if all(isinstance(x, dict) for x in non_null):
-            # get the keys and convert them to numpy arrays
-            # also add the exact GPU count from the values
-            non_null = non_null.apply(lambda x: np.array(list(x.keys())) if isinstance(x, dict) else x)
-
-
-        # Drop NaN and flatten all GPU types (each entry is a numpy array)
-        flat_gpu_types = pd.Series(np.concatenate(non_null.values))
-
-        # Count single and multi-GPU-type jobs
-        is_multi = non_null.apply(lambda x: len(x) > 1)
-        multi_count = is_multi.sum()
-        single_count = (~is_multi).sum()
-
-        # Count occurrences of each GPU type (across all jobs)
-        gpu_counts = flat_gpu_types.value_counts()
-        gpu_percents = gpu_counts / gpu_counts.sum() * 100
+        # Flatten all GPU types and count per job
+        multi_count = sum(1 for entry in non_null if len(entry) > 1)
+        single_count = len(non_null) - multi_count
 
         plt.figure(figsize=(7, 4))
+        gpu_counts = pd.Series(sum((Counter(entry) for entry in non_null), Counter())).sort_values(ascending=False)
         ax = sns.barplot(
-            x=gpu_counts.index, y=gpu_counts.values, hue=gpu_counts.index, palette="viridis", legend=False
+            x=gpu_counts.index,
+            y=gpu_counts.values,
+            hue=gpu_counts.index,
+            palette="viridis",
+            legend=False
         )
+
         plt.title(f"GPU Types ({col})")
         plt.xlabel("GPU type")
         plt.ylabel("Number of jobs using this GPU type")
         plt.xticks(rotation=45, ha="right")
 
-        # Annotate bars with counts, ensuring a gap above the tallest bar label
-        tallest = np.asarray(gpu_counts.values).max()
+        gpu_percents = gpu_counts / gpu_counts.sum() * 100
+        tallest = gpu_counts.max()
         gap = max(2.5, tallest * 0.08)
         ax.set_ylim(0, tallest + gap)
         for i, (count, percent) in enumerate(zip(gpu_counts.values, gpu_percents.values, strict=True)):
-            label_y = count + gap * 0.2  # offset above bar, proportional to gap
+            label_y = count + gap * 0.2
             ax.text(
                 i,
                 label_y,
@@ -710,9 +707,7 @@ class DataVisualizer:
                 bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7),
             )
 
-        # Add a text box showing number of jobs with multiple GPU types
         info_text = f"Jobs with 1 GPU type: {single_count}\nJobs with >1 GPU type: {multi_count}"
-        # Place the text box inside the axes, top right, with a small offset
         ax.text(
             0.98,
             0.98,
@@ -724,11 +719,9 @@ class DataVisualizer:
             transform=ax.transAxes,
             zorder=10,
         )
-
+        plt.tight_layout()
         if output_dir_path is not None:
-            plt.tight_layout()
-
-            plt.savefig(output_dir_path / f"{col}_barplot.png")
+            plt.savefig(output_dir_path / f"{col}_barplot.png", bbox_inches="tight")
         plt.show()
 
     def _generate_qos_pie_chart(self, jobs_df: pd.DataFrame, col: str, output_dir_path: Path | None = None):
