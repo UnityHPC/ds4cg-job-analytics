@@ -44,7 +44,12 @@ class DatabaseConnection:
     def fetch_all_column_names(self, table_name: str = "Jobs"):
         """Fetch all column names from the any table. By default, it fetches from a table named 'Jobs'.
         
-        Args: table_name (str): The name of the table to fetch all the column names from. Defaults to "Jobs"      
+        Args: table_name (str): The name of the table to fetch all the column names from. Defaults to "Jobs"  
+
+        Raises:
+            Exception: If the connection is not active.
+        Returns:
+            list: A list of column names from the specified table.    
         """
         if self.is_connected():
             query = f"SELECT * FROM {table_name} LIMIT 0"
