@@ -15,11 +15,15 @@ class DatabaseConnection:
         print(f"Connected to {self.db_url}")
 
     def _connect(self) -> duckdb.DuckDBPyConnection:
-        """Establish a connection to the DuckDB database."""
+        """Establish a connection to the DuckDB database.
+
+        Returns: duckdb.DuckDBPyConnection: The connection object to the DuckDB database.
+        """
         self.connection = duckdb.connect(self.db_url)
         return self.connection
 
     def _disconnect(self):
+        """Safely closes the active database connection"""
         self.connection.close()
 
     def __del__(self):
@@ -31,7 +35,7 @@ class DatabaseConnection:
 
     def is_connected(self) -> bool:
         """
-        Checks if it is connected by checking if the connection is not none.
+        Checks if the database connection is active.
 
         Returns: bool: True if the connection is active, False otherwise
         """
@@ -46,12 +50,9 @@ class DatabaseConnection:
         return self.connection if self.is_connected() else "No active connection"
 
     def fetch_all_column_names(self, table_name: str = "Jobs"):
-        """Fetch all column names from the Jobs table.
+        """Fetch all column names from the any table. By default, it fetches from a table named 'Jobs'.
         
-        Args: table_name 
-
-        Returns: None
-        
+        Args: table_name (str): The name of the table to fetch all the column names from. Defaults to "Jobs"      
         """
         if self.is_connected():
             query = f"SELECT * FROM {table_name} LIMIT 0"
@@ -60,7 +61,17 @@ class DatabaseConnection:
             raise Exception("Not connected")
 
     def fetch_all_jobs(self, table_name="Jobs"):
-        """Fetch all data from the specified table. Table name is set to Jobs but can be changed accordingly."""
+        """Fetch all data from the specified table. Table name is set to Jobs but can be changed accordingly.
+
+        args:
+            table_name (str): The name of the table to fetch data from. Defaults to "Jobs".
+
+        Raises:
+            Exception: If the connection is not active.
+            
+        Returns:
+            pd.DataFrame: A pandas DataFrame containing all rows from the specified table.
+        """
         if self.is_connected():
             query = f"SELECT * FROM {table_name}"
             return self.connection.execute(query).fetchdf()
