@@ -660,7 +660,10 @@ class DataVisualizer:
         col_data = jobs_df[col]
         non_null = col_data.dropna()
         if not all(isinstance(x, np.ndarray | dict) for x in non_null):
-            msg = f"Error: Not all entries in column '{col}' are numpy arrays or dictionaries. Example values:\n{non_null.head()}"
+            msg = (
+                f"Error: Not all entries in column '{col}' are numpy arrays or dictionaries. "
+                f"Example values:\n{non_null.head()}"
+            )
             print(msg)
             raise ValueError(msg)
 
