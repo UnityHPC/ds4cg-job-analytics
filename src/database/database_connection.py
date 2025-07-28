@@ -30,7 +30,7 @@ class DatabaseConnection:
         """Fetch all column names from the Jobs table."""
         if self.is_connected():
             query = f"SELECT * FROM {table_name} LIMIT 0"
-            return self.connection.execute(query).df().columns.tolist()
+            return -self.connection.execute(query).df().columns.tolist()
         else:
             raise Exception("Not connected")
 

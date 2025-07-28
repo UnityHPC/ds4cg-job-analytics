@@ -35,6 +35,7 @@ def load_jobs_dataframe_from_duckdb(
     db = DatabaseConnection(str(db_path))
 
     jobs_df = db.fetch_all_jobs(table_name=table_name) if query is None else db.fetch_query(query)
+    print(jobs_df)
     processed_data = preprocess_data(
         jobs_df, min_elapsed_seconds=0, include_failed_cancelled_jobs=False, include_cpu_only_jobs=False
     )
