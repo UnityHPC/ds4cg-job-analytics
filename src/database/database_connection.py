@@ -36,6 +36,14 @@ class DatabaseConnection:
             return self.connection.execute(query).df().columns.tolist()
         else:
             raise Exception("Not connected")
+        
+    def get_schema(self, table_name: str = "Jobs"):
+        """Get the schema of the specified table."""
+        if self.is_connected():
+            query = f"DESCRIBE {table_name}"
+            return self.connection.execute(query).fetchdf()
+        else:
+            raise Exception("Not connected")
 
     def fetch_all_jobs(self, table_name="Jobs"):
         """Fetch all data from the specified table. Table name is set to Jobs but can be changed accordingly."""

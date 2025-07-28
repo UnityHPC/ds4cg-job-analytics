@@ -573,24 +573,29 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         multi_count = 0
         single_count = 0
 
-        gpu_counts = sum((Counter(entry) for entry in non_null), Counter())
         multi_count = sum(1 for entry in non_null if len(entry) > 1)
         single_count = len(non_null) - multi_count
 
-        gpu_percents = {k: v / sum(gpu_counts.values()) * 100 for k, v in gpu_counts.items()}
         plt.figure(figsize=(7, 4))
+        gpu_counts = pd.Series(sum((Counter(entry) for entry in non_null), Counter())).sort_values(ascending=False)
         ax = sns.barplot(
-            x=gpu_counts.keys(), y=gpu_counts.values(), hue=gpu_counts.keys(), palette="viridis", legend=False
+            x=gpu_counts.index,
+            y=gpu_counts.values,
+            hue=gpu_counts.index,
+            palette="viridis",
+            legend=False
         )
+
         plt.title(f"GPU Types ({col})")
         plt.xlabel("GPU type")
         plt.ylabel("Number of jobs using this GPU type")
         plt.xticks(rotation=45, ha="right")
 
-        tallest = max(list(gpu_counts.values()))
+        gpu_percents = gpu_counts / gpu_counts.sum() * 100
+        tallest = gpu_counts.max()
         gap = max(2.5, tallest * 0.08)
         ax.set_ylim(0, tallest + gap)
-        for i, (count, percent) in enumerate(zip(gpu_counts.values(), gpu_percents.values(), strict=True)):
+        for i, (count, percent) in enumerate(zip(gpu_counts.values, gpu_percents.values, strict=True)):
             label_y = count + gap * 0.2
             ax.text(
                 i,
@@ -940,7 +945,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         jobs_df: pd.DataFrame,
         col: str,
         output_dir_path: Path | None = None,
-        figsize: tuple[float, float] = (12, 4),
+        figsize: tuple[float, float] = (15, 4),
     ) -> None:
         """Generate a bar plot for job partitions.
 
@@ -953,15 +958,13 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         Returns:
             None
         """
-        col_data = jobs_df[col]
-        # Partition should be a categorical column
-        # Count occurrences of each partition
+        col_data = jobs_df[col].astype(str)
         partition_counts = col_data.value_counts()
         partition_percents = partition_counts / partition_counts.sum() * 100
         plt.figure(figsize=(figsize))
         ax = sns.barplot(
             x=partition_counts.index,
-            y=partition_counts.values,
+            y=partition_counts, 
             hue=partition_counts.index,
             palette="viridis",
             legend=False,
@@ -973,14 +976,15 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
 
         # Annotate bars with counts, ensuring a gap above the tallest bar label
         tallest = partition_counts.max()
-        gap = max(2.5, tallest * 0.08)
+        gap = max(10, tallest * 0.1)
         ax.set_ylim(0, tallest + gap)
         for i, (pct, count) in enumerate(zip(partition_percents.values, partition_counts.values, strict=True)):
-            label_y = count + gap * 0.2  # offset above bar, proportional to gap
+            label_y_position = count + gap * 0.2  # offset above bar, proportional to gap
+            label = "<.1%" if pct < 0.1 and pct > 0 else f"{pct:.1f}%"
             ax.text(
                 i,
-                label_y,
-                f"{pct:.0f}%",
+                label_y_position,
+                label,
                 ha="center",
                 va="bottom",
                 fontsize=8,
@@ -1592,8 +1596,8 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             elif col in ["Constraints"]:
                 self._generate_constraints_bar_plot(jobs_df, col, output_dir_path)
 
-            # Unrecognized column type
+            # Skip visualization for other column types
             else:
-                print(f"Unrecognized column type '{col}' in DataFrame. Skipping visualization.")
+                print(f"Skipping visualization for column type '{col}' in DataFrame.")
             plt.close()
             continue
