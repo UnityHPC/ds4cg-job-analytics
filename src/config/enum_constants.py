@@ -213,10 +213,16 @@ class JobEfficiencyMetricsEnum(Enum):
 
 @unique
 class UserEfficiencyMetricsEnum(Enum):
+    """
+    Contains efficiency metrics for calculating efficiency of users.
+
+    These are used as jobs metrics (in EfficiencyAnalysis class) and also metrics for x-axis in ROC Plot (for users).
+    """
+
     JOB_HOURS = "job_hours"
     VRAM_HOURS = "vram_hours"
     WEIGHTED_AVG_ALLOC_VRAM_EFFICIENCY = "expected_value_alloc_vram_efficiency"
     WEIGHTED_AVG_VRAM_CONSTRAINTS_EFFICIENCY = "expected_value_vram_constraint_efficiency"
     WEIGHTED_AVG_GPU_COUNT = "expected_value_gpu_count"
-    AVG_ALLOC_VRAM_EFFICIENCY_SCORE = "alloc_vram_efficiency_score"
-    AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE = "vram_constraint_efficiency_score"
+    AVG_ALLOC_VRAM_EFFICIENCY_SCORE = "avg_alloc_vram_efficiency_score"
+    AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE = "avg_vram_constraint_efficiency_score"
