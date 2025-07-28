@@ -5,7 +5,7 @@ class DatabaseConnection:
     """
     A class to manage database connections using DuckDB.
 
-    This class provides methods to establish a connection to a DuckDB database using a given URL. It can be used to interact with the database and perform operations
+    This class provides methods to establish a connection to a DuckDB database using a given URL. It can be used to interact with the database and perform operations.
 
     """
     def __init__(self, db_url: str):
@@ -16,7 +16,7 @@ class DatabaseConnection:
         """
         Creates a database connection and returns the connection as an object. 
 
-        Returns: duckdb.DuckDBPyConnection
+        Returns: duckdb.DuckDBPyConnection:  The established connection object
         """
         self.connection = duckdb.connect(self.db_url)
         print(f"Connected to {self.db_url}")
@@ -33,7 +33,7 @@ class DatabaseConnection:
         """
         Checks if it is connected by checking if the connection is not none.
 
-        Returns: bool 
+        Returns: bool: True if the connection is active, False otherwise
         """
         return self.connection is not None
 
@@ -41,7 +41,7 @@ class DatabaseConnection:
         """
         Retrieves all information about the connection.
 
-        Returns: str
+        Returns: str:
         """
         return self.connection if self.is_connected() else "No active connection"
 
