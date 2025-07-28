@@ -62,11 +62,11 @@ def _get_multivalent_vram_based_on_node(gpu_type: str, node: str) -> int:
 
 def _get_vram_constraint(constraints: list[str], gpu_count: int, gpu_mem_usage: int) -> int | NAType:
     """
-    Get the VRAM assigned for a job based on its constraints and GPU usage.
+    Get the VRAM assigned for a job based on its constraints,  and GPU usage.
 
     This function extracts VRAM requests from the job constraints and returns the maximum requested VRAM from the
-    constraints. For GPU names that correspond to multiple VRAM values, take the minimum value that is not smaller
-    than the amount of VRAM used by that job.
+    constraints. For GPU names that correspond to multiple VRAM values, take the minimum value that is not smaller than
+    the amount of VRAM used by that job.
 
     Args:
         constraints (list[str]): List of constraints from the job, which may include VRAM requests.
@@ -95,7 +95,81 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int, gpu_mem_usage: 
     if not (len(vram_constraints)):
         return pd.NA  # if nothing is requested, return NAType
 
+    # TODO (Ayush): Check if we want to take max or min of the VRAM constraints
     return max(vram_constraints) * gpu_count
+
+
+def _get_partition_gpu(partition: str) -> str:
+    """
+    Get the GPU type based on the partition name.
+
+    This function maps specific partition names to their corresponding GPU types.
+
+    Args:
+        partition (str): The name of the partition (e.g., "superpod-a100", "umd-cscdr-gpu").
+
+    Returns:
+        str: The GPU type associated with the partition or the partition if no specific mapping exists.
+
+    """
+    temp = partition.replace("gypsum-", "")
+    if partition in ["superpod-a100", "umd-cscdr-gpu", "uri-gpu", "power9-gpu", "cbio-gpu"]:
+        return "a100-80g"
+    if partition in ["ials-gpu"]:
+        return "2080ti"
+    if partition in ["ece-gpu"]:
+        return "a100-40g"
+    if partition in ["lan"]:
+        return "a40"
+    if partition in ["astroth-gpu"]:
+        return "2080"
+    if partition in ["gpupod-l40s"]:
+        return "l40s"
+    return temp
+
+
+def _get_partition_constraint(partition: str, gpu_count: int) -> int | NAType:
+    """
+    Get the VRAM size based on the partition name requested.
+
+    This function returns the VRAM size in GiB for a given partition name. If the partition is not recognized,
+    it returns NAType.
+
+    Args:
+        partition (str): The name of the partition (e.g., "superpod-a100", "umd-cscdr-gpu").
+
+    Returns:
+        int | NAType: The VRAM size in GiB or NAType if the partition is not recognized.
+    """
+    gpu_type = _get_partition_gpu(partition)
+    if gpu_type not in VRAM_VALUES:
+        # if the GPU type is not in VRAM_VALUES, return NAType
+        return pd.NA
+    return VRAM_VALUES[gpu_type] * gpu_count
+
+
+def _get_requested_vram(vram_constraint: int | NAType, partition_constraint: int | NAType) -> int | NAType:
+    """
+    Get the requested VRAM for a job based on its constraints and partition.
+
+    This function determines the requested VRAM for a job by checking the VRAM constraint and the partition constraint.
+    If both are provided, it returns the maximum of the two. If only one is provided, it returns that value.
+    If neither is provided, it returns NAType.
+
+    Args:
+        vram_constraint (int | NAType): The VRAM constraint from the job's constraints.
+        partition_constraint (int | NAType): The VRAM size based on the partition name.
+
+    Returns:
+        int | NAType: The requested VRAM in GiB or NAType if no constraints are provided.
+    """
+    if pd.isna(vram_constraint) and pd.isna(partition_constraint):
+        return pd.NA
+    if pd.isna(vram_constraint):
+        return partition_constraint
+    if pd.isna(partition_constraint):
+        return vram_constraint
+    return max(vram_constraint, partition_constraint)
 
 
 def _calculate_approx_vram_single_gpu_type(
@@ -494,6 +568,12 @@ def preprocess_data(
     res.loc[:, "Queued"] = res["StartTime"] - res["SubmitTime"]
     res.loc[:, "vram_constraint"] = res.apply(
         lambda row: _get_vram_constraint(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1
+    ).astype(pd.Int64Dtype())  # Use Int64Dtype to allow for nullable integers
+    res.loc[:, "partition_constraint"] = res.apply(
+        lambda row: _get_partition_constraint(row["Partition"], row["GPUs"]), axis=1
+    ).astype(pd.Int64Dtype())  # Use Int64Dtype to allow for nullable integers
+    res.loc[:, "requested_vram"] = res.apply(
+        lambda row: _get_requested_vram(row["vram_constraint"], row["partition_constraint"]), axis=1
     ).astype(pd.Int64Dtype())  # Use Int64Dtype to allow for nullable integers
     res.loc[:, "allocated_vram"] = res.apply(
         lambda row: _get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
