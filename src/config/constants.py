@@ -22,7 +22,7 @@ VRAM_VALUES = {
 
 VRAM_CATEGORIES = [0, 8, 11, 12, 16, 23, 32, 40, 48, 80]
 
-DEFAULT_MIN_ELAPSED_SECONDS = 600
+DEFAULT_MIN_ELAPSED_SECONDS = 600  # 10 minutes, used for filtering jobs with short execution times
 
 # A map for categorical type construction, containing some values that exist in each type
 ATTRIBUTE_CATEGORIES = {
@@ -34,5 +34,6 @@ ATTRIBUTE_CATEGORIES = {
     "Partition": PartitionEnum,
 }
 
-# Storing GPU names that have multiple memory sizes
+# Storing GPU names that have multiple vram options
+# This is used to determine which GPU variant a job is using based on the VRAM usage
 MULTIVALENT_GPUS = {"a100": [40, 80], "v100": [16, 32]}

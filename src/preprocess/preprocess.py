@@ -1,6 +1,8 @@
 import pandas as pd
+from pandas.api.typing import NAType
 import numpy as np
 import re
+import warnings
 
 from ..config.constants import (
     VRAM_VALUES,
@@ -30,7 +32,7 @@ def _get_vram_from_node(gpu_type: str, node: str) -> int:
         This logic is based on the cluster specifications documented at:
         https://docs.unity.rc.umass.edu/documentation/cluster_specs/nodes/
 
-        TODO: Consider reading this information from a config file or database.
+        TODO (Ayush): Consider reading this information from a config file or database.
     """
     vram = 0
     if gpu_type not in MULTIVALENT_GPUS:
@@ -59,7 +61,7 @@ def _get_vram_from_node(gpu_type: str, node: str) -> int:
     return vram
 
 
-def _get_vram_constraint(constraints: list[str], gpu_count: int, gpu_mem_usage: int) -> int | None:
+def _get_vram_constraint(constraints: list[str], gpu_count: int, gpu_mem_usage: int) -> int | NAType:
     """
     Get the VRAM assigned for a job based on its constraints and GPU usage.
 
@@ -73,8 +75,8 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int, gpu_mem_usage: 
         gpu_mem_usage (int): GPU memory usage in bytes.
 
     Returns:
-        int | None: Maximum VRAM amount in GiB obtained based on the provided constraints, multiplied by the
-                    number of GPUs. Returns None if no VRAM constraints are present.
+        int | NAType: Maximum VRAM amount in GiB obtained based on the provided constraints, multiplied by the
+                    number of GPUs. Returns NAType if no VRAM constraints are present.
 
     """
     vram_constraints = []
@@ -92,7 +94,7 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int, gpu_mem_usage: 
                 vram_constraints.append(VRAM_VALUES[gpu_type])
 
     if not (len(vram_constraints)):
-        return None  # if nothing is requested, return None
+        return pd.NA  # if nothing is requested, return NAType
 
     return max(vram_constraints) * gpu_count
 
@@ -143,7 +145,9 @@ def _calculate_approx_vram_single_gpu_type(
         # calculate all VRAM for all nodes in the node_list
         node_values = set()  # to avoid duplicates
         for node in node_list:
-            node_values.add(_get_vram_from_node(gpu, node))
+            node_vram = _get_vram_from_node(gpu, node)
+            if node_vram != 0:  # only consider nodes with non-zero VRAM
+                node_values.add(_get_vram_from_node(gpu, node))
 
         if not node_values:
             raise ValueError(f"No valid nodes found for multivalent GPU type '{gpu}' in node list: {node_list}")
@@ -172,9 +176,6 @@ def _get_approx_allocated_vram(gpu_types: list[str], node_list: list[str], gpu_c
 
     Returns:
         int: Total allocated (estimate) VRAM for the job in GiB (gibibyte).
-
-    Raises:
-        ValueError: If no valid nodes are found for a multivalent GPU type in the node list.
     """
 
     # one type of GPU
@@ -194,14 +195,16 @@ def _get_approx_allocated_vram(gpu_types: list[str], node_list: list[str], gpu_c
         return total_vram
 
     # estimate VRAM for multiple GPUs where exact number isn't known
-    # TODO: update this based on the updated GPU types which specify exact number of GPUs
-    allocated_vrams = []
+    # TODO (Ayush): update this based on the updated GPU types which specify exact number of GPUs
+    allocated_vrams = set()
     for gpu in gpu_types:
         if gpu in MULTIVALENT_GPUS:
             for node in node_list:
-                allocated_vrams.append(_get_vram_from_node(gpu, node))
+                node_vram = _get_vram_from_node(gpu, node)
+                if node_vram != 0:
+                    allocated_vrams.add(_get_vram_from_node(gpu, node))
         else:
-            allocated_vrams.append(VRAM_VALUES[gpu])
+            allocated_vrams.add(VRAM_VALUES[gpu])
 
     vram_values = sorted(list(allocated_vrams))
     total_vram = vram_values.pop(0) * gpu_count  # use the GPU with the minimum VRAM value
@@ -233,7 +236,7 @@ def _fill_missing(res: pd.DataFrame) -> None:
         res["GPUType"]
         .fillna("")
         .apply(
-            lambda x: ["cpu"] if (isinstance(x, str) and x == "") else x.tolist() if isinstance(x, np.ndarray) else x
+            lambda x: (["cpu"] if (isinstance(x, str) and x == "") else x.tolist() if isinstance(x, np.ndarray) else x)
         )
     )
     res.loc[:, "GPUs"] = res["GPUs"].fillna(0)
@@ -242,8 +245,8 @@ def _fill_missing(res: pd.DataFrame) -> None:
 def preprocess_data(
     input_df: pd.DataFrame,
     min_elapsed_seconds: int = DEFAULT_MIN_ELAPSED_SECONDS,
-    include_failed_cancelled_jobs=False,
-    include_cpu_only_jobs=False,
+    include_failed_cancelled_jobs: bool = False,
+    include_cpu_only_jobs: bool = False,
 ) -> pd.DataFrame:
     """
     Preprocess dataframe, filtering out unwanted rows and columns, filling missing values and converting types.
@@ -284,7 +287,7 @@ def preprocess_data(
     ].copy()
 
     _fill_missing(res)
-    # type casting for columns involving time
+    # Type casting for columns involving time
     time_columns = ["StartTime", "SubmitTime"]
     for col in time_columns:
         res[col] = pd.to_datetime(res[col], errors="coerce")
@@ -297,7 +300,7 @@ def preprocess_data(
     res.loc[:, "Queued"] = res["StartTime"] - res["SubmitTime"]
     res.loc[:, "vram_constraint"] = res.apply(
         lambda row: _get_vram_constraint(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1
-    ).astype(pd.Int64Dtype())
+    ).astype(pd.Int64Dtype())  # Use Int64Dtype to allow for nullable integers
     res.loc[:, "allocated_vram"] = res.apply(
         lambda row: _get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
         axis=1,
@@ -305,11 +308,19 @@ def preprocess_data(
     res.loc[:, "user_jobs"] = res.groupby("User")["User"].transform("size")
     res.loc[:, "account_jobs"] = res.groupby("Account")["Account"].transform("size")
 
-    # convert columns to categorical
+    # Convert columns to categorical
 
     for col, enum_obj in ATTRIBUTE_CATEGORIES.items():
         enum_values = [e.value for e in enum_obj]
         unique_values = res[col].unique().tolist()
         all_categories = list(set(enum_values) | set(unique_values))
         res[col] = pd.Categorical(res[col], categories=all_categories, ordered=False)
+
+    # raise warning if GPUMemUsage or CPUMemUsage having overflow
+    mem_usage_columns = ["CPUMemUsage", "GPUMemUsage"]
+    for col_name in mem_usage_columns:
+        filtered = res[res[col_name] == np.inf].copy()
+        if len(filtered) > 0:
+            message = f"Some entries in {col_name} having infinity values.  This may be caused by overflow values."
+            warnings.warn(message=message, stacklevel=2, category=UserWarning)
     return res

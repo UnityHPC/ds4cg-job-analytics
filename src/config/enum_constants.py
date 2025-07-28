@@ -1,5 +1,5 @@
 """
-This file contains declaration of some enum class such as constants values of categorical types.
+Declaration of some enum class such as constants values of categorical types.
 """
 
 from enum import Enum
@@ -79,3 +79,12 @@ class PartitionEnum(Enum):
     URI_RICHAMP = "uri-richamp"
     VISTERRA = "visterra"
     ZHOULIN_CPU = "zhoulin-cpu"
+
+
+class FilterTypeEnum(Enum):
+    DICTIONARY = "dictionary"
+    LIST = "list"
+    SET = "set"
+    TUPLE = "tuple"
+    SCALAR = "scalar"
+    PD_NA = "pd_na"
