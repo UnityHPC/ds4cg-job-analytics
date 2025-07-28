@@ -6,7 +6,8 @@ class DatabaseConnection:
     """
     A class to manage database connections using DuckDB.
 
-    This class provides methods to establish a connection to a DuckDB database using a given URL. It can be used to interact with the database and perform operations.
+    This class provides methods to establish a connection to a DuckDB database using a given URL. 
+    It can be used to interact with the database and perform operations.
 
     """
     def __init__(self, db_url: str):
@@ -48,6 +49,7 @@ class DatabaseConnection:
 
         Raises:
             Exception: If the connection is not active.
+
         Returns:
             list: A list of column names from the specified table.    
         """
@@ -60,7 +62,7 @@ class DatabaseConnection:
     def fetch_all_jobs(self, table_name="Jobs"):
         """Fetch all data from the specified table. Table name is set to Jobs but can be changed accordingly.
 
-        args:
+        Args:
             table_name (str): The name of the table to fetch data from. Defaults to "Jobs".
 
         Raises:
@@ -97,4 +99,4 @@ class DatabaseConnection:
                     f"This query does not match the database schema. Valid columns are: {valid_columns}."
                 ) from e
         else:
-            raise Exception("Database connection is not established. Please connect to the database before executing queries.")
+            raise Exception("Database connection is not established. Connect to the database first.")
