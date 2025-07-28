@@ -19,7 +19,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
-import matplotlib.patches as mpatches
 import numpy as np
 import sys
 from .efficiency_analysis import EfficiencyAnalysis
@@ -56,44 +55,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         else:
             return f"{value:.1f}"
 
-    def _validate_inputs(
-        self,
-        input_df: pd.DataFrame,
-        min_threshold: float,
-        max_threshold: float,
-        threshold_step: float,
-        threshold_metric: JobEfficiencyMetricsEnum | None,
-        proportion_metric: ProportionMetricsEnum | None,
-    ) -> None:
-        """
-        Validate the input metrics to ensure they are present in the DataFrame.
-
-        Args:
-            threshold_metric (JobEfficiencyMetricsEnum): The metric used for thresholds.
-            proportion_metric (ProportionMetricsEnum): The metric for calculating proportions.
-            threshold_step (float): Step size for thresholds.
-            min_threshold (float): Minimum threshold value.
-            max_threshold (float): Maximum threshold value.
-
-        Raises:
-            KeyError: If the specified metrics are not found in the DataFrame.
-            ValueError: If the threshold step is not a positive number.
-            ValueError: If min_threshold is greater than max_threshold.
-        """
-        if threshold_metric and threshold_metric.value not in input_df.columns:
-            raise KeyError(f"Threshold metric '{threshold_metric.value}' not found in DataFrame.")
-        if (
-            proportion_metric
-            and proportion_metric.value != ProportionMetricsEnum.JOBS.value
-            and proportion_metric.value not in input_df.columns
-        ):
-            raise KeyError(f"Proportion metric '{proportion_metric.value}' not found in DataFrame.")
-        if threshold_step <= 0:
-            raise ValueError("Threshold step must be a positive number.")
-        if min_threshold > max_threshold:
-            raise ValueError("min_threshold cannot be greater than max_threshold.")
-
-    def _filter_invalid_records(
+    def _helper_filter_invalid_records(
         self, plot_data_frame: pd.DataFrame, threshold_metric: JobEfficiencyMetricsEnum
     ) -> pd.DataFrame:
         """
@@ -125,6 +87,85 @@ class ROCVisualizer(EfficiencyAnalysis):
         mask &= col != -np.inf
 
         return plot_data_frame[mask].copy()
+
+    def _validate_and_filter_inputs(
+        self,
+        input_df: pd.DataFrame,
+        min_threshold: float,
+        max_threshold: float,
+        threshold_step: float,
+        threshold_metric: JobEfficiencyMetricsEnum,
+        proportion_metric: ProportionMetricsEnum,
+    ) -> tuple[pd.DataFrame, float]:
+        """
+        Validate the input fields and filter out invalid records.
+
+        Args:
+            threshold_metric (JobEfficiencyMetricsEnum): The metric used for thresholds.
+            proportion_metric (ProportionMetricsEnum): The metric for calculating proportions.
+            threshold_step (float): Step size for thresholds.
+            min_threshold (float): Minimum threshold value.
+            max_threshold (float): Maximum threshold value.
+
+        Returns:
+            pd.Dataframe: The filtered dataframe.
+            float: The percentage of filtered data over the whole dataset.
+
+        Raises:
+            KeyError: If the specified metrics are not found in the DataFrame.
+            ValueError: If the threshold step is not a positive number.
+            ValueError: If min_threshold is greater than max_threshold.
+
+        Warnings:
+            UserWarning: if the filtered dataframe is empty.
+            UserWarning: if threshold_step is too small in comparison to the threshold range
+                defined by min_threshold and max_threshold.
+        """
+
+        # check if provided parameter is valid or not
+        if threshold_metric and threshold_metric.value not in input_df.columns:
+            raise KeyError(f"Threshold metric '{threshold_metric.value}' not found in DataFrame.")
+        if (
+            proportion_metric
+            and proportion_metric.value != ProportionMetricsEnum.JOBS.value
+            and proportion_metric.value not in input_df.columns
+        ):
+            raise KeyError(f"Proportion metric '{proportion_metric.value}' not found in DataFrame.")
+        if threshold_step <= 0:
+            raise ValueError("Threshold step must be a positive number.")
+        if min_threshold > max_threshold:
+            raise ValueError("min_threshold cannot be greater than max_threshold.")
+
+        # handle filtering invalid values
+        plot_data: pd.DataFrame = self._helper_filter_invalid_records(input_df, threshold_metric)
+        if plot_data.empty:
+            warnings.warn("No data available for the specified threshold metric.", stacklevel=2, category=UserWarning)
+
+        # calculate number of filtered records and provide information
+        filtered_out_records = len(input_df) - len(plot_data)
+        if filtered_out_records:
+            print(f"Filtered out {filtered_out_records} invalid records based on {threshold_metric.value} column.")
+        if threshold_metric == JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE and min_threshold >= 0.0:
+            min_threshold = plot_data[threshold_metric.value].min()
+            print(f"Setting min_threshold to {min_threshold} based on data.")
+
+        # check if threshold step is not too small in comparison to the range
+        distance = max_threshold - min_threshold
+        if threshold_step / distance <= 10 ** (-6):
+            # raise warning if threshold_step is too small in comparison to min_threshold
+            warnings.warn(
+                (
+                    f"Minimum threshold value is {min_threshold}, but step size is {threshold_step}. "
+                    "This may lead to high computational cost and time."
+                ),
+                stacklevel=2,
+                category=UserWarning,
+            )
+
+        # calculate percentage of plot_data in comparison to total dataset
+        remain_percentage = (len(input_df) - filtered_out_records) / len(input_df) * 100
+
+        return plot_data, remain_percentage
 
     def _generate_num_marker(
         self,
@@ -175,7 +216,7 @@ class ROCVisualizer(EfficiencyAnalysis):
             )
 
     def _clip_upper_threshold_metric(
-        self, clip_threshold_metric: tuple, plot_data_frame: pd.DataFrame, threshold_metrics: JobEfficiencyMetricsEnum
+        self, clip_threshold_metric: tuple, plot_data_frame: pd.DataFrame, threshold_metric: JobEfficiencyMetricsEnum
     ) -> None:
         """
         Clip the column values down to the given upper bound.
@@ -200,7 +241,7 @@ class ROCVisualizer(EfficiencyAnalysis):
             )
         to_clip, upper_bound = clip_threshold_metric
         if to_clip:
-            plot_data_frame[threshold_metrics.value] = plot_data_frame[threshold_metrics.value].clip(upper=upper_bound)
+            plot_data_frame[threshold_metric.value] = plot_data_frame[threshold_metric.value].clip(upper=upper_bound)
 
     # TODO (Tan): fixed the vectorized version commented below, currently an issue when run alloc_vram_efficiency_score
     # def _roc_calculate_proportion(
@@ -327,7 +368,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         proportion_metric: ProportionMetricsEnum = ProportionMetricsEnum.JOBS,
         plot_percentage: bool = True,
         num_markers: int = 10,
-        clip_threshold_metrics: tuple[bool, float] = (False, 0.0),
+        clip_threshold_metric: tuple[bool, float] = (False, 0.0),
     ) -> tuple[Figure, list[Axes]]:
         """
         Plot the ROC curve based on the specified threshold and proportion metrics.
@@ -360,11 +401,6 @@ class ROCVisualizer(EfficiencyAnalysis):
 
         Raises:
             ValueError: if dataframe jobs_with_efficiency_metrics is not calculated yet.
-            ValueError: If no data is available for the specified threshold metric.
-
-        Warnings:
-            UserWarning: if threshold_metric is ALLOC_VRAM_EFFICIENCY_SCORE and minimum value is
-                too high in comparison to threshold_step
         """
         if self.jobs_with_efficiency_metrics is None:
             raise ValueError(
@@ -372,8 +408,8 @@ class ROCVisualizer(EfficiencyAnalysis):
                 "use calculate_all_efficiency_metrics() to calculate the dataframe before plotting."
             )
         data = self.jobs_with_efficiency_metrics
-        # Validate inputs
-        self._validate_inputs(
+
+        plot_data, remain_percentage = self._validate_and_filter_inputs(
             data,
             min_threshold,
             max_threshold,
@@ -382,34 +418,8 @@ class ROCVisualizer(EfficiencyAnalysis):
             proportion_metric,
         )
 
-        # handle filtering null values
-        plot_data: pd.DataFrame = self._filter_invalid_records(data, threshold_metric)
-        if plot_data.empty:
-            raise ValueError("No data available for the specified threshold metric.")
-
-        # calculate number of filtered records and provide information
-        filtered_out_records = len(data) - len(plot_data)
-        if filtered_out_records:
-            print(f"Filtered out {filtered_out_records} invalid records based on {threshold_metric.value} column.")
-        if threshold_metric == JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE and min_threshold >= 0.0:
-            min_threshold = plot_data[threshold_metric.value].min()
-            print(f"Setting min_threshold to {min_threshold} based on data.")
-            if threshold_step / abs(min_threshold) <= 10 ** (-6):
-                # raise warning if threshold_step is too small in comparison to min_threshold
-                warnings.warn(
-                    (
-                        f"Minimum threshold value is {min_threshold}, but step size is {threshold_step}. "
-                        "This may lead to high computational cost and time."
-                    ),
-                    stacklevel=2,
-                    category=UserWarning,
-                )
-
-        # calculate percentage of plot_data in comparison to total dataset
-        remain_percentage = (len(data) - filtered_out_records) / len(data) * 100
-
         # clip threshold_metrics to defined value
-        self._clip_upper_threshold_metric(clip_threshold_metrics, plot_data, threshold_metric)
+        self._clip_upper_threshold_metric(clip_threshold_metric, plot_data, threshold_metric)
 
         # calculate threshold
         thresholds_arr: np.ndarray = np.arange(min_threshold, max_threshold + threshold_step, threshold_step)
@@ -427,28 +437,28 @@ class ROCVisualizer(EfficiencyAnalysis):
             total_raw_value = len(np.unique(plot_data[proportion_metric.value]))
         else:
             total_raw_value = plot_data[proportion_metric.value].sum()
-
-        plot_label = (
-            f"{proportion_metric.value.capitalize()} (Total: {self._format_number_for_display(total_raw_value)}"
-            f"{f', in {remain_percentage:.2f}% of dataset)' if remain_percentage < 100.0 else ')'}"
-        )
-
         if title is None:
             title = (
                 f"ROC plot for {'proportion' if plot_percentage else 'amounts'} of "
                 f"{proportion_metric.value} by threshold {threshold_metric.value}"
             )
+        title += (
+            f"\n Total {proportion_metric.value}: {self._format_number_for_display(total_raw_value)} "
+            f"(in {self._format_number_for_display(remain_percentage)}% of dataset)"
+        )
+
         y_label = f"{'Percentage' if plot_percentage else 'Count'} of {proportion_metric.value} below threshold"
         axe.set_title(title)
         axe.set_ylabel(y_label)
         axe.set_xlabel(f"Threshold values ({threshold_metric.value})")
         axe.plot(thresholds_arr, proportions_data)
+        axe.legend()
 
-        # add label to give information about total number of data and percentage to original dataset
-        custom_patch = mpatches.Patch(color="none", label=plot_label)
-        handles, _labels = axe.get_legend_handles_labels()
-        handles.append(custom_patch)
-        axe.legend(handles=handles)
+        # # add label to give information about total number of data and percentage to original dataset
+        # custom_patch = mpatches.Patch(color="none", label=plot_label)
+        # handles, _labels = axe.get_legend_handles_labels()
+        # handles.append(custom_patch)
+        # axe.legend(handles=handles)
 
         self._generate_num_marker(axe, thresholds_arr, proportions_data, num_markers)
 
@@ -467,6 +477,7 @@ class ROCVisualizer(EfficiencyAnalysis):
             ProportionMetricsEnum.JOB_HOURS, ProportionMetricsEnum.JOBS
         ] = ProportionMetricsEnum.JOBS,
         plot_percentage: bool = True,
+        clip_threshold_metric: tuple[bool, float] = (False, 0.0),
     ) -> tuple[Figure, list[Axes]]:
         """
         Plot ROC curve for User/ Pi group given threshold_metrics.
@@ -493,13 +504,15 @@ class ROCVisualizer(EfficiencyAnalysis):
             threshold_step (float): Step size for thresholds. Defaults to 1.0.
             threshold_metric (JobEfficiencyMetricsEnum): Metric used for thresholds. Defaults to ALLOC_VRAM_EFFICIENCY.
             plot_percentage (bool): Whether to plot the proportion as a percentage or as raw counts. Defaults to True.
+            clip_metric (tuple[bool, int]): A tuple where the first element is a boolean indicating whether to
+                clip the threshold metrics, and the second element is the upper value to clip to.
+                Defaults to (False, 0).
 
         Returns:
             tuple[Figure, list[Axes]]: A tuple containing the figure, list of axes.
 
         Raises:
             ValueError: if dataframe jobs_with_efficiency_metrics is not calculated yet.
-            ValueError: If no data is available for the specified threshold metric.
         """
         if self.jobs_with_efficiency_metrics is None:
             raise ValueError(
@@ -508,9 +521,7 @@ class ROCVisualizer(EfficiencyAnalysis):
             )
 
         data = self.jobs_with_efficiency_metrics
-        filtered_out_records = 0
-        # Validate inputs
-        self._validate_inputs(
+        plot_data, remain_percentage = self._validate_and_filter_inputs(
             data,
             min_threshold,
             max_threshold,
@@ -519,37 +530,7 @@ class ROCVisualizer(EfficiencyAnalysis):
             proportion_metric,
         )
 
-        plot_data: pd.DataFrame = data[data[threshold_metric.value].notna()].copy()
-
-        if plot_data.empty:
-            raise ValueError("No data available for the specified threshold metric.")
-
-        null_data_length = len(data) - len(plot_data)
-        if null_data_length:
-            filtered_out_records += null_data_length
-            print(f"Amount of entries whose {threshold_metric.value} is null: {null_data_length}")
-
-        if threshold_metric == JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE:
-            prev_length = len(plot_data)
-            plot_data = plot_data[plot_data[threshold_metric.value] != -np.inf].copy()
-            print(f"Amount of entries whose {threshold_metric.value} is -inf : {prev_length - len(plot_data)}")
-            filtered_out_records += prev_length - len(plot_data)
-            if min_threshold >= 0.0:
-                min_threshold = plot_data[threshold_metric.value].min()
-                if threshold_step / abs(min_threshold) <= 10 ** (-6):
-                    # raise warning if threshold_step is too small in comparison to min_threshold
-                    warnings.warn(
-                        (
-                            f"Minimum threshold value is {min_threshold}, but step size is {threshold_step}. "
-                            "May lead to high computational cost and time."
-                        ),
-                        stacklevel=2,
-                        category=UserWarning,
-                    )
-                print(f"Setting min_threshold to {min_threshold} based on data.")
-
-        # caculate percentage of plot_data in comparison to total dataset
-        remain_percentage = (len(data) - filtered_out_records) / len(data) * 100
+        self._clip_upper_threshold_metric(clip_threshold_metric, plot_data, threshold_metric)
 
         thresholds_arr: np.ndarray = np.arange(min_threshold, max_threshold + threshold_step, threshold_step)
         fig, axe = plt.subplots(1, 1, figsize=(16, 6))
@@ -560,12 +541,24 @@ class ROCVisualizer(EfficiencyAnalysis):
             )
             axe.plot(thresholds_arr, proportion_data, label=f"{target}")
 
+        # Create label with total count and percentage of plot_data for title
+        if proportion_metric == ProportionMetricsEnum.JOBS:
+            total_raw_value = len(plot_data)
+        elif proportion_metric in {ProportionMetricsEnum.USER, ProportionMetricsEnum.PI_GROUP}:
+            total_raw_value = len(np.unique(plot_data[proportion_metric.value]))
+        else:
+            total_raw_value = plot_data[proportion_metric.value].sum()
+
         if title is None:
             title = (
                 f"Multple line ROC plot ({object_column_type.value}) for "
                 f"{'proportion' if plot_percentage else 'amounts'} of "
                 f"{proportion_metric.value} by threshold {threshold_metric.value}"
             )
+        title += (
+            f"\n Total {proportion_metric.value}: {self._format_number_for_display(total_raw_value)} "
+            f"(in {self._format_number_for_display(remain_percentage)}% of dataset)"
+        )
         y_label = f"{'Percentage' if plot_percentage else 'Count'} of {proportion_metric.value} below threshold"
         axe.set_title(title)
         axe.set_ylabel(y_label)
