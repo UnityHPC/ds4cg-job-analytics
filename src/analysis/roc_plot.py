@@ -7,9 +7,6 @@ THe group by thing for user and pi group maybe used for only number. of user/ pi
     aggregated score.
 
 Actions item:
-- Add clipping options
-- Add the annotation percentage of database, clipping for multiple_line plots
-- Update miultiple_line plots to use other functions
 - explore group by option + aggregation metrics
 - refactor roc_plot to use less arguments, consider printing out statistics info of thresholds
 """
@@ -96,9 +93,9 @@ class ROCVisualizer(EfficiencyAnalysis):
         threshold_step: float,
         threshold_metric: JobEfficiencyMetricsEnum,
         proportion_metric: ProportionMetricsEnum,
-    ) -> tuple[pd.DataFrame, float]:
+    ) -> tuple[pd.DataFrame, float, float | int]:
         """
-        Validate the input fields and filter out invalid records.
+        Validate the inputs, filter invalid records, calculate sum of proportion metric and percentage of remain data.
 
         Args:
             threshold_metric (JobEfficiencyMetricsEnum): The metric used for thresholds.
@@ -110,6 +107,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         Returns:
             pd.Dataframe: The filtered dataframe.
             float: The percentage of filtered data over the whole dataset.
+            float | int: The sum of value of proportion metrics over the filtered data.
 
         Raises:
             KeyError: If the specified metrics are not found in the DataFrame.
@@ -165,7 +163,15 @@ class ROCVisualizer(EfficiencyAnalysis):
         # calculate percentage of plot_data in comparison to total dataset
         remain_percentage = (len(input_df) - filtered_out_records) / len(input_df) * 100
 
-        return plot_data, remain_percentage
+        # caculate the total value of proportion metrics to declare in title
+        if proportion_metric == ProportionMetricsEnum.JOBS:
+            total_raw_value = len(plot_data)
+        elif proportion_metric in {ProportionMetricsEnum.USER, ProportionMetricsEnum.PI_GROUP}:
+            total_raw_value = len(np.unique(plot_data[proportion_metric.value]))
+        else:
+            total_raw_value = plot_data[proportion_metric.value].sum()
+
+        return plot_data, remain_percentage, total_raw_value
 
     def _generate_num_marker(
         self,
@@ -409,7 +415,7 @@ class ROCVisualizer(EfficiencyAnalysis):
             )
         data = self.jobs_with_efficiency_metrics
 
-        plot_data, remain_percentage = self._validate_and_filter_inputs(
+        plot_data, remain_percentage, total_raw_value = self._validate_and_filter_inputs(
             data,
             min_threshold,
             max_threshold,
@@ -430,13 +436,6 @@ class ROCVisualizer(EfficiencyAnalysis):
             plot_data, proportion_metric, thresholds_arr, threshold_metric, plot_percentage
         )
 
-        # Create label with total count and percentage of plot_data for legend
-        if proportion_metric == ProportionMetricsEnum.JOBS:
-            total_raw_value = len(plot_data)
-        elif proportion_metric in {ProportionMetricsEnum.USER, ProportionMetricsEnum.PI_GROUP}:
-            total_raw_value = len(np.unique(plot_data[proportion_metric.value]))
-        else:
-            total_raw_value = plot_data[proportion_metric.value].sum()
         if title is None:
             title = (
                 f"ROC plot for {'proportion' if plot_percentage else 'amounts'} of "
@@ -521,7 +520,7 @@ class ROCVisualizer(EfficiencyAnalysis):
             )
 
         data = self.jobs_with_efficiency_metrics
-        plot_data, remain_percentage = self._validate_and_filter_inputs(
+        plot_data, remain_percentage, total_raw_value = self._validate_and_filter_inputs(
             data,
             min_threshold,
             max_threshold,
@@ -540,14 +539,6 @@ class ROCVisualizer(EfficiencyAnalysis):
                 filtered, proportion_metric, thresholds_arr, threshold_metric, plot_percentage
             )
             axe.plot(thresholds_arr, proportion_data, label=f"{target}")
-
-        # Create label with total count and percentage of plot_data for title
-        if proportion_metric == ProportionMetricsEnum.JOBS:
-            total_raw_value = len(plot_data)
-        elif proportion_metric in {ProportionMetricsEnum.USER, ProportionMetricsEnum.PI_GROUP}:
-            total_raw_value = len(np.unique(plot_data[proportion_metric.value]))
-        else:
-            total_raw_value = plot_data[proportion_metric.value].sum()
 
         if title is None:
             title = (
