@@ -333,7 +333,7 @@ class EfficiencyAnalysis:
         # Efficiency metrics
         self.jobs_w_efficiency_metrics["efficiency_category"] = pd.cut(
             self.jobs_w_efficiency_metrics["alloc_vram_efficiency"],
-            bins=[0, 0.1, 0.3, 0.6, 1.0],
+            bins=[0, 0.1, 0.3, 0.6, 1],
             labels=["Very Low (<10%)", "Low (10-30%)", "Medium (30-60%)", "High (60-100%)"],
         )
 
@@ -643,7 +643,7 @@ class EfficiencyAnalysis:
         elif time_unit == TimeUnitEnum.DAYS.value:
             data["TimeGroup"] = pd.to_datetime(data["StartTime"]).dt.date
         else:
-            raise ValueError("Invalid time unit. Choose 'Months', 'Weeks', or 'Days'.")
+            raise ValueError(f"Invalid time unit {time_unit}. Choose 'Months', 'Weeks', or 'Days'.")
 
         return data
 
@@ -1366,7 +1366,7 @@ class EfficiencyAnalysis:
             ) from None
 
         for idx, (user_df, hover_text, user) in enumerate(zip(user_dfs, hover_texts, users, strict=True)):
-            if user_df is None:
+            if user_df is None or user_df.empty:
                 continue
             fig.add_trace(
                 go.Scatter(
@@ -1382,6 +1382,8 @@ class EfficiencyAnalysis:
                 secondary_y=False,
             )
             if job_count_trace:
+                if user_df is None or user_df.empty:
+                    continue
                 fig.add_trace(
                     go.Scatter(
                         x=user_df["TimeGroup_Datetime"],  # Use datetime for proper chronological ordering

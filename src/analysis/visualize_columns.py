@@ -659,10 +659,16 @@ class DataVisualizer:
         # Check if all non-null entries are numpy arrays
         col_data = jobs_df[col]
         non_null = col_data.dropna()
-        if not all(isinstance(x, np.ndarray) for x in non_null):
-            msg = f"Error: Not all entries in column '{col}' are numpy arrays. Example values:\n{non_null.head()}"
+        if not all(isinstance(x, np.ndarray | dict) for x in non_null):
+            msg = f"Error: Not all entries in column '{col}' are numpy arrays or dictionaries. Example values:\n{non_null.head()}"
             print(msg)
             raise ValueError(msg)
+
+        if all(isinstance(x, dict) for x in non_null):
+            # get the keys and convert them to numpy arrays
+            # also add the exact GPU count from the values
+            non_null = non_null.apply(lambda x: np.array(list(x.keys())) if isinstance(x, dict) else x)
+
 
         # Drop NaN and flatten all GPU types (each entry is a numpy array)
         flat_gpu_types = pd.Series(np.concatenate(non_null.values))
@@ -717,6 +723,8 @@ class DataVisualizer:
         )
 
         if output_dir_path is not None:
+            plt.tight_layout()
+
             plt.savefig(output_dir_path / f"{col}_barplot.png")
         plt.show()
 
