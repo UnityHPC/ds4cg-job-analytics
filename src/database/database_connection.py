@@ -97,4 +97,4 @@ class DatabaseConnection:
                     f"This query does not match the database schema. Valid columns are: {valid_columns}."
                 ) from e
         else:
-            raise Exception("No active database connection.")
+            raise Exception("Database connection is not established. Please connect to the database before executing queries.")
