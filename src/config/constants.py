@@ -1,12 +1,12 @@
 from .enum_constants import InteractiveEnum, QOSEnum, StatusEnum, ExitCodeEnum, PartitionEnum, AdminsAccountEnum
 
 VRAM_VALUES = {
-    "a100": 40,  # Default VRAM for a100 is 40GB, but we check usage to see which variant they want
+    "a100": 80,  # By default, a100 is considered to be the 80GB variant
     "a100-40g": 40,  # 40GB variant of a100 that can be specified explicitly in constraints
     "a100-80g": 80,  # 80GB variant of a100 that can be specified explicitly in constraints
-    "v100": 16,
+    "v100": 32, # By default, v100 is considered to be the 32GB variant
     "a40": 48,
-    "gh200": 95,
+    "gh200": 80,
     "rtx_8000": 48,
     "2080_ti": 11,
     "1080_ti": 11,
