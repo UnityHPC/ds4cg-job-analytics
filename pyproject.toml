@@ -13,6 +13,7 @@ build-backend = "setuptools.build_meta"
 # Ruff configuration options
 line-length = 119 # Override ruff's default so that lines aren't more than 120 characters
 target-version = "py311"
+preview = true # enable preview features to support new pydocstyle rules 
 
 # Formatting
 indent-width = 4
@@ -35,16 +36,21 @@ select = [
     "NPY",
     # pandas-vet: PD
     "PD",
-    # 1 blank line between summary and description: D205
-    "D205",
     # flake8-todos: TD
     "TD",
+    # pydoclint: DOC
+    "DOC",
+    # flake8-annotations: ANN
+    "ANN",
+    # pydocstyle: D
+    # One blank line between summary and description: D205
+    "D205",
     # Docstring capitalization: D403, D405
     "D403", "D405",
     # Docstring should not start with this: D404
     "D404",
-    # flake8-annotations: ANN
-    "ANN",
+    # Missing blank line after docstring section: D410
+    "D410"
 ]
 ignore = [
     # Ignore use ternary operator in if statements
@@ -52,7 +58,9 @@ ignore = [
     # Ignore use of FIXME tags
     "TD001",
     # Ignore missing issue link in TODO tags
-    "TD003"
+    "TD003",
+    # Ignore removing returns section when function doesn't return anything
+    "DOC202",
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -63,10 +71,8 @@ ignore = [
 
 # TODO (Arda): Remove these ignores once the code is fixed
 "tests/*" = ["ANN"]
-"src/preprocess/*" = ["ANN"]
-"src/database/*" = ["ANN"]
+"src/database/*" = ["ANN", "DOC"]
 "src/analysis/visualize_columns.py" = ["ANN"]
-
 
 [tool.ruff.lint.isort]
 # Combine multiple 'as' imports on a single line (e.g., import foo as bar, baz as qux)

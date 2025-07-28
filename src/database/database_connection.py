@@ -34,6 +34,22 @@ class DatabaseConnection:
         else:
             raise Exception("Not connected")
 
+    def fetch_column_info(self, table_name: str = "Jobs"):
+        """
+        Fetch column information for the specified table (types, NULLABLE, etc.).
+
+        Args:
+            table_name (str): The name of the table to describe.
+
+        Returns:
+            pd.DataFrame: A DataFrame containing the column information.
+        """
+        if self.is_connected():
+            query = f"DESCRIBE {table_name}"
+            return self.connection.execute(query).df()
+        else:
+            raise Exception("Not connected")
+
     def fetch_all_jobs(self, table_name="Jobs"):
         """Fetch all data from the specified table. Table name is set to Jobs but can be changed accordingly."""
         if self.is_connected():
