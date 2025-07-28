@@ -7,10 +7,9 @@ THe group by thing for user and pi group maybe used for only number. of user/ pi
     aggregated score.
 
 Actions item:
-- Your way of calculation for proportion is correct, but should retain information about how much records are left
-    (number and percentage) on the dataframe. DONE
-- Also when plot by percentage, print out the total number on y-axis at the 100%. DONE
-- Also should allow job_hours, vram_hours on x-axis (in this case, y-axis should be job_count) DONE
+- Add clipping options
+- Add the annotation percentage of database, clipping for multiple_line plots
+- Update miultiple_line plots to use other functions
 - explore group by option + aggregation metrics
 - refactor roc_plot to use less arguments, consider printing out statistics info of thresholds
 """
@@ -175,6 +174,34 @@ class ROCVisualizer(EfficiencyAnalysis):
                 va="bottom",
             )
 
+    def _clip_upper_threshold_metric(
+        self, clip_threshold_metric: tuple, plot_data_frame: pd.DataFrame, threshold_metrics: JobEfficiencyMetricsEnum
+    ) -> None:
+        """
+        Clip the column values down to the given upper bound.
+
+        Args:
+            clip_threshold_metric (tuple): A tuple where the first element is a boolean indicating whether to
+                clip the threshold metrics, and the second element is the upper value to clip to.
+            plot_data_frame (pd.DataFrame): The DataFrame containing the data to plot.
+            threshold_metrics (JobEfficiencyMetricsEnum): The metric used for thresholds.
+
+        Raises:
+            ValueError: If the clip_threshold_metric parameter is not a tuple containing a boolean and a float.
+        """
+        if (
+            len(clip_threshold_metric) != 2
+            or not isinstance(clip_threshold_metric[0], bool)
+            or not isinstance(clip_threshold_metric[1], float)
+        ):
+            raise ValueError(
+                "Invalid clip_threshold_metric parameter provided. "
+                "Parameter must be a tuple containing a booean value and a numeric values"
+            )
+        to_clip, upper_bound = clip_threshold_metric
+        if to_clip:
+            plot_data_frame[threshold_metrics.value] = plot_data_frame[threshold_metrics.value].clip(upper=upper_bound)
+
     # TODO (Tan): fixed the vectorized version commented below, currently an issue when run alloc_vram_efficiency_score
     # def _roc_calculate_proportion(
     #     self,
@@ -300,6 +327,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         proportion_metric: ProportionMetricsEnum = ProportionMetricsEnum.JOBS,
         plot_percentage: bool = True,
         num_markers: int = 10,
+        clip_threshold_metrics: tuple[bool, float] = (False, 0.0),
     ) -> tuple[Figure, list[Axes]]:
         """
         Plot the ROC curve based on the specified threshold and proportion metrics.
@@ -312,6 +340,9 @@ class ROCVisualizer(EfficiencyAnalysis):
 
         If plot by percentage, percentage will be based on the filtered data, not the original data.
 
+        If clip_threshold_metrics is True, then threshold will be clipped as following:
+
+
         Args:
             title (str or None): Title of the plot. Defaults to None.
             min_threshold (float): Minimum threshold value. Defaults to 0.0.
@@ -320,6 +351,9 @@ class ROCVisualizer(EfficiencyAnalysis):
             threshold_metric (JobEfficiencyMetricsEnum): Metric used for thresholds. Defaults to ALLOC_VRAM_EFFICIENCY.
             proportion_metric (ProportionMetricsEnum): Metric for calculating proportions. Defaults to JOBS.
             plot_percentage (bool): Whether to plot the proportion as a percentage or as raw counts. Defaults to True.
+            clip_metrics (tuple[bool, int]): A tuple where the first element is a boolean indicating whether to
+                clip the threshold metrics, and the second element is the upper value to clip to.
+                Defaults to (False, 0).
 
         Returns:
             tuple[Figure, list[Axes]]: A tuple containing the figure, list of axes.
@@ -374,17 +408,8 @@ class ROCVisualizer(EfficiencyAnalysis):
         # calculate percentage of plot_data in comparison to total dataset
         remain_percentage = (len(data) - filtered_out_records) / len(data) * 100
 
-        # clip score appropriately
-        clip_score_dict = {
-            JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY: 1,
-            JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY: 1,
-            JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE: 0,
-            JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY_SCORE: 0,
-        }
-
-        if threshold_metric in clip_score_dict:
-            upper_bound = clip_score_dict[threshold_metric]
-            plot_data[threshold_metric.value] = plot_data[threshold_metric.value].clip(upper=upper_bound)
+        # clip threshold_metrics to defined value
+        self._clip_upper_threshold_metric(clip_threshold_metrics, plot_data, threshold_metric)
 
         # calculate threshold
         thresholds_arr: np.ndarray = np.arange(min_threshold, max_threshold + threshold_step, threshold_step)
