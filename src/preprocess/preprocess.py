@@ -316,11 +316,11 @@ def preprocess_data(
         all_categories = list(set(enum_values) | set(unique_values))
         res[col] = pd.Categorical(res[col], categories=all_categories, ordered=False)
 
-    # raise warning if GPUMemUsage or CPUMemUsage having overflow
+    # Raise warning if GPUMemUsage or CPUMemUsage having infinity values
     mem_usage_columns = ["CPUMemUsage", "GPUMemUsage"]
     for col_name in mem_usage_columns:
         filtered = res[res[col_name] == np.inf].copy()
         if len(filtered) > 0:
-            message = f"Some entries in {col_name} having infinity values.  This may be caused by overflow values."
+            message = f"Some entries in {col_name} having infinity values. This may be caused by an overflow."
             warnings.warn(message=message, stacklevel=2, category=UserWarning)
     return res
