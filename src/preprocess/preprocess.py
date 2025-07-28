@@ -511,7 +511,7 @@ def preprocess_data(
     This function will take in a dataframe to create a new dataframe satisfying given criteria.
 
     Args:
-        data (pd.DataFrame): The input dataframe containing job data.
+        input_df (pd.DataFrame): The input dataframe containing job data.
         min_elapsed_seconds (int, optional): Minimum elapsed time in seconds to keep a job record. Defaults to 600.
         include_failed_cancelled_jobs (bool, optional): Whether to include jobs with status FAILED or CANCELLED.
         include_cpu_only_jobs (bool, optional): Whether to include jobs that do not use GPUs (CPU-only jobs).
