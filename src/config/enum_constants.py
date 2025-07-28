@@ -17,6 +17,7 @@ class InteractiveEnum(Enum):
         RSTUDIO: Represents RStudio jobs.
         DESKTOP: Represents desktop jobs.
     """
+
     NON_INTERACTIVE = "non-interactive"
     SHELL = "shell"
     JUPYTER = "bc_jupyter"
@@ -35,6 +36,7 @@ class QOSEnum(Enum):
         SHORT: Represents short QoS.
         LONG: Represents long QoS.
     """
+
     NORMAL = "normal"
     UPDATES = "updates"
     SHORT = "short"
@@ -55,6 +57,7 @@ class StatusEnum(Enum):
         PENDING: Represents jobs that are pending.
         NODE_FAIL: Represents jobs that have failed due to node issues.
     """
+
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
@@ -74,6 +77,7 @@ class ExitCodeEnum(Enum):
         ERROR: Represents an error during job execution.
         SIGNALED: Represents a job that was signaled to terminate.
     """
+
     SUCCESS = "SUCCESS"
     ERROR = "ERROR"
     SIGNALED = "SIGNALED"
@@ -86,12 +90,14 @@ class AdminsAccountEnum(Enum):
     Attributes:
         ROOT: Represents the root admin account.
     """
+
     ROOT = "root"
 
 
 @unique
 class PartitionEnum(Enum):
     """An enumeration representing different partitions on Unity."""
+
     BUILDING = "building"
     ARM_GPU = "arm-gpu"
     ARM_PREEMPT = "arm-preempt"
@@ -196,5 +202,21 @@ class JobEfficiencyMetricsEnum(Enum):
     VRAM_CONSTRAINT_EFFICIENCY_SCORE = "vram_constraint_efficiency_score"
     ALLOC_VRAM_EFFICIENCY_SCORE = "alloc_vram_efficiency_score"
     CPU_MEM_EFFICIENCY = "cpu_mem_efficiency"
+    GPU_COUNT = "gpu_count"
     JOB_HOURS = "job_hours"
     VRAM_HOURS = "vram_hours"
+    USED_VRAM_GIB = "used_vram_gib"
+    # CPU column
+    USED_CPU_MEMORY_GIB = "used_cpu_mem_gib"
+    ALLOCATED_CPU_MEM_GIB = "allocated_cpu_mem_gib"
+
+
+@unique
+class UserEfficiencyMetricsEnum(Enum):
+    JOB_HOURS = "job_hours"
+    VRAM_HOURS = "vram_hours"
+    WEIGHTED_AVG_ALLOC_VRAM_EFFICIENCY = "expected_value_alloc_vram_efficiency"
+    WEIGHTED_AVG_VRAM_CONSTRAINTS_EFFICIENCY = "expected_value_vram_constraint_efficiency"
+    WEIGHTED_AVG_GPU_COUNT = "expected_value_gpu_count"
+    AVG_ALLOC_VRAM_EFFICIENCY_SCORE = "alloc_vram_efficiency_score"
+    AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE = "vram_constraint_efficiency_score"

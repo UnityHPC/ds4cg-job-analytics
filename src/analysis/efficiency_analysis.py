@@ -15,6 +15,7 @@ from src.config.enum_constants import (
     FilterTypeEnum,
     MetricsDataFrameNameEnum,
     JobEfficiencyMetricsEnum,
+    UserEfficiencyMetricsEnum,
 )
 
 
@@ -281,24 +282,26 @@ class EfficiencyAnalysis:
 
         vram_hour_col_name = JobEfficiencyMetricsEnum.VRAM_HOURS.value
         job_hour_col_name = JobEfficiencyMetricsEnum.JOB_HOURS.value
+        gpu_count_col_name = JobEfficiencyMetricsEnum.GPU_COUNT.value
+        used_vram_col_name = JobEfficiencyMetricsEnum.USED_VRAM_GIB.value
 
         # rename GPUs to gpu_count for clarity
-        filtered_jobs = filtered_jobs.rename(columns={"GPUs": "gpu_count"})
+        filtered_jobs = filtered_jobs.rename(columns={"GPUs": gpu_count_col_name})
 
         # Calculate job efficiency metrics
         filtered_jobs.loc[:, job_hour_col_name] = (
-            filtered_jobs["Elapsed"].dt.total_seconds() * filtered_jobs["gpu_count"] / 3600
+            filtered_jobs["Elapsed"].dt.total_seconds() * filtered_jobs[gpu_count_col_name] / 3600
         )
         filtered_jobs.loc[:, vram_hour_col_name] = filtered_jobs["allocated_vram"] * filtered_jobs[job_hour_col_name]
-        filtered_jobs.loc[:, "used_vram_gib"] = filtered_jobs["GPUMemUsage"] / (2**30)
+        filtered_jobs.loc[:, used_vram_col_name] = filtered_jobs["GPUMemUsage"] / (2**30)
         # Compute alloc_vram_efficiency, a float in the range [0, 1].
         filtered_jobs.loc[:, JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY.value] = (
-            filtered_jobs["used_vram_gib"] / filtered_jobs["allocated_vram"]
+            filtered_jobs[used_vram_col_name] / filtered_jobs["allocated_vram"]
         )
 
         # Compute vram_constraint_efficiency, a nullable float in the range [0, 1]. Set to NA if vram_constraint is NA
         filtered_jobs.loc[:, JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY.value] = (
-            filtered_jobs["used_vram_gib"] / filtered_jobs["vram_constraint"]
+            filtered_jobs[used_vram_col_name] / filtered_jobs["vram_constraint"]
         )
 
         # Calculate job allocated VRAM efficiency score
@@ -319,11 +322,13 @@ class EfficiencyAnalysis:
         filtered_jobs.loc[:, JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY_SCORE.value] = score
 
         # Add CPU memory metrics if available
+        used_cpu_mem_col = JobEfficiencyMetricsEnum.USED_CPU_MEMORY_GIB.value
+        allocated_cpu_mem_col = JobEfficiencyMetricsEnum.ALLOCATED_CPU_MEM_GIB.value
         if "CPUMemUsage" in self.jobs_df.columns and "Memory" in self.jobs_df.columns:
-            filtered_jobs.loc[:, "used_cpu_mem_gib"] = filtered_jobs["CPUMemUsage"] / (2**30)
-            filtered_jobs.loc[:, "allocated_cpu_mem_gib"] = filtered_jobs["Memory"] / (2**10)  # Memory is in MiB
+            filtered_jobs.loc[:, used_cpu_mem_col] = filtered_jobs["CPUMemUsage"] / (2**30)
+            filtered_jobs.loc[:, allocated_cpu_mem_col] = filtered_jobs["Memory"] / (2**10)  # Memory is in MiB
             filtered_jobs.loc[:, JobEfficiencyMetricsEnum.CPU_MEM_EFFICIENCY.value] = (
-                filtered_jobs["used_cpu_mem_gib"] / filtered_jobs["allocated_cpu_mem_gib"]
+                filtered_jobs[used_cpu_mem_col] / filtered_jobs[allocated_cpu_mem_col]
             )
             filtered_jobs = filtered_jobs.drop(columns=["CPUMemUsage", "Memory"])
 
