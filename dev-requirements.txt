@@ -8,3 +8,8 @@ build
 black
 mypy
 coverage
+pandas-stubs
+types-seaborn
+jupyterlab
+nbconvert
+nbdime
