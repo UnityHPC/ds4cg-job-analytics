@@ -8,14 +8,18 @@ VRAM_VALUES = {
     "a40": 48,
     "gh200": 80,
     "rtx_8000": 48,
+    "rtx8000": 48,  # Alias for RTX 8000
     "2080_ti": 11,
+    "2080ti": 11,  # Alias for 2080 Ti
     "1080_ti": 11,
+    "1080ti": 11,  # Alias for 1080 Ti
     "2080": 8,
     "h100": 80,
     "l4": 23,
     "m40": 23,
     "l40s": 48,
     "titan_x": 12,
+    "titanx": 12,  # Alias for Titan X
     "a16": 16,
     "cpu": 0,
 }

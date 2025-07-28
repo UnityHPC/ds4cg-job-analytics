@@ -91,9 +91,13 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int, gpu_mem_usage: 
                 vram_constraints.append(max(MULTIVALENT_GPUS[gpu_type]))
             else:
                 vram_constraints.append(VRAM_VALUES[gpu_type])
+        else:
+            if constr in VRAM_VALUES:
+                # If the constraint is a GPU type, get its VRAM value
+                vram_constraints.append(VRAM_VALUES[constr])
 
-    if not (len(vram_constraints)):
-        return pd.NA  # if nothing is requested, return NAType
+    if not (len(vram_constraints)) or gpu_count == 0:
+        return pd.NA  # if there are no constraints, return NAType
 
     # TODO (Ayush): Check if we want to take max or min of the VRAM constraints
     return max(vram_constraints) * gpu_count
@@ -113,10 +117,12 @@ def _get_partition_gpu(partition: str) -> str:
 
     """
     temp = partition.replace("gypsum-", "")
-    if partition in ["superpod-a100", "umd-cscdr-gpu", "uri-gpu", "power9-gpu", "cbio-gpu"]:
+    if partition in ["superpod-a100", "umd-cscdr-gpu", "uri-gpu", "cbio-gpu"]:
         return "a100-80g"
+    if partition in ["power9-gpu"]:
+        return "v100"
     if partition in ["ials-gpu"]:
-        return "2080ti"
+        return "2080_ti"
     if partition in ["ece-gpu"]:
         return "a100-40g"
     if partition in ["lan"]:
@@ -256,7 +262,6 @@ def _adjust_vram_for_multivalent_gpus(multivalent: dict, allocated_vram: int, gp
     Returns:
         int: Adjusted total allocated VRAM in GiB.
     """
-    # TODO (Ayush): Estimate based on a better algorithm
 
     # Assume they wanted the bigger VRAM variant for each GPU until the condition is satisfied
     for gpu, gpu_count in multivalent.items():

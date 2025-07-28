@@ -8,6 +8,7 @@ from src.config.enum_constants import (
     PartitionEnum,
     AdminsAccountEnum,
 )
+from src.preprocess.preprocess import _get_partition_constraint, _get_requested_vram, _get_vram_constraint
 import pytest
 
 
@@ -49,6 +50,8 @@ def test_preprocess_data_filtered_columns(mock_data_frame):
     assert "EndTime" not in data.columns
     assert "Nodes" not in data.columns
     assert "Preempted" not in data.columns
+    assert "partition_constraint" in data.columns
+    assert "requested_vram" in data.columns
 
 
 @pytest.mark.parametrize("mock_data_frame", ["mock_data_frame", "mock_data_frame_new_format"], indirect=True)
@@ -403,3 +406,73 @@ def test_preprocess_gpu_type(mock_data_frame):
 
     # Check that numpy arrays in GPUType are converted to lists
     assert all(isinstance(row, list) for row in data["GPUType"] if not pd.isna(row))
+
+
+def test_get_partition_constraint_known():
+    """
+    Test that _get_partition_constraint returns the correct VRAM constraint for known partitions.
+    """
+    # Known partition, e.g. "superpod-a100" maps to a100-80g (80 GiB)
+    assert _get_partition_constraint("superpod-a100", 2) == 160
+    # Known partition, e.g. "ece-gpu" maps to a100-40g (40 GiB)
+    assert _get_partition_constraint("ece-gpu", 1) == 40
+    # Known partition, e.g. "ials-gpu" maps to 2080ti (11 GiB)
+    assert _get_partition_constraint("ials-gpu", 3) == 33
+    # Known partition, e.g. "lan" maps to a40 (48 GiB)
+    assert _get_partition_constraint("lan", 2) == 96
+
+
+def test_get_partition_constraint_unknown():
+    """
+    Test that _get_partition_constraint returns pd.NA for unknown partitions.
+    """
+    # Unknown partition returns pd.NA
+    assert pd.isna(_get_partition_constraint("unknown-partition", 1))
+
+
+def test_get_requested_vram_cases():
+    """
+    Test that _get_requested_vram handles various cases correctly.
+    """
+    # Both constraints are int
+    assert _get_requested_vram(100, 80) == 100
+    assert _get_requested_vram(80, 100) == 100
+    # One constraint is NA
+    assert _get_requested_vram(pd.NA, 80) == 80
+    assert _get_requested_vram(100, pd.NA) == 100
+    # Both constraints are NA
+    assert pd.isna(_get_requested_vram(pd.NA, pd.NA))
+
+
+@pytest.mark.parametrize("mock_data_frame", ["mock_data_frame", "mock_data_frame_new_format"], indirect=True)
+def test_partition_constraint_and_requested_vram_on_mock_data(mock_data_frame):
+    """
+    Test that the partition_constraint and requested_vram columns are correctly computed in the preprocessed data.
+    """
+    # Run preprocess_data on the mock data
+    processed = preprocess_data(
+        mock_data_frame, min_elapsed_seconds=0, include_cpu_only_jobs=True, include_failed_cancelled_jobs=True
+    )
+
+    # Check that partition_constraint and requested_vram columns exist
+    assert "partition_constraint" in processed.columns
+    assert "requested_vram" in processed.columns
+
+    # For each row, check that requested_vram is the max of partition_constraint and Constraints (if both are not NA)
+    for _idx, row in processed.iterrows():
+        part_con = _get_partition_constraint(row["Partition"], row["GPUs"])
+        constraint_val = _get_vram_constraint(row["Constraints"], row["GPUs"], row["GPUMemUsage"])
+        # Compute expected requested_vram
+        if pd.isna(part_con) and pd.isna(constraint_val):
+            expected = pd.NA
+        elif pd.isna(part_con):
+            expected = constraint_val
+        elif pd.isna(constraint_val):
+            expected = part_con
+        else:
+            expected = max(part_con, constraint_val)
+        actual = row["requested_vram"]
+        if pd.isna(expected):
+            assert pd.isna(actual)
+        else:
+            assert actual == expected
