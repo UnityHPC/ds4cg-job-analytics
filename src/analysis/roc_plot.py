@@ -556,3 +556,17 @@ class ROCVisualizer(EfficiencyAnalysis):
         axe.set_xlabel(f"Threshold values ({threshold_metric.value})")
         axe.legend()
         return fig, [axe]
+
+    def plot_roc_users(
+        self,
+        title: str | None = None,
+        min_threshold: float = 0.0,
+        max_threshold: float = 100.0,
+        threshold_step: float = 1.0,
+        threshold_metric: JobEfficiencyMetricsEnum = JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY,
+        proportion_metric: ProportionMetricsEnum = ProportionMetricsEnum.JOBS,
+        plot_percentage: bool = True,
+        num_markers: int = 10,
+        clip_threshold_metric: tuple[bool, float] = (False, 0.0),
+    ) -> None:
+        pass
