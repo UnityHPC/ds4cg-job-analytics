@@ -8,7 +8,7 @@ class DatabaseConnection:
         self.connection = self._connect()
         print(f"Connected to {self.db_url}")
 
-    def _connect(self) -> duckdb.DuckDBPyConnection:
+    def _connect(self, read_only=False) -> duckdb.DuckDBPyConnection:
         """Establish a connection to the DuckDB database."""
         self.connection = duckdb.connect(self.db_url, read_only=True)
         return self.connection
