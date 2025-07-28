@@ -1,4 +1,3 @@
-from .visualize_columns import DataVisualizer as DataVisualizer
 from .roc_plot import ROCVisualizer as ROCVisualizer
 from .efficiency_analysis import EfficiencyAnalysis as EfficiencyAnalysis
 from .efficiency_analysis import (

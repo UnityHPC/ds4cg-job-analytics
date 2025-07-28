@@ -3,6 +3,8 @@ import os
 
 
 class DatabaseConnection:
+    """A class to manage the connection to a DuckDB database."""
+    
     def __init__(self, db_url: str):
         self.db_url = db_url
         self.connection = self._connect()
@@ -24,6 +26,7 @@ class DatabaseConnection:
                 print(f"Disconnected from {self.db_url}")
 
     def is_connected(self) -> bool:
+        """Check if the connection to the database is active."""
         return self.connection is not None
 
     def fetch_all_column_names(self, table_name: str = "Jobs"):
@@ -31,6 +34,30 @@ class DatabaseConnection:
         if self.is_connected():
             query = f"SELECT * FROM {table_name} LIMIT 0"
             return self.connection.execute(query).df().columns.tolist()
+        else:
+            raise Exception("Not connected")
+        
+    def get_schema(self, table_name: str = "Jobs"):
+        """Get the schema of the specified table."""
+        if self.is_connected():
+            query = f"DESCRIBE {table_name}"
+            return self.connection.execute(query).fetchdf()
+        else:
+            raise Exception("Not connected")
+
+    def fetch_column_info(self, table_name: str = "Jobs"):
+        """
+        Fetch column information for the specified table (types, NULLABLE, etc.).
+
+        Args:
+            table_name (str): The name of the table to describe.
+
+        Returns:
+            pd.DataFrame: A DataFrame containing the column information.
+        """
+        if self.is_connected():
+            query = f"DESCRIBE {table_name}"
+            return self.connection.execute(query).df()
         else:
             raise Exception("Not connected")
 
