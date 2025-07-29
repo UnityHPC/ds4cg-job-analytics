@@ -163,10 +163,10 @@ def _get_partition_constraint(partition: str, gpu_count: int) -> int | NAType:
     Returns:
         int | NAType: The VRAM size in GiB or NAType if the partition is not recognized.
     """
-    gpu_type = _get_partition_gpu(partition)
-    gpu_type = gpu_type.lower()
+    gpu_type = _get_partition_gpu(partition).lower()
     if gpu_type not in VRAM_VALUES:
         # if the GPU type is not in VRAM_VALUES, return NAType
+        print(f"[ERROR] GPU type {gpu_type} from constraints not found in VRAM_VALUES. Setting VRAM to NA.")
         return pd.NA
     return VRAM_VALUES[gpu_type] * gpu_count
 
