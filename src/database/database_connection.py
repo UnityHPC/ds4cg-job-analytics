@@ -3,14 +3,14 @@ import os
 
 
 class DatabaseConnection:
-    def __init__(self, db_url: str):
+    def __init__(self, db_url: str, read_only: bool = True):
         self.db_url = db_url
-        self.connection = self._connect()
+        self.connection = self._connect(read_only=read_only)
         print(f"Connected to {self.db_url}")
 
-    def _connect(self, read_only=False) -> duckdb.DuckDBPyConnection:
+    def _connect(self, read_only: bool) -> duckdb.DuckDBPyConnection:
         """Establish a connection to the DuckDB database."""
-        self.connection = duckdb.connect(self.db_url, read_only=True)
+        self.connection = duckdb.connect(self.db_url, read_only=read_only)
         return self.connection
 
     def _disconnect(self):
