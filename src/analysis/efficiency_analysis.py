@@ -374,8 +374,8 @@ class EfficiencyAnalysis:
             self.jobs_with_efficiency_metrics.groupby("User", observed=True)
             .agg(
                 job_count=("JobID", "count"),
-                user_job_hours=("job_hours", "sum"),
-                pi_account=("Account", "first"),
+                user_job_hours=(job_job_hour_col, "sum"),
+                Account=("Account", "first"),
                 avg_alloc_vram_eff_score=(JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE.value, avg_non_inf),
                 avg_vram_constraint_eff_score=(
                     JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY_SCORE.value,
@@ -385,11 +385,11 @@ class EfficiencyAnalysis:
             .reset_index()
         )
 
-        print(users_w_efficiency_metrics.columns)
-
-        # change name of 2 calculated avergage column
+        # change names of aggregated columns to predefined metrics/ proportions enum
         users_w_efficiency_metrics = users_w_efficiency_metrics.rename(
             columns={
+                "job_count": UserEfficiencyMetricsEnum.JOBS.value,
+                "user_job_hours": UserEfficiencyMetricsEnum.JOB_HOURS.value,
                 "avg_alloc_vram_eff_score": UserEfficiencyMetricsEnum.AVG_ALLOC_VRAM_EFFICIENCY_SCORE.value,
                 "avg_vram_constraint_eff_score": UserEfficiencyMetricsEnum.AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE.value,
             },
@@ -588,20 +588,26 @@ class EfficiencyAnalysis:
             )
 
         pi_efficiency_metrics = (
-            self.users_with_efficiency_metrics.groupby("pi_account", observed=True)
+            self.users_with_efficiency_metrics.groupby("Account", observed=True)
             .agg(
-                job_count=("job_count", "sum"),
-                pi_acc_job_hours=("user_job_hours", "sum"),
+                job_count=(UserEfficiencyMetricsEnum.JOBS.value, "sum"),
+                pi_acc_job_hours=(UserEfficiencyMetricsEnum.JOB_HOURS.value, "sum"),
                 user_count=("User", "nunique"),
-                pi_acc_vram_hours=("vram_hours", "sum"),
-                avg_alloc_vram_efficiency_score=("avg_alloc_vram_efficiency_score", "mean"),
-                avg_vram_constraint_efficiency_score=("avg_vram_constraint_efficiency_score", "mean"),
+                pi_acc_vram_hours=(UserEfficiencyMetricsEnum.VRAM_HOURS.value, "sum"),
+                avg_alloc_vram_efficiency_score=(
+                    UserEfficiencyMetricsEnum.AVG_ALLOC_VRAM_EFFICIENCY_SCORE.value,
+                    "mean",
+                ),
+                avg_vram_constraint_efficiency_score=(
+                    UserEfficiencyMetricsEnum.AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE.value,
+                    "mean",
+                ),
             )
             .reset_index()
         )
-
+        print("reached here")
         # Compute pi_acc_vram_hours once and reuse for both metrics
-        pi_acc_vram_hours = self.users_with_efficiency_metrics.groupby("pi_account", observed=True)[
+        pi_acc_vram_hours = self.users_with_efficiency_metrics.groupby("Account", observed=True)[
             "vram_hours"
         ].transform("sum")
 
@@ -612,9 +618,7 @@ class EfficiencyAnalysis:
         )
 
         pi_efficiency_metrics.loc[:, "expected_value_alloc_vram_efficiency"] = (
-            self.users_with_efficiency_metrics.groupby("pi_account", observed=True)[
-                "weighted_ev_alloc_vram_efficiency"
-            ]
+            self.users_with_efficiency_metrics.groupby("Account", observed=True)["weighted_ev_alloc_vram_efficiency"]
             .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
             .to_numpy()
         )
@@ -626,7 +630,7 @@ class EfficiencyAnalysis:
         )
 
         pi_efficiency_metrics.loc[:, "expected_value_vram_constraint_efficiency"] = (
-            self.users_with_efficiency_metrics.groupby("pi_account", observed=True)[
+            self.users_with_efficiency_metrics.groupby("Account", observed=True)[
                 "weighted_ev_vram_constraint_efficiency"
             ]
             .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
@@ -639,7 +643,7 @@ class EfficiencyAnalysis:
             / pi_acc_vram_hours
         )
         pi_efficiency_metrics.loc[:, "expected_value_gpu_count"] = (
-            self.users_with_efficiency_metrics.groupby("pi_account", observed=True)["weighted_ev_gpu_count"]
+            self.users_with_efficiency_metrics.groupby("Account", observed=True)["weighted_ev_gpu_count"]
             .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
             .to_numpy()
         )

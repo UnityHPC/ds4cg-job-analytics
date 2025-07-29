@@ -7,10 +7,12 @@ THe group by thing for user and pi group maybe used for only number. of user/ pi
     aggregated score.
 
 Actions item:
-- explore group by option + aggregation metrics
 - Need to check if proportion metric = USER, PI_GROUP works corectly when we look at plot for users/ group of users
 - refactor roc_plot to use less arguments, consider printing out statistics info of thresholds
 - Maybe put own threshold metrics into a single dictionary parameter and validate_and_filter will modify min_threshold
+
+- Issue: some new metric of user (user_job_hours, user_vram_hours) will be also on both x-axis and y-axis
+ -> Need to add a bunch more to ProportionMetrics Enum, maybe best if we let it as jobs and vram_hours
 """
 
 from pathlib import Path
@@ -59,6 +61,21 @@ class ROCVisualizer(EfficiencyAnalysis):
         else:
             return f"{value:.1f}"
 
+    def _normalize_threshold_arr(self, threshold_arr: np.ndarray) -> np.ndarray:
+        """
+        Normalize the threshold array. Intended for internal use only.
+
+        Args:
+            threshold_arr (np.ndarray): the array to normalize
+
+        Returns:
+            np.ndarray: the new normalized threshold array
+
+        """
+        min_val, max_val = threshold_arr[0], threshold_arr[-1]
+        res = (threshold_arr - min_val) / (max_val - min_val)
+        return res
+
     def _helper_filter_invalid_records(
         self, plot_data_frame: pd.DataFrame, threshold_metric: JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum
     ) -> pd.DataFrame:
@@ -80,7 +97,11 @@ class ROCVisualizer(EfficiencyAnalysis):
         metric_to_filters = {
             JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY,
             JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE,
+            JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY_SCORE,
             UserEfficiencyMetricsEnum.WEIGHTED_AVG_VRAM_CONSTRAINTS_EFFICIENCY,
+            UserEfficiencyMetricsEnum.WEIGHTED_AVG_ALLOC_VRAM_EFFICIENCY,
+            UserEfficiencyMetricsEnum.AVG_ALLOC_VRAM_EFFICIENCY_SCORE,
+            UserEfficiencyMetricsEnum.AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE,
         }
 
         # no filter needed
@@ -141,6 +162,14 @@ class ROCVisualizer(EfficiencyAnalysis):
         if min_threshold > max_threshold:
             raise ValueError("min_threshold cannot be greater than max_threshold.")
 
+        # for metrics that may reuire taking min of their values as minimum
+        manual_min_threshold_setting = {
+            JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE,
+            JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY_SCORE,
+            UserEfficiencyMetricsEnum.AVG_ALLOC_VRAM_EFFICIENCY_SCORE,
+            UserEfficiencyMetricsEnum.AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE,
+        }
+
         # handle filtering invalid values
         plot_data: pd.DataFrame = self._helper_filter_invalid_records(input_df, threshold_metric)
         if plot_data.empty:
@@ -150,17 +179,17 @@ class ROCVisualizer(EfficiencyAnalysis):
         filtered_out_records = len(input_df) - len(plot_data)
         if filtered_out_records:
             print(f"Filtered out {filtered_out_records} invalid records based on {threshold_metric.value} column.")
-        if threshold_metric == JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE and min_threshold >= 0.0:
+        if threshold_metric in manual_min_threshold_setting and min_threshold >= 0.0:
             min_threshold = plot_data[threshold_metric.value].min()
             print(f"Setting min_threshold to {min_threshold} based on data.")
 
         # check if threshold step is not too small in comparison to the range
         distance = max_threshold - min_threshold
-        if threshold_step / distance <= 10 ** (-6):
+        if distance and threshold_step / distance <= 10 ** (-6):
             # raise warning if threshold_step is too small in comparison to min_threshold
             warnings.warn(
                 (
-                    f"Minimum threshold value is {min_threshold}, but step size is {threshold_step}. "
+                    f"Total range of thresholds is {distance}, but step size is {threshold_step}. "
                     "This may lead to high computational cost and time."
                 ),
                 stacklevel=2,
@@ -631,7 +660,7 @@ class ROCVisualizer(EfficiencyAnalysis):
             )
         title += (
             f"\n Total {proportion_metric.value}: {self._format_number_for_display(total_raw_value)} "
-            f"(in {self._format_number_for_display(remain_percentage)}% of dataset)"
+            f"(in {self._format_number_for_display(remain_percentage)}% of aggregated User dataset)"
         )
 
         y_label = f"{'Percentage' if plot_percentage else 'Count'} of {proportion_metric.value} below threshold"
