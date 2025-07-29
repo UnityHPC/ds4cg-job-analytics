@@ -20,6 +20,9 @@ def convert_csv_to_db(path_to_csv: str, path_to_db: str):
         conn = duckdb.connect(path_to_db)
         df_mock = pd.read_csv(path_to_csv)
 
+        #Convert TimeLimit to minutes
+        
+
         # Convert some columns in csv to correct data types as specified in the Unity schema
         for col in ["SubmitTime", "StartTime", "EndTime"]:
             df_mock[col] = pd.to_datetime(df_mock[col], format="%m/%d/%y %H:%M")

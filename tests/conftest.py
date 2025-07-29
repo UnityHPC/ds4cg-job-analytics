@@ -3,6 +3,7 @@ from src.database import DatabaseConnection
 from .mock_data.convert_csv_to_db import convert_csv_to_db
 import tempfile
 import shutil
+import os
 
 
 @pytest.fixture(scope="module")
@@ -18,4 +19,9 @@ def mock_data_frame():
         raise Exception("Exception at mock_data_frame") from e
     finally:
         del db
+        print("removing tree")
+        print(temp_db_dir)
         shutil.rmtree(temp_db_dir)
+        # print("removed tree")
+        # if os.path.exists(temp_db_dir):
+        #     raise Exception("Temporary directory was not removed properly")
