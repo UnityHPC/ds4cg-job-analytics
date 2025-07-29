@@ -434,8 +434,8 @@ def test_get_requested_vram_cases():
     """
     Test that _get_requested_vram handles various cases correctly.
     """
-    # Both constraints are int
-    assert _get_requested_vram(100, 80) == 100
+    # Both constraints are int, choose partition constraint
+    assert _get_requested_vram(100, 80) == 80
     assert _get_requested_vram(80, 100) == 100
     # One constraint is NA
     assert _get_requested_vram(pd.NA, 80) == 80
