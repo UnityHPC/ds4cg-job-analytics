@@ -82,7 +82,7 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int, gpu_mem_usage: 
     """
     vram_constraints = []
     for constr in constraints:
-        constr = constr.strip("'")
+        constr = constr.strip("'").lower()  # Normalize constraints to lowercase and strip quotes
         if constr.startswith("vram"):
             vram_constraints.append(int(constr.replace("vram", "")))
         elif constr.startswith("gpu"):
@@ -90,26 +90,17 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int, gpu_mem_usage: 
             if len(split_constr) > 1:
                 gpu_type = split_constr[1].lower()
             else:
-                print(f"[ERROR] Malformed GPU constraint: '{constr}'. Setting VRAM to 0.")
-                vram_constraints.append(0)
+                print(f"[ERROR] Malformed GPU constraint: '{constr}'. Setting VRAM to NA.")
                 continue
-            if gpu_type in MULTIVALENT_GPUS and (gpu_mem_usage / (2**30)) > VRAM_VALUES.get(gpu_type, 0) * gpu_count:
-                # For GPU names that correspond to multiple VRAM values, take the minimum value
-                # that is not smaller than the amount of VRAM used by that job.
-                vram_constraints.append(max(MULTIVALENT_GPUS[gpu_type]))
+
+            if gpu_type in VRAM_VALUES:
+                vram_constraints.append(VRAM_VALUES[gpu_type])
             else:
-                if gpu_type in VRAM_VALUES:
-                    vram_constraints.append(VRAM_VALUES[gpu_type])
-                else:
-                    print(f"[ERROR] GPU type '{gpu_type}' not found in VRAM_VALUES. Setting VRAM to 0.")
-                    vram_constraints.append(0)
+                print(f"[ERROR] GPU type '{gpu_type}' not found in VRAM_VALUES. Setting VRAM to NA.")
         else:
-            constr_lower = constr.lower()
-            if constr_lower in VRAM_VALUES:
-                vram_constraints.append(VRAM_VALUES[constr_lower])
-            else:
-                print(f"[ERROR] Constraint '{constr}' not found in VRAM_VALUES. Setting VRAM to 0.")
-                vram_constraints.append(0)
+            # if they enter a GPU name without the prefix
+            if constr in VRAM_VALUES:
+                vram_constraints.append(VRAM_VALUES[constr])
 
     if not (len(vram_constraints)) or gpu_count == 0:
         return pd.NA  # if there are no constraints, return NAType
@@ -134,7 +125,7 @@ def _get_partition_gpu(partition: str) -> str:
     temp = partition.replace("gypsum-", "")
     if partition in ["superpod-a100", "umd-cscdr-gpu", "uri-gpu", "cbio-gpu"]:
         return "a100-80g"
-    if partition in ["power9-gpu"]:
+    if partition in ["power9-gpu", "power9-gpu-preempt"]:
         return "v100"
     if partition in ["ials-gpu"]:
         return "2080_ti"
@@ -166,7 +157,6 @@ def _get_partition_constraint(partition: str, gpu_count: int) -> int | NAType:
     gpu_type = _get_partition_gpu(partition).lower()
     if gpu_type not in VRAM_VALUES:
         # if the GPU type is not in VRAM_VALUES, return NAType
-        print(f"[ERROR] GPU type {gpu_type} from constraints not found in VRAM_VALUES. Setting VRAM to NA.")
         return pd.NA
     return VRAM_VALUES[gpu_type] * gpu_count
 
@@ -176,7 +166,8 @@ def _get_requested_vram(vram_constraint: int | NAType, partition_constraint: int
     Get the requested VRAM for a job based on its constraints and partition.
 
     This function determines the requested VRAM for a job by checking the VRAM constraint and the partition constraint.
-    If both are provided, it returns the maximum of the two. If only one is provided, it returns that value.
+    If both are provided, it returns the partition constraint as that is more accurate.
+    If only one is provided, it returns that value.
     If neither is provided, it returns NAType.
 
     Args:
@@ -188,11 +179,11 @@ def _get_requested_vram(vram_constraint: int | NAType, partition_constraint: int
     """
     if pd.isna(vram_constraint) and pd.isna(partition_constraint):
         return pd.NA
-    if pd.isna(vram_constraint):
-        return partition_constraint
     if pd.isna(partition_constraint):
         return vram_constraint
-    return max(vram_constraint, partition_constraint)
+
+    # if a partition constraint is provided, we use it
+    return partition_constraint
 
 
 def _calculate_approx_vram_single_gpu_type(

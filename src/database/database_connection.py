@@ -20,7 +20,7 @@ class DatabaseConnection:
 
     def __del__(self):
         """Ensure the connection is closed when the object is deleted."""
-        if self.is_connected():
+        if hasattr(self, "connection") and self.is_connected():
             self._disconnect()
             if not os.getenv("PYTEST_VERSION"):
                 print(f"Disconnected from {self.db_url}")
