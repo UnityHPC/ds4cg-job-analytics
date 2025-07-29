@@ -1,5 +1,6 @@
 from .enum_constants import InteractiveEnum, QOSEnum, StatusEnum, ExitCodeEnum, PartitionEnum, AdminsAccountEnum
 
+# VRAM values for different GPU types in GB. Add new GPU types in lowercase as needed.
 VRAM_VALUES = {
     "a100": 80,  # By default, a100 is considered to be the 80GB variant
     "a100-40g": 40,  # 40GB variant of a100 that can be specified explicitly in constraints
