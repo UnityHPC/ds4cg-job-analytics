@@ -1,10 +1,10 @@
 import pytest
 from src.database.database_connection import DatabaseConnection
 import tempfile
-import os
+import shutil
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def temp_file_db():
     """
     Create a temporary file-based database for testing.
@@ -12,80 +12,83 @@ def temp_file_db():
     Yields:
         DatabaseConnection: A connected temporary database instance for testing.
     """
-    fd, temp_db_path = tempfile.mkstemp(suffix=".db")
-    os.close(fd)
-    os.remove(temp_db_path)
-    print(f"Database file will be created at: {temp_db_path}")
+    try:
+        mem_db = None
+        temp_db_dir = tempfile.mkdtemp()
+        temp_db_path = f"{temp_db_dir}/mock_database.db"
+        mem_db = DatabaseConnection(db_url=temp_db_path)
+        schema_sql = """
+        CREATE TABLE Jobs (
+            UUID VARCHAR,
+            JobID INTEGER,
+            ArrayID INTEGER,
+            JobName VARCHAR,
+            IsArray BOOLEAN,
+            Interactive VARCHAR,
+            Preempted BOOLEAN,
+            Account VARCHAR,
+            User VARCHAR,
+            Constraints VARCHAR[],
+            QOS VARCHAR,
+            Status VARCHAR,
+            ExitCode VARCHAR,
+            SubmitTime TIMESTAMP,
+            StartTime TIMESTAMP,
+            EndTime TIMESTAMP,
+            Elapsed INTEGER,
+            TimeLimit INTEGER,
+            Partition VARCHAR,
+            Nodes VARCHAR,
+            NodeList VARCHAR[],
+            CPUs SMALLINT,
+            Memory INTEGER,
+            GPUs SMALLINT,
+            GPUType VARCHAR[],
+            GPUMemUsage FLOAT,
+            GPUComputeUsage FLOAT,
+            CPUMemUsage FLOAT,
+            CPUComputeUsage FLOAT
+        );
+        """
+        mem_db.connection.execute(schema_sql)
+        insert_sql = """
+        INSERT INTO Jobs VALUES (
+            'abc-123', 101, NULL, 'train_model', FALSE, 'yes', FALSE,
+            'projectX', 'alice', ['A100'], 'normal', 'COMPLETED', '0:0',
+            CURRENT_TIMESTAMP - INTERVAL 3 HOUR,
+            CURRENT_TIMESTAMP - INTERVAL 2 HOUR,
+            CURRENT_TIMESTAMP - INTERVAL 1 HOUR,
+            3600, 7200, 'gpu', 'node001', ['node001'],
+            16, 640, 1, ['A100'], 120, 0.85, 320, 0.75
+        );
+        INSERT INTO Jobs VALUES (
+            'xyz-215', 102, NULL, 'train_model', FALSE, 'yes', FALSE,
+            'projectX', 'bob', ['A100'], 'normal', 'FAILED', '0:0',
+            CURRENT_TIMESTAMP - INTERVAL 3 HOUR,
+            CURRENT_TIMESTAMP - INTERVAL 2 HOUR,
+            CURRENT_TIMESTAMP - INTERVAL 1 HOUR,
+            3600, 7200, 'gpu', 'node001', ['node001'],
+            16, 640, 1, ['M40'], 120, 0.85, 320, 0.75
+        );
+        INSERT INTO Jobs VALUES (
+            'xyz-217', 103, NULL, 'train_model', FALSE, 'yes', FALSE,
+            'projectX', 'chris', ['A100'], 'normal', 'OUT_OF_MEMORY', '0:0',
+            CURRENT_TIMESTAMP - INTERVAL 3 HOUR,
+            CURRENT_TIMESTAMP - INTERVAL 2 HOUR,
+            CURRENT_TIMESTAMP - INTERVAL 1 HOUR,
+            3600, 7200, 'gpu', 'node001', ['node001'],
+            16, 640, 1, ['M40'], 120, 0.85, 320, 0.75
+        );
+        """
+        mem_db.connection.execute(insert_sql)
 
-    mem_db = DatabaseConnection(db_url=temp_db_path)
-    schema_sql = """
-    CREATE TABLE Jobs (
-        UUID VARCHAR,
-        JobID INTEGER,
-        ArrayID INTEGER,
-        JobName VARCHAR,
-        IsArray BOOLEAN,
-        Interactive VARCHAR,
-        Preempted BOOLEAN,
-        Account VARCHAR,
-        User VARCHAR,
-        Constraints VARCHAR[],
-        QOS VARCHAR,
-        Status VARCHAR,
-        ExitCode VARCHAR,
-        SubmitTime TIMESTAMP,
-        StartTime TIMESTAMP,
-        EndTime TIMESTAMP,
-        Elapsed INTEGER,
-        TimeLimit INTEGER,
-        Partition VARCHAR,
-        Nodes VARCHAR,
-        NodeList VARCHAR[],
-        CPUs SMALLINT,
-        Memory INTEGER,
-        GPUs SMALLINT,
-        GPUType VARCHAR[],
-        GPUMemUsage FLOAT,
-        GPUComputeUsage FLOAT,
-        CPUMemUsage FLOAT,
-        CPUComputeUsage FLOAT
-    );
-    """
-    mem_db.connection.execute(schema_sql)
-    insert_sql = """
-    INSERT INTO Jobs VALUES (
-        'abc-123', 101, NULL, 'train_model', FALSE, 'yes', FALSE,
-        'projectX', 'alice', ['A100'], 'normal', 'COMPLETED', '0:0',
-        CURRENT_TIMESTAMP - INTERVAL 3 HOUR,
-        CURRENT_TIMESTAMP - INTERVAL 2 HOUR,
-        CURRENT_TIMESTAMP - INTERVAL 1 HOUR,
-        3600, 7200, 'gpu', 'node001', ['node001'],
-        16, 640, 1, ['A100'], 120, 0.85, 320, 0.75
-    );
-    INSERT INTO Jobs VALUES (
-        'xyz-215', 102, NULL, 'train_model', FALSE, 'yes', FALSE,
-        'projectX', 'bob', ['A100'], 'normal', 'FAILED', '0:0',
-        CURRENT_TIMESTAMP - INTERVAL 3 HOUR,
-        CURRENT_TIMESTAMP - INTERVAL 2 HOUR,
-        CURRENT_TIMESTAMP - INTERVAL 1 HOUR,
-        3600, 7200, 'gpu', 'node001', ['node001'],
-        16, 640, 1, ['M40'], 120, 0.85, 320, 0.75
-    );
-    INSERT INTO Jobs VALUES (
-        'xyz-217', 103, NULL, 'train_model', FALSE, 'yes', FALSE,
-        'projectX', 'chris', ['A100'], 'normal', 'OUT_OF_MEMORY', '0:0',
-        CURRENT_TIMESTAMP - INTERVAL 3 HOUR,
-        CURRENT_TIMESTAMP - INTERVAL 2 HOUR,
-        CURRENT_TIMESTAMP - INTERVAL 1 HOUR,
-        3600, 7200, 'gpu', 'node001', ['node001'],
-        16, 640, 1, ['M40'], 120, 0.85, 320, 0.75
-    );
-    """
-    mem_db.connection.execute(insert_sql)
-
-    yield mem_db
-
-    os.remove(temp_db_path)
+        yield mem_db
+    except Exception as e:
+        raise e
+    finally:
+        if mem_db is not None:
+            del mem_db
+        shutil.rmtree(temp_db_dir)
 
 
 def test_connection_established(temp_file_db):

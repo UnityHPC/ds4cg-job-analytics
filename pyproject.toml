@@ -43,14 +43,22 @@ select = [
     # flake8-annotations: ANN
     "ANN",
     # pydocstyle: D
+    # Undocumented public method and public class: D102, D101
+    "D102", "D101",
+    # pydocstyle: D
     # One blank line between summary and description: D205
     "D205",
+    # pydocstyle: D
     # Docstring capitalization: D403, D405
     "D403", "D405",
+    # pydocstyle: D
     # Docstring should not start with this: D404
     "D404",
+    # pydocstyle: D
     # Missing blank line after docstring section: D410
-    "D410"
+    "D410",
+    # undocumented-param (D417)
+    "D417",
 ]
 ignore = [
     # Ignore use ternary operator in if statements
@@ -66,21 +74,20 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # Ignore some rules in Benjamin's file
 
-"scripts/*" = ["N", "NPY", "PD", "D100", "TD", "ANN"]
+"mvp-scripts/*" = ["N", "NPY", "PD", "D100", "TD", "ANN"]
 "notebooks/SlurmGPU.ipynb" = ["N", "NPY", "PD", "D100", "TD", "ANN"]
 
 # TODO (Arda): Remove these ignores once the code is fixed
 "tests/*" = ["ANN"]
 "src/database/*" = ["ANN", "DOC"]
-"src/analysis/visualize_columns.py" = ["ANN"]
 
 [tool.ruff.lint.isort]
 # Combine multiple 'as' imports on a single line (e.g., import foo as bar, baz as qux)
 combine-as-imports = true
 # Force sorting of imports within each section (standard, third-party, first-party)
 force-sort-within-sections = true
-# Treat the 'scripts' and 'src' directory as first-party code for import sorting
-known-first-party = ["scripts", "src"]
+# Treat 'scripts' and 'src' directory as first-party code for import sorting
+known-first-party = ["mvp-scripts", "src"]
 
 # Docstring style
 [tool.ruff.format]
@@ -106,14 +113,7 @@ pythonpath = "."
 testpaths = ["tests"]
 
 [tool.mkdocs]
-# MkDocs configuration options (you can embed YAML directly in pyproject.toml)
-config = """
-site_name: DS4CG Unity Job Analytics Docs
-theme.name: material
-nav:
-- Home: index.md
-- About: about.md
-"""
+# MkDocs configuration options in the YAML file (mkdocs.yml) can be embedded here in pyproject.toml instead
 
 [tool.coverage.run]
 source = ["unity-job-analytics"]
@@ -127,8 +127,8 @@ python_version = "3.11"
 ignore_missing_imports = true
 exclude = [
     # Exclude Benjamin's code from type checking
-    "scripts/cpu_metrics.py",
-    "scripts/gpu_metrics.py",
-    "scripts/zero_gpu_usage_list.py",
+    "mvp-scripts/cpu_metrics.py",
+    "mvp-scripts/gpu_metrics.py",
+    "mvp-scripts/zero_gpu_usage_list.py",
     "notebooks/SlurmGPU.ipynb"
 ]
