@@ -292,7 +292,6 @@ def preprocess_data(
     for col in time_columns:
         res[col] = pd.to_datetime(res[col], errors="coerce")
 
-    timedelta_columns = ["TimeLimit", "Elapsed"]
     res["TimeLimit"] = pd.to_timedelta(res["TimeLimit"], unit="m", errors="coerce")
     res["Elapsed"] = pd.to_timedelta(res["Elapsed"], unit="s", errors="coerce")
 

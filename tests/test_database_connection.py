@@ -87,6 +87,7 @@ def temp_file_db():
         raise e
     finally:
         if mem_db is not None:
+            mem_db._disconnect()
             del mem_db
         shutil.rmtree(temp_db_dir)
 
