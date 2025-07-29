@@ -2,6 +2,7 @@ import pandas as pd
 from pandas.api.typing import NAType
 import numpy as np
 import re
+import warnings
 
 from ..config.constants import (
     VRAM_VALUES,
@@ -356,7 +357,7 @@ def _fill_missing(res: pd.DataFrame) -> None:
     res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)
     res.loc[:, "Interactive"] = res["Interactive"].fillna("non-interactive")
     res.loc[:, "Constraints"] = (
-        res["Constraints"].fillna("").apply(lambda x: [] if isinstance(x, str) and x == "" else x)
+        res["Constraints"].fillna("").apply(lambda x: [] if isinstance(x, str) and x == "" else list(x))
     )
     res.loc[:, "GPUType"] = (
         res["GPUType"]
@@ -380,7 +381,7 @@ def preprocess_data(
     This function will take in a dataframe to create a new dataframe satisfying given criteria.
 
     Args:
-        data (pd.DataFrame): The input dataframe containing job data.
+        input_df (pd.DataFrame): The input dataframe containing job data.
         min_elapsed_seconds (int, optional): Minimum elapsed time in seconds to keep a job record. Defaults to 600.
         include_failed_cancelled_jobs (bool, optional): Whether to include jobs with status FAILED or CANCELLED.
         include_cpu_only_jobs (bool, optional): Whether to include jobs that do not use GPUs (CPU-only jobs).
@@ -457,4 +458,12 @@ def preprocess_data(
         unique_values = res[col].unique().tolist()
         all_categories = list(set(enum_values) | set(unique_values))
         res[col] = pd.Categorical(res[col], categories=all_categories, ordered=False)
+
+    # Raise warning if GPUMemUsage or CPUMemUsage having infinity values
+    mem_usage_columns = ["CPUMemUsage", "GPUMemUsage"]
+    for col_name in mem_usage_columns:
+        filtered = res[res[col_name] == np.inf].copy()
+        if len(filtered) > 0:
+            message = f"Some entries in {col_name} having infinity values. This may be caused by an overflow."
+            warnings.warn(message=message, stacklevel=2, category=UserWarning)
     return res

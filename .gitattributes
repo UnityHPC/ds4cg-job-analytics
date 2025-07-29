@@ -1,0 +1,8 @@
+# Ensure all text files use LF (Unix) line endings in the repository, regardless of OS.
+# text=auto: Normalize all text files for consistent line endings across platforms.
+# eol=lf: Always use LF (\n) as the line ending in the working directory and in the repo.
+* text=auto eol=lf
+
+# Define the merge and diff driver for Jupyter Notebook files.
+*.ipynb	diff=jupyternotebook
+*.ipynb	merge=jupyternotebook
