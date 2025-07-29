@@ -18,7 +18,8 @@ class DatabaseConnection:
     def _connect(self) -> duckdb.DuckDBPyConnection:
         """Establish a connection to the DuckDB database.
 
-        Returns: duckdb.DuckDBPyConnection: The connection object to the DuckDB database.
+        Returns: 
+            duckdb.DuckDBPyConnection: The connection object to the DuckDB database.
         """
         self.connection = duckdb.connect(self.db_url)
         return self.connection
@@ -38,14 +39,16 @@ class DatabaseConnection:
         """
         Checks if the database connection is active.
 
-        Returns: bool: True if the connection is active, False otherwise
+        Returns: bool: 
+            True if the connection is active, False otherwise
         """
         return self.connection is not None
 
     def fetch_all_column_names(self, table_name: str = "Jobs"):
         """Fetch all column names from the any table. By default, it fetches from a table named 'Jobs'.
         
-        Args: table_name (str): The name of the table to fetch all the column names from. Defaults to "Jobs"  
+        Args: 
+            table_name (str): The name of the table to fetch all the column names from. Defaults to "Jobs"  
 
         Raises:
             Exception: If the connection is not active.
