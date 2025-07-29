@@ -12,9 +12,9 @@ def temp_file_db():
     Yields:
         DatabaseConnection: A connected temporary database instance for testing.
     """
+    temp_db_dir = tempfile.mkdtemp()
+    mem_db = None
     try:
-        mem_db = None
-        temp_db_dir = tempfile.mkdtemp()
         temp_db_path = f"{temp_db_dir}/mock_database.db"
         mem_db = DatabaseConnection(db_url=temp_db_path)
         schema_sql = """
@@ -87,6 +87,7 @@ def temp_file_db():
         raise e
     finally:
         if mem_db is not None:
+            mem_db._disconnect()
             del mem_db
         shutil.rmtree(temp_db_dir)
 

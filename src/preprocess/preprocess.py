@@ -158,6 +158,7 @@ def _get_partition_constraint(partition: str, gpu_count: int) -> int | NAType:
 
     Args:
         partition (str): The name of the partition (e.g., "superpod-a100", "umd-cscdr-gpu").
+        gpu_count (int): The number of GPUs requested by the job.
 
     Returns:
         int | NAType: The VRAM size in GiB or NAType if the partition is not recognized.
