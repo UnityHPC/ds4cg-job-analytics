@@ -376,17 +376,24 @@ class EfficiencyAnalysis:
                 job_count=("JobID", "count"),
                 user_job_hours=("job_hours", "sum"),
                 pi_account=("Account", "first"),
-                avg_alloc_vram_eff_score=("alloc_vram_efficiency_score", avg_non_inf),
-                avg_vram_constraint_eff_score=("vram_constraint_efficiency_score", avg_non_inf),
+                avg_alloc_vram_eff_score=(JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE.value, avg_non_inf),
+                avg_vram_constraint_eff_score=(
+                    JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY_SCORE.value,
+                    avg_non_inf,
+                ),
             )
             .reset_index()
         )
 
+        print(users_w_efficiency_metrics.columns)
+
         # change name of 2 calculated avergage column
-        users_w_efficiency_metrics.rename({
-            "avg_alloc_vram_eff_score": UserEfficiencyMetricsEnum.AVG_ALLOC_VRAM_EFFICIENCY_SCORE.value,
-            "avg_vram_constraint_eff_score": UserEfficiencyMetricsEnum.AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE.value,
-        })
+        users_w_efficiency_metrics = users_w_efficiency_metrics.rename(
+            columns={
+                "avg_alloc_vram_eff_score": UserEfficiencyMetricsEnum.AVG_ALLOC_VRAM_EFFICIENCY_SCORE.value,
+                "avg_vram_constraint_eff_score": UserEfficiencyMetricsEnum.AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE.value,
+            },
+        )
 
         self.jobs_with_efficiency_metrics.loc[:, "weighted_alloc_vram_efficiency"] = (
             self.jobs_with_efficiency_metrics[JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY.value]

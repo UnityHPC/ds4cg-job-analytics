@@ -185,8 +185,8 @@ class ProportionMetricsEnum(Enum):
     JOB_HOURS = "job_hours"
     VRAM_HOURS = "vram_hours"
     JOBS = "jobs"
-    USER = "User"
-    PI_GROUP = "Account"
+    USERS = "User"
+    PI_GROUPS = "Account"
 
 
 @unique
@@ -226,3 +226,14 @@ class UserEfficiencyMetricsEnum(Enum):
     WEIGHTED_AVG_GPU_COUNT = "expected_value_gpu_count"
     AVG_ALLOC_VRAM_EFFICIENCY_SCORE = "avg_alloc_vram_efficiency_score"
     AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE = "avg_vram_constraint_efficiency_score"
+
+
+@unique
+class ROCPlotTypes(Enum):
+    """
+    Contain different plot types for ROC
+    """
+
+    JOB = "JOB"
+    USER = "USER"
+    PI_GROUP = "PI_GROUP"
