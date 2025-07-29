@@ -24,6 +24,8 @@ VRAM_CATEGORIES = [0, 8, 11, 12, 16, 23, 32, 40, 48, 80]
 
 DEFAULT_MIN_ELAPSED_SECONDS = 600  # 10 minutes, used for filtering jobs with short execution times
 
+DEFAULT_NORMALIZED_THRESHOLD_STEP = 0.01
+
 # A map for categorical type construction, containing some values that exist in each type
 ATTRIBUTE_CATEGORIES = {
     "Interactive": InteractiveEnum,

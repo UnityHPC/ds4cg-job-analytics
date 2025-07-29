@@ -61,9 +61,9 @@ class ROCVisualizer(EfficiencyAnalysis):
         else:
             return f"{value:.1f}"
 
-    def _normalize_threshold_arr(self, threshold_arr: np.ndarray) -> np.ndarray:
+    def _normalize_arr(self, arr: np.ndarray) -> np.ndarray:
         """
-        Normalize the threshold array. Intended for internal use only.
+        Normalize an array. Intended for internal use only.
 
         Args:
             threshold_arr (np.ndarray): the array to normalize
@@ -72,8 +72,8 @@ class ROCVisualizer(EfficiencyAnalysis):
             np.ndarray: the new normalized threshold array
 
         """
-        min_val, max_val = threshold_arr[0], threshold_arr[-1]
-        res = (threshold_arr - min_val) / (max_val - min_val)
+        min_val, max_val = arr[0], arr[-1]
+        res = (arr - min_val) / (max_val - min_val)
         return res
 
     def _helper_filter_invalid_records(
@@ -122,6 +122,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         threshold_step: float,
         threshold_metric: JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum,
         proportion_metric: ProportionMetricsEnum,
+        plot_type: ROCPlotTypes = ROCPlotTypes.JOB,
     ) -> tuple[pd.DataFrame, float, float | int, float]:
         """
         Validate the inputs, filter invalid records, calculate sum of proportion metric and percentage of remain data.
@@ -132,6 +133,7 @@ class ROCVisualizer(EfficiencyAnalysis):
             threshold_step (float): Step size for thresholds.
             min_threshold (float): Minimum threshold value.
             max_threshold (float): Maximum threshold value.
+            plot_type (ROCPlotTypes): the type of ROC Plot
 
         Returns:
             pd.Dataframe: The filtered dataframe.
@@ -199,8 +201,14 @@ class ROCVisualizer(EfficiencyAnalysis):
         # calculate percentage of plot_data in comparison to total dataset
         remain_percentage = (len(input_df) - filtered_out_records) / len(input_df) * 100
 
+        type_to_associate_metric: dict[ROCPlotTypes, ProportionMetricsEnum] = {
+            ROCPlotTypes.JOB: ProportionMetricsEnum.JOBS,
+            ROCPlotTypes.USER: ProportionMetricsEnum.USERS,
+            ROCPlotTypes.PI_GROUP: ProportionMetricsEnum.PI_GROUPS,
+        }
+
         # caculate the total value of proportion metrics to declare in title
-        if proportion_metric == ProportionMetricsEnum.JOBS:
+        if proportion_metric == type_to_associate_metric[plot_type]:
             total_raw_value = len(plot_data)
         elif proportion_metric in {ProportionMetricsEnum.USERS, ProportionMetricsEnum.PI_GROUPS}:
             total_raw_value = len(np.unique(plot_data[proportion_metric.value]))
@@ -634,6 +642,7 @@ class ROCVisualizer(EfficiencyAnalysis):
             threshold_step,
             threshold_metric,
             proportion_metric,
+            plot_type=ROCPlotTypes.USER,
         )
 
         # clip threshold_metrics to defined value
