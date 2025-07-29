@@ -39,8 +39,8 @@ class DatabaseConnection:
         """
         Checks if the database connection is active.
 
-        Returns: bool: 
-            True if the connection is active, False otherwise
+        Returns: 
+            bool: True if the connection is active, False otherwise
         """
         return self.connection is not None
 
