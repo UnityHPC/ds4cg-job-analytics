@@ -24,6 +24,7 @@ class DatabaseConnection:
                 print(f"Disconnected from {self.db_url}")
 
     def is_connected(self) -> bool:
+        """Check if the connection to the database is active."""
         return self.connection is not None
 
     def fetch_all_column_names(self, table_name: str = "Jobs"):
@@ -34,7 +35,7 @@ class DatabaseConnection:
         else:
             raise Exception("Not connected")
 
-    def fetch_column_info(self, table_name: str = "Jobs"):
+    def get_schema(self, table_name: str = "Jobs"):
         """
         Fetch column information for the specified table (types, NULLABLE, etc.).
 
@@ -46,7 +47,7 @@ class DatabaseConnection:
         """
         if self.is_connected():
             query = f"DESCRIBE {table_name}"
-            return self.connection.execute(query).df()
+            return self.connection.execute(query).fetchdf()
         else:
             raise Exception("Not connected")
 
