@@ -28,3 +28,19 @@ class UsersWithMetricsKwargsModel(EfficiencyMetricsKwargsModel):
     column: str
     bar_label_columns: list[str] | None
     figsize: tuple[int | float, int | float] = Field(default=(8, 8))
+
+
+class TimeSeriesVisualizationKwargsModel(BaseModel):
+    """Model for keyword arguments used in time series visualizations (VRAM efficiency/hours over time)."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+    users: list[str]
+    start_date: str | None = None
+    end_date: str | None = None
+    days_back: int | None = None
+    time_unit: str = "Months"
+    remove_zero_values: bool = True
+    max_points: int = 100
+    annotation_style: str = "hover"  # "hover", "combined", "table", "none"
+    show_secondary_y: bool = False
+    exclude_fields: list[str] | None = None
