@@ -3,6 +3,8 @@ import os
 
 
 class DatabaseConnection:
+
+    """A class to manage the connection to a DuckDB database."""
     def __init__(self, db_url: str, read_only: bool = True):
         self.db_url = db_url
         self.connection = self._connect(read_only=read_only)
