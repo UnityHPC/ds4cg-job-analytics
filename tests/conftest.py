@@ -45,14 +45,14 @@ def helper_filter_irrelevant_records(
 @pytest.fixture(scope="module")
 def mock_data():
     temp_db_dir = tempfile.mkdtemp()
-    db = None
+    mem_db = None
     try:
         temp_db_path = f"{temp_db_dir}/mock.db"
         convert_csv_to_db("tests/mock_data/mock.csv", temp_db_path)
-        db = DatabaseConnection(temp_db_path)
-        yield db.fetch_all_jobs(), temp_db_path
+        mem_db = DatabaseConnection(temp_db_path)
+        yield mem_db.fetch_all_jobs(), temp_db_path
     except Exception as e:
         raise Exception("Exception at mock_data_frame") from e
     finally:
-        if db is not None and db.is_connected():
-            shutil.rmtree(temp_db_dir)
+        del mem_db
+        shutil.rmtree(temp_db_dir)

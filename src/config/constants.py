@@ -34,7 +34,8 @@ ATTRIBUTE_CATEGORIES = {
     "Partition": PartitionEnum,
 }
 
-# Storing GPU names that have multiple memory sizes
+# Storing GPU names that have multiple vram options
+# This is used to determine which GPU variant a job is using based on the VRAM usage
 MULTIVALENT_GPUS = {"a100": [40, 80], "v100": [16, 32]}
 
 

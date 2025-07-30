@@ -1,6 +1,8 @@
 import pandas as pd
+from pandas.api.typing import NAType
 import numpy as np
 import re
+import warnings
 
 from ..config.constants import (
     VRAM_VALUES,
@@ -11,7 +13,6 @@ from ..config.constants import (
     ENFORCE_COLUMNS,
 )
 from ..config.enum_constants import StatusEnum, AdminsAccountEnum, PartitionEnum, QOSEnum
-import warnings
 
 
 def _get_vram_from_node(gpu_type: str, node: str) -> int:
@@ -33,7 +34,7 @@ def _get_vram_from_node(gpu_type: str, node: str) -> int:
         This logic is based on the cluster specifications documented at:
         https://docs.unity.rc.umass.edu/documentation/cluster_specs/nodes/
 
-        TODO: Consider reading this information from a config file or database.
+        TODO (Ayush): Consider reading this information from a config file or database.
     """
     vram = 0
     if gpu_type not in MULTIVALENT_GPUS:
@@ -62,7 +63,7 @@ def _get_vram_from_node(gpu_type: str, node: str) -> int:
     return vram
 
 
-def _get_vram_constraint(constraints: list[str], gpu_count: int, gpu_mem_usage: int) -> int | None:
+def _get_vram_constraint(constraints: list[str], gpu_count: int, gpu_mem_usage: int) -> int | NAType:
     """
     Get the VRAM assigned for a job based on its constraints and GPU usage.
 
@@ -76,8 +77,8 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int, gpu_mem_usage: 
         gpu_mem_usage (int): GPU memory usage in bytes.
 
     Returns:
-        int | None: Maximum VRAM amount in GiB obtained based on the provided constraints, multiplied by the
-                    number of GPUs. Returns None if no VRAM constraints are present.
+        int | NAType: Maximum VRAM amount in GiB obtained based on the provided constraints, multiplied by the
+                    number of GPUs. Returns NAType if no VRAM constraints are present.
 
     """
     vram_constraints = []
@@ -94,7 +95,8 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int, gpu_mem_usage: 
             else:
                 vram_constraints.append(VRAM_VALUES[gpu_type])
     if not (len(vram_constraints)):
-        return None  # if nothing is requested, return None
+        return pd.NA  # if nothing is requested, return NAType
+
     return max(vram_constraints) * gpu_count
 
 
@@ -144,7 +146,9 @@ def _calculate_approx_vram_single_gpu_type(
         # calculate all VRAM for all nodes in the node_list
         node_values = set()  # to avoid duplicates
         for node in node_list:
-            node_values.add(_get_vram_from_node(gpu, node))
+            node_vram = _get_vram_from_node(gpu, node)
+            if node_vram != 0:  # only consider nodes with non-zero VRAM
+                node_values.add(_get_vram_from_node(gpu, node))
 
         if not node_values:
             raise ValueError(f"No valid nodes found for multivalent GPU type '{gpu}' in node list: {node_list}")
@@ -173,9 +177,6 @@ def _get_approx_allocated_vram(gpu_types: list[str], node_list: list[str], gpu_c
 
     Returns:
         int: Total allocated (estimate) VRAM for the job in GiB (gibibyte).
-
-    Raises:
-        ValueError: If no valid nodes are found for a multivalent GPU type in the node list.
     """
 
     # one type of GPU
@@ -195,14 +196,16 @@ def _get_approx_allocated_vram(gpu_types: list[str], node_list: list[str], gpu_c
         return total_vram
 
     # estimate VRAM for multiple GPUs where exact number isn't known
-    # TODO: update this based on the updated GPU types which specify exact number of GPUs
-    allocated_vrams = []
+    # TODO (Ayush): update this based on the updated GPU types which specify exact number of GPUs
+    allocated_vrams = set()
     for gpu in gpu_types:
         if gpu in MULTIVALENT_GPUS:
             for node in node_list:
-                allocated_vrams.append(_get_vram_from_node(gpu, node))
+                node_vram = _get_vram_from_node(gpu, node)
+                if node_vram != 0:
+                    allocated_vrams.add(_get_vram_from_node(gpu, node))
         else:
-            allocated_vrams.append(VRAM_VALUES[gpu])
+            allocated_vrams.add(VRAM_VALUES[gpu])
 
     vram_values = sorted(list(allocated_vrams))
     total_vram = vram_values.pop(0) * gpu_count  # use the GPU with the minimum VRAM value
@@ -225,43 +228,30 @@ def _fill_missing(res: pd.DataFrame) -> None:
 
     # all Nan value are np.nan
     # fill default values for specific columns
+    res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)
+    res.loc[:, "Interactive"] = res["Interactive"].fillna("non-interactive")
+    res.loc[:, "Constraints"] = (
+        res["Constraints"].fillna("").apply(lambda x: [] if isinstance(x, str) and x == "" else list(x))
+    )
+    res.loc[:, "GPUType"] = (
+        res["GPUType"]
+        .fillna("")
+        .apply(
+            lambda x: (["cpu"] if (isinstance(x, str) and x == "") else x.tolist() if isinstance(x, np.ndarray) else x)
+        )
+    )
+    res.loc[:, "GPUs"] = res["GPUs"].fillna(0)
 
-    fill_map = {
-        "ArrayID": lambda col: col.fillna(-1),
-        "Interactive": lambda col: col.fillna("non-interactive"),
-        "Constraints": lambda col: col.fillna("").apply(lambda x: [] if isinstance(x, str) and x == "" else x),
-        "GPUType": lambda col: col.fillna("").apply(
-            lambda x: ["cpu"] if isinstance(x, str) and x == "" else x.tolist() if isinstance(x, np.ndarray) else x
-        ),
-        "GPUs": lambda col: col.fillna(0),
-    }
 
-    for col, fill_func in fill_map.items():
-        if col in res.columns:
-            res.loc[:, col] = fill_func(res[col])
-
-
-# TODO: alllow an option to also filter out QOS with custom values
 def preprocess_data(
     input_df: pd.DataFrame,
     min_elapsed_seconds: int = DEFAULT_MIN_ELAPSED_SECONDS,
-    include_failed_cancelled_jobs=False,
-    include_cpu_only_jobs=False,
-    include_custom_qos=False,
+    include_failed_cancelled_jobs: bool = False,
+    include_cpu_only_jobs: bool = False,
+    include_custom_qos: bool = False,
 ) -> pd.DataFrame:
     """
     Preprocess dataframe, filtering out unwanted rows and columns, filling missing values and converting types.
-
-    This function will take in a dataframe to create a new dataframe satisfying given criteria.
-
-    Args:
-        data (pd.DataFrame): The input dataframe containing job data.
-        min_elapsed_seconds (int, optional): Minimum elapsed time in seconds to keep a job record. Defaults to 600.
-        include_failed_cancelled_jobs (bool, optional): Whether to include jobs with status FAILED or CANCELLED.
-        include_cpu_only_jobs (bool, optional): Whether to include jobs that do not use GPUs (CPU-only jobs).
-
-    Returns:
-        pd.DataFrame: The preprocessed dataframe
 
     Handling missing columns logic:
         - columns in ENFORCE_COLUMNS are columns that are must-have for basic metrics calculation.
@@ -269,6 +259,21 @@ def preprocess_data(
         - For any columns in ENFORCE_COLUMNS that do not exist, a KeyError will be raised.
         - For any columns in ESSENTIAL_COLUMNS but not in ENFORCE_COLUMNS, a warning will be raised.
         - _fill_missing, records filtering, and type conversion logic will happen only if columns involved exist
+
+    Args:
+        input_df (pd.DataFrame): The input dataframe containing job data.
+        min_elapsed_seconds (int, optional): Minimum elapsed time in seconds to keep a job record. Defaults to 600.
+        include_failed_cancelled_jobs (bool, optional): Whether to include jobs with status FAILED or CANCELLED.
+            Default to False.
+        include_cpu_only_jobs (bool, optional): Whether to include jobs that do not use GPUs (CPU-only jobs).
+            Default to False.
+        include_custom_qos (bool, optional): Whether to include entries with custom qos values or not. Default to False
+
+    Returns:
+        pd.DataFrame: The new preprocessed dataframe
+
+    Raises:
+        KeyError: If any columns in ENFORCE_COLUMNS do not exist in the dataframe.
 
     """
     # drop columns and avoid errors in case any of them is not in the dataframe
@@ -312,8 +317,7 @@ def preprocess_data(
     res = data[mask].copy()
 
     _fill_missing(res)
-
-    # type casting for columns involving time
+    # Type casting for columns involving time
     time_columns = ["StartTime", "SubmitTime"]
     for col in time_columns:
         res[col] = pd.to_datetime(res[col], errors="coerce")
@@ -324,32 +328,18 @@ def preprocess_data(
             res[col] = pd.to_timedelta(res[col], unit="s", errors="coerce")
         except KeyError:
             continue
-
     # Added parameters for calculating VRAM metrics
     res.loc[:, "Queued"] = res["StartTime"] - res["SubmitTime"]
-
-    # vram_constraints calculation
-    vram_series = res.apply(
+    res.loc[:, "vram_constraint"] = res.apply(
         lambda row: _get_vram_constraint(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1
-    )
-    # add this if else block to handle type of vram_series properly
-    # when dataframe is empty, vram_series is the whole epty dataframe
-    if len(vram_series):
-        res.loc[:, "vram_constraint"] = vram_series.astype(pd.Int64Dtype())
-    else:
-        res.loc[:, "vram_constraint"] = pd.Series(dtype=pd.Int64Dtype())
-
-    # allocated_vram calculation
-    allocated_series = res.apply(
+    ).astype(pd.Int64Dtype())  # Use Int64Dtype to allow for nullable integers
+    res.loc[:, "allocated_vram"] = res.apply(
         lambda row: _get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
         axis=1,
     )
-    if len(allocated_series):
-        res.loc[:, "allocated_vram"] = allocated_series.astype("int64")
-    else:
-        res.loc[:, "allocated_vram"] = pd.Series(dtype="int64")
 
-    # convert columns to categorical
+    # Convert columns to categorical
+
     for col, enum_obj in ATTRIBUTE_CATEGORIES.items():
         try:
             enum_values = [e.value for e in enum_obj]
@@ -358,4 +348,12 @@ def preprocess_data(
             res[col] = pd.Categorical(res[col], categories=all_categories, ordered=False)
         except KeyError:
             continue
+
+    # Raise warning if GPUMemUsage or CPUMemUsage having infinity values
+    mem_usage_columns = ["CPUMemUsage", "GPUMemUsage"]
+    for col_name in mem_usage_columns:
+        filtered = res[res[col_name] == np.inf].copy()
+        if len(filtered) > 0:
+            message = f"Some entries in {col_name} having infinity values. This may be caused by an overflow."
+            warnings.warn(message=message, stacklevel=2, category=UserWarning)
     return res

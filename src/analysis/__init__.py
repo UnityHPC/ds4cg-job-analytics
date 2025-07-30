@@ -1,2 +1,4 @@
-from .visualize_columns import DataVisualizer as DataVisualizer
-from .vram_usage import load_preprocessed_jobs_dataframe_from_duckdb as load_preprocessed_jobs_dataframe_from_duckdb
+from .efficiency_analysis import EfficiencyAnalysis as EfficiencyAnalysis
+from .efficiency_analysis import (
+    load_preprocessed_jobs_dataframe_from_duckdb as load_preprocessed_jobs_dataframe_from_duckdb,
+)

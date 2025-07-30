@@ -84,7 +84,7 @@ def test_load_jobs_filter_min_elapsed(mock_data):
     """
     mock_csv, db_path = mock_data
     temp = helper_filter_irrelevant_records(mock_csv, 13000)
-    res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=db_path, min_elasped_seconds=13000, days_back=90)
+    res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=db_path, min_elapsed_seconds=13000, days_back=90)
     cutoff = datetime.now() - timedelta(days=90)
     ground_truth_csv = temp[
         (temp["Status"] != StatusEnum.CANCELLED.value)
