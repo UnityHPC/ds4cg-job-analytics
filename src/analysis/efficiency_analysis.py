@@ -4,8 +4,10 @@ Tools to analyze efficiency of Jobs based on their VRAM usage.
 The aim is to identify potential inefficiencies in GPU usage and notify users or PIs about these issues.
 """
 
+import datetime
 from typing import cast
 import pandas as pd
+from pandas.api.types import is_datetime64_any_dtype
 import numpy as np
 from pathlib import Path
 from src.preprocess.preprocess import preprocess_data
@@ -96,14 +98,27 @@ class EfficiencyAnalysis:
         return pd.api.types.is_integer_dtype(type(val)) or pd.api.types.is_float_dtype(type(val))
 
     @staticmethod
-    def apply_numeric_filter(
+    def is_date_type(val: object) -> bool:
+        """
+        Check if the value is a date type (str or datetime).
+
+        Args:
+            val (object): The value to check.
+
+        Returns:
+            bool: True if the value is a date type, False otherwise.
+        """
+        return isinstance(val, str | datetime.datetime)
+
+    @staticmethod
+    def apply_column_filter(
         col: pd.Series,
         filter: int | float | list | set | tuple | dict | pd.api.typing.NAType,
         permissible_filter_types: set[FilterTypeEnum],
         filter_name: str,
     ) -> pd.Series:
         """
-        Helper to apply a numeric filter to a pandas Series.
+        Helper to apply filters to a pandas Series.
 
         Args:
             col (pd.Series): The column to filter.
@@ -118,51 +133,71 @@ class EfficiencyAnalysis:
             ValueError: If the filter is invalid.
         """
         mask = pd.Series([True] * len(col), index=col.index)
-        if filter is not None:
-            if filter is pd.NA or (isinstance(filter, float) and np.isnan(filter)):
-                if FilterTypeEnum.PD_NA not in permissible_filter_types:
-                    raise ValueError(
-                        f"{filter_name} cannot be pd.NA or <NA>. "
-                        f"Permissible filter types are {permissible_filter_types}."
-                    )
-                mask &= col.isna()
-            elif isinstance(filter, list | set | tuple):
-                # Check if the filter is a list, set, or tuple and if all values are numeric
-                # If one of list, set, or tuple is allowed, then we assume all are allowed
-                valid_filter_types_set = {
-                    FilterTypeEnum.LIST,
-                    FilterTypeEnum.SET,
-                    FilterTypeEnum.TUPLE,
-                }
-                if not valid_filter_types_set.issubset(permissible_filter_types):
-                    raise ValueError(f"{filter_name} cannot be a list, set, or tuple.")
-                if not all(EfficiencyAnalysis.is_numeric_type(val) for val in filter):
-                    raise ValueError("All filter values must be integers or floats.")
-                mask &= col.isin(filter)
-            elif isinstance(filter, dict):
-                if FilterTypeEnum.DICTIONARY not in permissible_filter_types:
-                    raise ValueError(f"{filter_name} cannot be a dictionary.")
-                if "inclusive" not in filter or not isinstance(filter["inclusive"], bool):
-                    raise ValueError("If a filter is a dict, it must include an 'inclusive' boolean key.")
-                inclusive = filter["inclusive"]
-                # Check min/max values are int or float if present using pandas type checks
-                for key in ("min", "max"):
+        if filter is None:
+            return mask
+        if filter is pd.NA or (isinstance(filter, float) and np.isnan(filter)):
+            if FilterTypeEnum.PD_NA not in permissible_filter_types:
+                raise ValueError(
+                    f"{filter_name} cannot be pd.NA or <NA>. Permissible filter types are {permissible_filter_types}."
+                )
+            mask &= col.isna()
+        elif isinstance(filter, list | set | tuple):
+            # Check if the filter is a list, set, or tuple and if all values are numeric
+            # If one of list, set, or tuple is allowed, then we assume all are allowed
+            valid_filter_types_set = {
+                FilterTypeEnum.LIST,
+                FilterTypeEnum.SET,
+                FilterTypeEnum.TUPLE,
+            }
+            if not valid_filter_types_set.issubset(permissible_filter_types):
+                raise ValueError(f"{filter_name} cannot be a list, set, or tuple.")
+            if not all(EfficiencyAnalysis.is_numeric_type(val) for val in filter):
+                raise ValueError("All filter values must be integers or floats.")
+            mask &= col.isin(filter)
+        elif isinstance(filter, dict):
+            if FilterTypeEnum.DICTIONARY not in permissible_filter_types:
+                raise ValueError(f"{filter_name} cannot be a dictionary.")
+            if "inclusive" not in filter or not isinstance(filter["inclusive"], bool):
+                raise ValueError("If a filter is a dict, it must include an 'inclusive' boolean key.")
+
+            inclusive = filter["inclusive"]
+
+            # Date filter
+            for key in ("start", "end"):
+                if key in filter and not EfficiencyAnalysis.is_date_type(filter[key]):
+                    raise ValueError("Datetime filter must be a string or a datetime object.")
+
+            if "start" in filter:
+                start_time = filter["start"]
+                mask &= col.ge(start_time) if inclusive else col.gt(start_time)
+            if "end" in filter:
+                end_time = filter["end"]
+                mask &= col.le(end_time) if inclusive else col.lt(end_time)
+
+            # Check min/max values are int or float if present using pandas type checks
+            for key in ("min", "max"):
+                if is_datetime64_any_dtype(col):
+                    if key in filter and not EfficiencyAnalysis.is_date_type(filter[key]):
+                        raise ValueError(f"['{key}'] must be a date type (str or datetime).")
+                else:
                     if key in filter and not EfficiencyAnalysis.is_numeric_type(filter[key]):
                         raise ValueError(f"['{key}'] must be an integer or float.")
-                if "min" in filter:
-                    mask &= col.ge(filter["min"]) if inclusive else col.gt(filter["min"])
-                if "max" in filter:
-                    mask &= col.le(filter["max"]) if inclusive else col.lt(filter["max"])
+            if "min" in filter:
+                mask &= col.ge(filter["min"]) if inclusive else col.gt(filter["min"])
+            if "max" in filter:
+                mask &= col.le(filter["max"]) if inclusive else col.lt(filter["max"])
+        else:
+            if FilterTypeEnum.NUMERIC_SCALAR not in permissible_filter_types:
+                raise ValueError(f"{filter_name} cannot be a numeric scalar.")
             else:
-                if FilterTypeEnum.NUMERIC_SCALAR not in permissible_filter_types:
-                    raise ValueError(f"{filter_name} cannot be a numeric scalar.")
+                # Only allow numeric types or date types
+                if EfficiencyAnalysis.is_numeric_type(filter):
+                    numeric_filter = cast(float | int, filter)
+                    mask &= col.eq(numeric_filter)
+                elif EfficiencyAnalysis.is_date_type(filter):
+                    mask &= col.eq(filter)
                 else:
-                    # Only allow numeric types
-                    if EfficiencyAnalysis.is_numeric_type(filter):
-                        numeric_filter = cast(float | int, filter)
-                        mask &= col.eq(numeric_filter)
-                    else:
-                        raise ValueError(f"{filter_name} must be a numeric type.")
+                    raise ValueError(f"{filter_name} must be a numeric type.")
         return mask
 
     def filter_jobs_for_analysis(
@@ -211,7 +246,7 @@ class EfficiencyAnalysis:
         # vram_constraint
         if vram_constraint_filter is not None:
             try:
-                mask &= EfficiencyAnalysis.apply_numeric_filter(
+                mask &= EfficiencyAnalysis.apply_column_filter(
                     self.jobs_df["vram_constraint"],
                     vram_constraint_filter,
                     set(FilterTypeEnum.__members__.values()),
@@ -223,7 +258,7 @@ class EfficiencyAnalysis:
         # GPU memory usage filter
         if gpu_mem_usage_filter is not None:
             try:
-                mask &= EfficiencyAnalysis.apply_numeric_filter(
+                mask &= EfficiencyAnalysis.apply_column_filter(
                     self.jobs_df["GPUMemUsage"],
                     gpu_mem_usage_filter,
                     {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY},
@@ -235,7 +270,7 @@ class EfficiencyAnalysis:
         # Allocated VRAM filter
         if allocated_vram_filter is not None:
             try:
-                mask &= EfficiencyAnalysis.apply_numeric_filter(
+                mask &= EfficiencyAnalysis.apply_column_filter(
                     self.jobs_df["allocated_vram"],
                     allocated_vram_filter,
                     set(FilterTypeEnum.__members__.values()).difference({FilterTypeEnum.PD_NA}),
@@ -247,7 +282,7 @@ class EfficiencyAnalysis:
         # GPU count filter
         if gpu_count_filter is not None:
             try:
-                mask &= EfficiencyAnalysis.apply_numeric_filter(
+                mask &= EfficiencyAnalysis.apply_column_filter(
                     self.jobs_df["GPUs"],
                     gpu_count_filter,
                     set(FilterTypeEnum.__members__.values()).difference({FilterTypeEnum.PD_NA}),
@@ -452,7 +487,7 @@ class EfficiencyAnalysis:
 
         if alloc_vram_efficiency_filter is not None:
             try:
-                mask &= EfficiencyAnalysis.apply_numeric_filter(
+                mask &= EfficiencyAnalysis.apply_column_filter(
                     self.users_with_efficiency_metrics["expected_value_alloc_vram_efficiency"],
                     alloc_vram_efficiency_filter,
                     {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY},
@@ -502,7 +537,7 @@ class EfficiencyAnalysis:
 
         if vram_hours_filter is not None:
             try:
-                mask &= EfficiencyAnalysis.apply_numeric_filter(
+                mask &= EfficiencyAnalysis.apply_column_filter(
                     self.users_with_efficiency_metrics["vram_hours"],
                     vram_hours_filter,
                     {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY},
@@ -663,7 +698,7 @@ class EfficiencyAnalysis:
 
         if vram_hours_filter is not None:
             try:
-                mask &= EfficiencyAnalysis.apply_numeric_filter(
+                mask &= EfficiencyAnalysis.apply_column_filter(
                     self.pi_accounts_with_efficiency_metrics["pi_acc_vram_hours"],
                     vram_hours_filter,
                     {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY},
@@ -734,10 +769,15 @@ class EfficiencyAnalysis:
 
         for column, filter in filter_criteria.items():
             try:
-                mask &= EfficiencyAnalysis.apply_numeric_filter(
+                mask &= EfficiencyAnalysis.apply_column_filter(
                     getattr(self, metrics_df_name_enum.value)[column],
                     filter,
-                    {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY, FilterTypeEnum.PD_NA},
+                    {
+                        FilterTypeEnum.NUMERIC_SCALAR,
+                        FilterTypeEnum.DICTIONARY,
+                        FilterTypeEnum.PD_NA,
+                        FilterTypeEnum.DATE,
+                    },
                     filter_name=f"{column}_filter",
                 )
             except ValueError as e:

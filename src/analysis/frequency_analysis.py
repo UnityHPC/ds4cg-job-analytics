@@ -1,5 +1,3 @@
-import datetime
-
 from src.analysis.efficiency_analysis import EfficiencyAnalysis
 from src.config.enum_constants import TimeUnitEnum
 import pandas as pd
@@ -22,8 +20,12 @@ class FrequencyAnalysis(EfficiencyAnalysis):
         super().__init__(df)
 
     def prepare_time_series_data(
-        self, users: list[str], metric: str, time_unit: TimeUnitEnum, remove_zero_values: bool = True
-    ) -> tuple[list[str], list[str], list[datetime.datetime], dict[str, pd.DataFrame]]:
+        self,
+        users: list[str],
+        metric: str,
+        time_unit: TimeUnitEnum,
+        remove_zero_values: bool = True,
+    ) -> pd.DataFrame:
         """
         Prepare time series data for visualization.
 
@@ -34,111 +36,40 @@ class FrequencyAnalysis(EfficiencyAnalysis):
             remove_zero_values (bool): Whether to remove zero values.
 
         Returns:
-            tuple: (all_time_groups, all_time_groups_str, all_time_groups_datetime, user_dfs_dict)
-
-        Raises:
-            ValueError: If an invalid time unit is provided.
+            pd.DataFrame: A DataFrame with grouped time series data, including additional fields for visualization.
         """
-
         data = self.jobs_df.copy()
+
         # Group jobs by the specified time unit
-        if time_unit == "Months":
-            data["TimeGroup"] = pd.to_datetime(data["StartTime"]).dt.to_period("M")
-        elif time_unit == "Weeks":
-            data["TimeGroup"] = pd.to_datetime(data["StartTime"]).dt.to_period("W")
-        elif time_unit == "Days":
-            data["TimeGroup"] = pd.to_datetime(data["StartTime"]).dt.date
-        else:
-            raise ValueError(f"Invalid time unit {time_unit}. Choose 'Months', 'Weeks', or 'Days'.")
+        data = self.group_jobs_by_time(data, time_unit)
 
-        # Prepare time series data logic
-        user_time_groups = set()
-        user_time_groups_map = {}
-        for user in users:
-            user_data = data[data["User"] == user]
-            if remove_zero_values:
-                user_data = user_data[user_data[metric] > 0]
-            user_time_groups_map[user] = set(user_data["TimeGroup"].dropna().unique())
-            user_time_groups.update(user_time_groups_map[user])
+        data["all_time_groups"] = self.trim_zero_job_time_groups(
+            data["TimeGroup"].unique().tolist(), data["JobID"].value_counts().to_dict(), remove_zero_values
+        )
 
-        # Ensure continuous timeline by filling in missing time periods
-        all_time_groups = sorted(user_time_groups)
+        # Filter by users
+        data = data[data["User"].isin(users)]
 
-        # Format time groups as strings and datetime objects
-        all_time_groups_str = [str(tg) for tg in all_time_groups]
-        all_time_groups_datetime = [pd.to_datetime(str(tg)) for tg in all_time_groups]
+        # Aggregate data by time group and user
+        grouped_data = (
+            data.groupby(["TimeGroup", "User"], observed=True)
+            .agg(
+                Metric=(metric, "sum"),
+                JobCount=("JobID", "count"),
+                GPUHours=("job_hours", "sum"),
+            )
+            .reset_index()
+        )
 
-        # Process each user's data
-        user_dfs_dict = {}
-        for user in users:
-            user_data = data[data["User"] == user]
-            if user_data.empty:
-                user_dfs_dict[user] = pd.DataFrame()
-                continue
+        # Add additional fields for visualization
+        grouped_data["TimeGroup_Str"] = grouped_data["TimeGroup"].astype(str)
+        grouped_data["TimeGroup_Datetime"] = grouped_data["TimeGroup"].dt.start_time
 
-            grouped_efficiency = []
-            grouped_hours = []
-            grouped_vram_hours = []
-            grouped_job_counts = []
+        # Remove zero values if required
+        if remove_zero_values:
+            grouped_data = grouped_data[grouped_data["Metric"] > 0]
 
-            for time_group in all_time_groups:
-                group_data = user_data[user_data["TimeGroup"] == time_group]
-                user_gpu_hours = group_data["job_hours"].sum() if not group_data.empty else 0
-                user_vram_hours = group_data["vram_hours"].sum() if not group_data.empty else 0
-                total_gpu_hours = data[data["TimeGroup"] == time_group]["job_hours"].sum()
-
-                if total_gpu_hours > 0 and not group_data.empty:
-                    efficiency = (group_data[metric] * user_gpu_hours / total_gpu_hours).mean()
-                else:
-                    efficiency = 0
-
-                grouped_efficiency.append(efficiency)
-                grouped_hours.append(user_gpu_hours)
-                grouped_vram_hours.append(user_vram_hours)
-                grouped_job_counts.append(group_data["JobID"].count() if not group_data.empty else 0)
-
-            user_df = pd.DataFrame({
-                "TimeGroup": all_time_groups,
-                "TimeGroup_Str": all_time_groups_str,
-                "TimeGroup_Datetime": all_time_groups_datetime,
-                "Efficiency": grouped_efficiency,
-                "GPU_Hours": grouped_hours,
-                "VRAM_Hours": grouped_vram_hours,
-                "Job_Count": grouped_job_counts,
-            })
-
-            user_dfs_dict[user] = user_df
-
-        return all_time_groups, all_time_groups_str, all_time_groups_datetime, user_dfs_dict
-
-    def filter_jobs_by_date_range(
-        self,
-        start_date: str | datetime.datetime | None = None,
-        end_date: str | datetime.datetime | None = None,
-        days_back: int | None = None,
-    ) -> pd.DataFrame:
-        """
-        Filter jobs based on a specific date range or relative days back.
-
-        Args:
-            start_date (str, datetime.datetime): Start date in 'YYYY-MM-DD' format (optional).
-            end_date (str, datetime.datetime): End date in 'YYYY-MM-DD' format (optional).
-            days_back (int): Number of days back from today to filter jobs (optional).
-
-        Returns:
-            pd.DataFrame: Filtered jobs DataFrame.
-        """
-        data = self.jobs_df.copy()
-
-        if days_back:
-            start_date = pd.Timestamp.now() - pd.Timedelta(days=days_back)
-
-        if start_date:
-            data = data[data["StartTime"] >= pd.to_datetime(start_date)]
-        if end_date:
-            data = data[data["StartTime"] <= pd.to_datetime(end_date)]
-
-        return data
+        return grouped_data
 
     def group_jobs_by_time(self, data: pd.DataFrame, time_unit: TimeUnitEnum) -> pd.DataFrame:
         """

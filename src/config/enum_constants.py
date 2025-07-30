@@ -146,8 +146,9 @@ class FilterTypeEnum(Enum):
         LIST: Represents a Python list type.
         SET: Represents a Python set type.
         TUPLE: Represents a Python tuple type.
-        SCALAR: Represents a scalar value (e.g., int, float, str).
+        NUMERIC_SCALAR: Represents a scalar value (e.g., int, float, str).
         PD_NA: Represents a pandas 'NA' value for missing data.
+        DATE: Represents a date type (str or datetime).
     """
 
     DICTIONARY = auto()
@@ -156,6 +157,7 @@ class FilterTypeEnum(Enum):
     TUPLE = auto()
     NUMERIC_SCALAR = auto()
     PD_NA = auto()
+    DATE = auto()
 
 
 @unique
