@@ -1,0 +1,317 @@
+[
+  {
+    "name": "arm-gpu",
+    "type": "gpu",
+    "node_count": 3,
+    "maxtime": "14 days",
+    "deftime": "1 hour",
+    "max_ram": 560,
+    "max_cpus": 72
+  },
+  {
+    "name": "arm-preempt",
+    "type": "cpu",
+    "node_count": 3,
+    "maxtime": "14 days",
+    "deftime": "1 hour",
+    "max_ram": 250,
+    "max_cpus": 80
+  },
+  {
+    "name": "astroth-cpu",
+    "type": "cpu",
+    "node_count": 9,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 1000,
+    "max_cpus": 128
+  },
+  {
+    "name": "astroth-gpu",
+    "type": "gpu",
+    "node_count": 3,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 30,
+    "max_cpus": 8
+  },
+  {
+    "name": "cbio-cpu",
+    "type": "cpu",
+    "node_count": 5,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 500,
+    "max_cpus": 128
+  },
+  {
+    "name": "cbio-gpu",
+    "type": "gpu",
+    "node_count": 1,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 500,
+    "max_cpus": 128
+  },
+  {
+    "name": "ceewater_casey-cpu",
+    "type": "cpu",
+    "node_count": 10,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 500,
+    "max_cpus": 128
+  },
+  {
+    "name": "ceewater_cjgleason-cpu",
+    "type": "cpu",
+    "node_count": 10,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 500,
+    "max_cpus": 128
+  },
+  {
+    "name": "ceewater_kandread-cpu",
+    "type": "cpu",
+    "node_count": 10,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 500,
+    "max_cpus": 128
+  },
+  {
+    "name": "cpu",
+    "type": "cpu",
+    "node_count": 147,
+    "maxtime": "2 days",
+    "deftime": "1 hour",
+    "max_ram": 1510,
+    "max_cpus": 192
+  },
+  {
+    "name": "cpu-preempt",
+    "type": "cpu",
+    "node_count": 138,
+    "maxtime": "2 days",
+    "deftime": "1 hour",
+    "max_ram": 1510,
+    "max_cpus": 224
+  },
+  {
+    "name": "ece-gpu",
+    "type": "gpu",
+    "node_count": 2,
+    "maxtime": "5 days",
+    "deftime": "1 hour",
+    "max_ram": 370,
+    "max_cpus": 32
+  },
+  {
+    "name": "fsi-lab",
+    "type": "cpu",
+    "node_count": 1,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 1510,
+    "max_cpus": 192
+  },
+  {
+    "name": "gaoseismolab-cpu",
+    "type": "cpu",
+    "node_count": 5,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 500,
+    "max_cpus": 64
+  },
+  {
+    "name": "gpu",
+    "type": "gpu",
+    "node_count": 154,
+    "maxtime": "2 days",
+    "deftime": "1 hour",
+    "max_ram": 2010,
+    "max_cpus": 112
+  },
+  {
+    "name": "gpu-preempt",
+    "type": "gpu",
+    "node_count": 78,
+    "maxtime": "2 days",
+    "deftime": "1 hour",
+    "max_ram": 2010,
+    "max_cpus": 128
+  },
+  {
+    "name": "superpod-a100",
+    "type": "gpu",
+    "node_count": 12,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 2010,
+    "max_cpus": 112
+  },
+  {
+    "name": "gpupod-l40s",
+    "type": "gpu",
+    "node_count": 10,
+    "maxtime": "14 days",
+    "deftime": "1 hour",
+    "max_ram": 500,
+    "max_cpus": 32
+  },
+  {
+    "name": "ials-gpu",
+    "type": "gpu",
+    "node_count": 31,
+    "maxtime": "14 days",
+    "deftime": "1 hour",
+    "max_ram": 500,
+    "max_cpus": 32
+  },
+  {
+    "name": "jdelhommelle",
+    "type": "cpu",
+    "node_count": 1,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 1510,
+    "max_cpus": 224
+  },
+  {
+    "name": "lan",
+    "type": "gpu",
+    "node_count": 1,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 500,
+    "max_cpus": 32
+  },
+  {
+    "name": "mpi",
+    "type": "cpu",
+    "node_count": 13,
+    "maxtime": "2 days",
+    "deftime": "1 hour",
+    "max_ram": 250,
+    "max_cpus": 64
+  },
+  {
+    "name": "power9",
+    "type": "cpu",
+    "node_count": 2,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 250,
+    "max_cpus": 32
+  },
+  {
+    "name": "power9-gpu",
+    "type": "gpu",
+    "node_count": 16,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 510,
+    "max_cpus": 40
+  },
+  {
+    "name": "power9-gpu-osg",
+    "type": "gpu",
+    "node_count": 2,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 250,
+    "max_cpus": 32
+  },
+  {
+    "name": "power9-gpu-preempt",
+    "type": "gpu",
+    "node_count": 16,
+    "maxtime": "2 days",
+    "deftime": "1 hour",
+    "max_ram": 510,
+    "max_cpus": 40
+  },
+  {
+    "name": "toltec-cpu",
+    "type": "cpu",
+    "node_count": 7,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 370,
+    "max_cpus": 32
+  },
+  {
+    "name": "umd-cscdr-arm",
+    "type": "cpu",
+    "node_count": 3,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 250,
+    "max_cpus": 80
+  },
+  {
+    "name": "umd-cscdr-cpu",
+    "type": "cpu",
+    "node_count": 35,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 250,
+    "max_cpus": 64
+  },
+  {
+    "name": "umd-cscdr-gpu",
+    "type": "gpu",
+    "node_count": 10,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 2000,
+    "max_cpus": 128
+  },
+  {
+    "name": "uri-cpu",
+    "type": "cpu",
+    "node_count": 43,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 1000,
+    "max_cpus": 64
+  },
+  {
+    "name": "uri-gpu",
+    "type": "gpu",
+    "node_count": 11,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 1000,
+    "max_cpus": 64
+  },
+  {
+    "name": "uri-richamp",
+    "type": "cpu",
+    "node_count": 5,
+    "maxtime": "Unlimited",
+    "deftime": "1 hour",
+    "max_ram": 120,
+    "max_cpus": 64
+  },
+  {
+    "name": "visterra",
+    "type": "cpu",
+    "node_count": 8,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 370,
+    "max_cpus": 48
+  },
+  {
+    "name": "zhoulin-cpu",
+    "type": "cpu",
+    "node_count": 6,
+    "maxtime": "30 days",
+    "deftime": "1 hour",
+    "max_ram": 500,
+    "max_cpus": 128
+  }
+]
