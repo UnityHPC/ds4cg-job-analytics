@@ -1,6 +1,6 @@
 import pytest
 import pandas
-from src.analysis import load_jobs_dataframe_from_duckdb
+from src.analysis import load_preprocessed_jobs_dataframe_from_duckdb
 from .conftest import helper_filter_irrelevant_records
 from src.config.enum_constants import StatusEnum
 from src.config.constants import ENFORCE_COLUMNS, ESSENTIAL_COLUMNS
@@ -15,7 +15,7 @@ This test version assume that load_jobs_dataframe_from_duckdb will always ignore
 
 
 def test_load_jobs_correct_types(mock_data):
-    res = load_jobs_dataframe_from_duckdb(db_path=mock_data[1])
+    res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=mock_data[1])
     assert isinstance(res, pandas.DataFrame)
 
 
@@ -31,7 +31,7 @@ def test_load_jobs_no_filter(mock_data):
         & (temp["GPUType"].notna())
         & (temp["GPUs"].notna())
     ]
-    res = load_jobs_dataframe_from_duckdb(db_path=db_path)
+    res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=db_path)
     expect_num_records = len(ground_truth_csv)
     assert expect_num_records == len(res)
 
@@ -42,7 +42,7 @@ def test_load_jobs_filter_day_back_1(mock_data):
     """
     mock_csv, db_path = mock_data
     temp = helper_filter_irrelevant_records(mock_csv, 0)
-    res = load_jobs_dataframe_from_duckdb(db_path=db_path, days_back=90)
+    res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=db_path, days_back=90)
     cutoff = datetime.now() - timedelta(days=90)
     ground_truth_csv = temp[
         (temp["Status"] != StatusEnum.CANCELLED.value)
@@ -63,7 +63,7 @@ def test_load_jobs_filter_day_back_2(mock_data):
     """
     mock_csv, db_path = mock_data
     temp = helper_filter_irrelevant_records(mock_csv, 0)
-    res = load_jobs_dataframe_from_duckdb(db_path=db_path, days_back=150)
+    res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=db_path, days_back=150)
     cutoff = datetime.now() - timedelta(days=150)
     ground_truth_csv = temp[
         (temp["Status"] != StatusEnum.CANCELLED.value)
@@ -84,7 +84,7 @@ def test_load_jobs_filter_min_elapsed(mock_data):
     """
     mock_csv, db_path = mock_data
     temp = helper_filter_irrelevant_records(mock_csv, 13000)
-    res = load_jobs_dataframe_from_duckdb(db_path=db_path, min_elasped_seconds=13000, days_back=90)
+    res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=db_path, min_elasped_seconds=13000, days_back=90)
     cutoff = datetime.now() - timedelta(days=90)
     ground_truth_csv = temp[
         (temp["Status"] != StatusEnum.CANCELLED.value)
@@ -105,7 +105,7 @@ def test_load_jobs_filter_day_back_include_all(mock_data):
     """
     mock_csv, db_path = mock_data
     temp = helper_filter_irrelevant_records(mock_csv, 0)
-    res = load_jobs_dataframe_from_duckdb(
+    res = load_preprocessed_jobs_dataframe_from_duckdb(
         db_path=db_path, days_back=90, include_cpu_only_jobs=True, include_failed_cancelled_jobs=True
     )
     cutoff = datetime.now() - timedelta(days=90)
@@ -122,7 +122,7 @@ def test_load_jobs_custom_query(mock_data, recwarn):
         "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage, Elapsed FROM Jobs "
         "WHERE Status != 'CANCELLED' AND Status !='FAILED' AND ArrayID is not NULL AND Interactive is not NULL"
     )
-    res = load_jobs_dataframe_from_duckdb(db_path=db_path, custom_query=query, include_cpu_only_jobs=True)
+    res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=db_path, custom_query=query, include_cpu_only_jobs=True)
     filtered_data = mock_csv[
         (mock_csv["Status"] != "CANCELLED") & (mock_csv["Status"] != "FAILED") & (mock_csv["ArrayID"].notna())
     ].copy()
@@ -143,7 +143,7 @@ def test_load_jobs_custom_query_days_back_1(mock_data, recwarn):
         "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage, Elapsed FROM Jobs "
         "WHERE Status != 'CANCELLED' AND Status !='FAILED' AND ArrayID is not NULL AND Interactive is not NULL"
     )
-    res = load_jobs_dataframe_from_duckdb(
+    res = load_preprocessed_jobs_dataframe_from_duckdb(
         db_path=db_path, custom_query=query, include_cpu_only_jobs=True, days_back=150
     )
     cutoff = datetime.now() - timedelta(days=150)
@@ -173,7 +173,7 @@ def test_load_jobs_custom_query_days_back_2(mock_data, recwarn):
         f"AND StartTime >= '{cutoff}'"
     )
 
-    res = load_jobs_dataframe_from_duckdb(
+    res = load_preprocessed_jobs_dataframe_from_duckdb(
         db_path=db_path, custom_query=query, include_cpu_only_jobs=True, days_back=100
     )
 
@@ -209,7 +209,7 @@ def test_preprocess_key_errors_raised(mock_data, recwarn):
         col_str = ", ".join(col_names)
         query = f"SELECT {col_str} FROM Jobs"
         with pytest.raises(KeyError):
-            _res = load_jobs_dataframe_from_duckdb(db_path=db_path, custom_query=query)
+            _res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=db_path, custom_query=query)
 
 
 def test_preprocess_warning_raised(mock_data, recwarn):
@@ -233,4 +233,4 @@ def test_preprocess_warning_raised(mock_data, recwarn):
             f"Column {col} not exist in dataframe, this may result in unexpected outcome when filtering."
         )
         with pytest.warns(UserWarning, match=expect_warning_msg):
-            _res = load_jobs_dataframe_from_duckdb(db_path=db_path, custom_query=query)
+            _res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=db_path, custom_query=query)

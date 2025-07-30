@@ -18,7 +18,7 @@ import warnings
 # gpu_meme_usage. {min: 90, max: 1000, exclude: True}
 
 
-def load_jobs_dataframe_from_duckdb(
+def load_preprocessed_jobs_dataframe_from_duckdb(
     db_path=None,
     table_name="Jobs",
     sample_size=None,
@@ -100,7 +100,7 @@ class EfficiencyAnalysis:
     """
 
     def __init__(self, db_path=None, table_name="Jobs", sample_size=None, random_state=None):
-        self.jobs_df = load_jobs_dataframe_from_duckdb(db_path, table_name, sample_size, random_state)
+        self.jobs_df = load_preprocessed_jobs_dataframe_from_duckdb(db_path, table_name, sample_size, random_state)
         self.efficiency_df = None
         self.analysis_results = None
 
