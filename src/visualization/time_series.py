@@ -2,6 +2,7 @@ from abc import ABC
 from typing import Any
 
 import matplotlib.pyplot as plt
+import numpy as np
 import plotly.graph_objects as go
 import pandas as pd
 from pydantic import ValidationError
@@ -225,7 +226,7 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
     def _add_user_time_series_traces(
         self,
         fig: go.Figure,
-        users: list[str],
+        users: list[str] | np.ndarray,
         user_dfs: list[pd.DataFrame],
         hover_texts: list[list[str]],
         y_key: str,
@@ -320,7 +321,7 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
 
         users = time_series_df["User"].unique()
         user_dfs = []
-        hover_texts = []
+        hover_texts: list[list[str]] = []
 
         for user in users:
             user_data = time_series_df[time_series_df["User"] == user]
@@ -414,7 +415,7 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
 
         users = time_series_df["User"].unique()
         user_dfs = []
-        hover_texts = []
+        hover_texts: list[list[str]] = []
 
         for user in users:
             user_data = time_series_df[time_series_df["User"] == user]

@@ -113,7 +113,7 @@ class EfficiencyAnalysis:
     @staticmethod
     def apply_column_filter(
         col: pd.Series,
-        filter: int | float | list | set | tuple | dict | pd.api.typing.NAType,
+        filter: str | datetime.datetime | int | float | list | set | tuple | dict | pd.api.typing.NAType,
         permissible_filter_types: set[FilterTypeEnum],
         filter_name: str,
     ) -> pd.Series:
@@ -122,7 +122,7 @@ class EfficiencyAnalysis:
 
         Args:
             col (pd.Series): The column to filter.
-            filter (int | float | list | set | tuple | dict | pd.api.typing.NAType): The filter value(s).
+            filter (str | datetime | int | float | list | set | tuple | dict | pd.api.typing.NAType): The filter value(s).
             permissible_filter_types (set[FilterTypeEnum]): Set of permissible filter types.
             filter_name (str): Name of the filter.
 
@@ -195,7 +195,8 @@ class EfficiencyAnalysis:
                     numeric_filter = cast(float | int, filter)
                     mask &= col.eq(numeric_filter)
                 elif EfficiencyAnalysis.is_date_type(filter):
-                    mask &= col.eq(filter)
+                    date_filter = cast(str | datetime.datetime, filter)
+                    mask &= col.eq(date_filter)
                 else:
                     raise ValueError(f"{filter_name} must be a numeric type.")
         return mask
