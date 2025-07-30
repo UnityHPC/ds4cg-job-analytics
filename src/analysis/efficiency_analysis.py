@@ -78,7 +78,7 @@ def load_preprocessed_jobs_dataframe_from_duckdb(
                 UserWarning,
                 stacklevel=2,
             )
-        print(custom_query)
+
         jobs_df = db.fetch_query(custom_query)
         processed_data = preprocess_data(
             jobs_df,

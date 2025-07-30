@@ -228,19 +228,19 @@ def _fill_missing(res: pd.DataFrame) -> None:
 
     # all Nan value are np.nan
     # fill default values for specific columns
-    res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)
-    res.loc[:, "Interactive"] = res["Interactive"].fillna("non-interactive")
-    res.loc[:, "Constraints"] = (
-        res["Constraints"].fillna("").apply(lambda x: [] if isinstance(x, str) and x == "" else list(x))
-    )
-    res.loc[:, "GPUType"] = (
-        res["GPUType"]
-        .fillna("")
-        .apply(
-            lambda x: (["cpu"] if (isinstance(x, str) and x == "") else x.tolist() if isinstance(x, np.ndarray) else x)
-        )
-    )
-    res.loc[:, "GPUs"] = res["GPUs"].fillna(0)
+    fill_map = {
+        "ArrayID": lambda col: col.fillna(-1),
+        "Interactive": lambda col: col.fillna("non-interactive"),
+        "Constraints": lambda col: col.fillna("").apply(lambda x: [] if isinstance(x, str) and x == "" else x),
+        "GPUType": lambda col: col.fillna("").apply(
+            lambda x: ["cpu"] if isinstance(x, str) and x == "" else x.tolist() if isinstance(x, np.ndarray) else x
+        ),
+        "GPUs": lambda col: col.fillna(0),
+    }
+
+    for col, fill_func in fill_map.items():
+        if col in res.columns:
+            res.loc[:, col] = fill_func(res[col])
 
 
 def preprocess_data(
@@ -290,7 +290,6 @@ def preprocess_data(
                 UserWarning,
                 stacklevel=2,
             )
-
     mask = pd.Series([True] * len(data))
 
     # for filtering columns that must exist in the dataset
@@ -316,6 +315,7 @@ def preprocess_data(
             mask &= cond(data)
     res = data[mask].copy()
 
+    print("DEBUG")
     _fill_missing(res)
     # Type casting for columns involving time
     time_columns = ["StartTime", "SubmitTime"]
@@ -330,13 +330,33 @@ def preprocess_data(
             continue
     # Added parameters for calculating VRAM metrics
     res.loc[:, "Queued"] = res["StartTime"] - res["SubmitTime"]
-    res.loc[:, "vram_constraint"] = res.apply(
+    # res.loc[:, "vram_constraint"] = res.apply(
+    #     lambda row: _get_vram_constraint(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1
+    # ).astype(pd.Int64Dtype())  # Use Int64Dtype to allow for nullable integers
+    # res.loc[:, "allocated_vram"] = res.apply(
+    #     lambda row: _get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
+    #     axis=1,
+    # )
+
+    # vram_constraint_calculation
+    vram_constraints_series = res.apply(
         lambda row: _get_vram_constraint(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1
-    ).astype(pd.Int64Dtype())  # Use Int64Dtype to allow for nullable integers
-    res.loc[:, "allocated_vram"] = res.apply(
+    )
+    # when dataframe is empty, vram_constraints_series is the whole epty dataframe
+    if len(vram_constraints_series):
+        res.loc[:, "vram_constraint"] = vram_constraints_series.astype(pd.Int64Dtype())
+    else:
+        res.loc[:, "vram_constraint"] = pd.Series(dtype=pd.Int64Dtype())
+
+    # allocated_vram calculation
+    vram_allocated_series = res.apply(
         lambda row: _get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
         axis=1,
     )
+    if len(vram_allocated_series):
+        res.loc[:, "allocated_vram"] = vram_allocated_series.astype("int64")
+    else:
+        res.loc[:, "allocated_vram"] = pd.Series(dtype="int64")
 
     # Convert columns to categorical
 
@@ -352,6 +372,8 @@ def preprocess_data(
     # Raise warning if GPUMemUsage or CPUMemUsage having infinity values
     mem_usage_columns = ["CPUMemUsage", "GPUMemUsage"]
     for col_name in mem_usage_columns:
+        if col_name not in res.columns:
+            continue
         filtered = res[res[col_name] == np.inf].copy()
         if len(filtered) > 0:
             message = f"Some entries in {col_name} having infinity values. This may be caused by an overflow."

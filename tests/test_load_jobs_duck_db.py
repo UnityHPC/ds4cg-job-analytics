@@ -208,7 +208,7 @@ def test_preprocess_key_errors_raised(mock_data, recwarn):
         col_names.remove(col)
         col_str = ", ".join(col_names)
         query = f"SELECT {col_str} FROM Jobs"
-        with pytest.raises(KeyError):
+        with pytest.raises(RuntimeError):
             _res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=db_path, custom_query=query)
 
 
