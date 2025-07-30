@@ -1,0 +1,84 @@
+import pandas as pd
+from pathlib import Path
+from src.preprocess.preprocess import preprocess_data
+from src.database import DatabaseConnection
+from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
+import re
+from datetime import timedelta, datetime
+import warnings
+
+
+def load_preprocessed_jobs_dataframe_from_duckdb(
+    db_path: str | Path,
+    table_name: str = "Jobs",
+    sample_size: int | None = None,
+    random_state: pd._typing.RandomState | None = None,
+    days_back: int | None = None,
+    custom_query: str = "",
+    include_failed_cancelled_jobs: bool = False,
+    include_cpu_only_jobs: bool = False,
+    min_elapsed_seconds: int = DEFAULT_MIN_ELAPSED_SECONDS,
+) -> pd.DataFrame:
+    """
+    Load jobs DataFrame from a DuckDB database and preprocess it.
+
+    Args:
+        db_path (str or Path): Path to the DuckDB database.
+        table_name (str, optional): Table name to query. Defaults to 'Jobs'.
+        sample_size (int, optional): Number of rows to sample from the DataFrame. Defaults to None (no sampling).
+        random_state (pd._typing.RandomState, optional): Random state for reproducibility. Defaults to None.
+        days_back (int, optional): Number of days back to filter jobs based on StartTime.
+            Deafults to None. If None, will not filter by startTime.
+        custom_query(str, optional): Custom SQL query to execute. Defaults to an empty string.
+            If empty, will select all jobs.
+        include_failed_cancelled_jobs (bool, optional): If True, include jobs with FAILED or CANCELLED status.
+            Defaults to False.
+        include_cpu_only_jobs (bool, optional): If True, include jobs that do not use GPUs (CPU-only jobs).
+            Defaults to False.
+        min_elapsed_seconds (int, optional): Minimum elapsed time in seconds to filter jobs by elapsed time.
+            Defaults to 0.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the table data.
+
+    Raises:
+        RuntimeError: If the jobs DataFrame cannot be loaded from the database.
+    """
+
+    def _contain_dates_back_condition(query: str) -> bool:
+        pattern = r"(?i:WHERE)\s+[^;]*StartTime\s*>=\s*[^;]+"
+        return bool(re.search(pattern, query, re.IGNORECASE))
+
+    if isinstance(db_path, Path):
+        db_path = db_path.resolve()
+    try:
+        db = DatabaseConnection(str(db_path))
+
+        if not custom_query:
+            custom_query = f"SELECT * FROM {table_name}"
+        if days_back is not None and not _contain_dates_back_condition(custom_query):
+            cutoff = datetime.now() - timedelta(days=days_back)
+            if "where" not in custom_query.lower():
+                custom_query += f" WHERE StartTime >= '{cutoff}'"
+            else:
+                custom_query += f" AND StartTime >= '{cutoff}'"
+        elif days_back is not None and _contain_dates_back_condition(custom_query):
+            warnings.warn(
+                f"Parameter days_back = {days_back} is passed but custom_query already contained conditions for "
+                "filtering by dates_back. dates_back condition in custom_query will be used.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        jobs_df = db.fetch_query(custom_query)
+        processed_data = preprocess_data(
+            jobs_df,
+            min_elapsed_seconds,
+            include_failed_cancelled_jobs,
+            include_cpu_only_jobs,
+        )
+        if sample_size is not None:
+            processed_data = processed_data.sample(n=sample_size, random_state=random_state)
+        return processed_data
+    except Exception as e:
+        raise RuntimeError(f"Failed to load jobs DataFrame: {e}") from e
