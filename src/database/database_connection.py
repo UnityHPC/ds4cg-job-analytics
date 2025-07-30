@@ -25,7 +25,7 @@ class DatabaseConnection:
         return self.connection
 
     def _disconnect(self):
-        """Safely closes the active database connection"""
+        """Safely close the active database connection"""
         self.connection.close()
 
     def __del__(self):
@@ -37,7 +37,7 @@ class DatabaseConnection:
 
     def is_connected(self) -> bool:
         """
-        Checks if the database connection is active.
+        Check if the database connection is active.
 
         Returns: 
             bool: True if the connection is active, False otherwise
@@ -45,13 +45,13 @@ class DatabaseConnection:
         return self.connection is not None
 
     def fetch_all_column_names(self, table_name: str = "Jobs"):
-        """Fetch all column names from the any table. By default, it fetches from a table named 'Jobs'.
+        """Fetch all column names from any table. By default, it fetches from a table named 'Jobs'.
         
         Args: 
             table_name (str): The name of the table to fetch all the column names from. Defaults to "Jobs"  
 
         Raises:
-            Exception: If the connection is not active.
+            ConnectionError: If the connection is not active.
 
         Returns:
             list: A list of column names from the specified table.    
@@ -60,7 +60,7 @@ class DatabaseConnection:
             query = f"SELECT * FROM {table_name} LIMIT 0"
             return self.connection.execute(query).df().columns.tolist()
         else:
-            raise Exception("Not connected")
+            raise ConnectionError("Database connection is not established.")
 
     def get_schema(self, table_name: str = "Jobs"):
         """
@@ -85,7 +85,7 @@ class DatabaseConnection:
             table_name (str): The name of the table to fetch data from. Defaults to "Jobs".
 
         Raises:
-            Exception: If the connection is not active.
+            ConnectionError: If the connection is not active.
             
         Returns:
             pd.DataFrame: A pandas DataFrame containing all rows from the specified table.
@@ -94,7 +94,7 @@ class DatabaseConnection:
             query = f"SELECT * FROM {table_name}"
             return self.connection.execute(query).fetchdf()
         else:
-            raise Exception("Not connected")
+            raise ConnectionError("Database connection is not established.")
 
     def fetch_query(self, query: str):
         """
@@ -104,7 +104,8 @@ class DatabaseConnection:
             query (str): The SQL query to execute.
 
         Raises:
-            Exception: If the query does not match the database schema or if there is no active connection
+            ValueError: If the query does not match the database schema or if there is no active connection
+            ConnectionError: If the connection is not active.
 
         Returns:
             pd.DataFrame: The result of the query as a pandas DataFrame.
@@ -114,8 +115,8 @@ class DatabaseConnection:
                 return self.connection.query(query).to_df()
             except duckdb.BinderException as e:
                 valid_columns = self.fetch_all_column_names()
-                raise Exception(
+                raise ValueError(
                     f"This query does not match the database schema. Valid columns are: {valid_columns}."
                 ) from e
         else:
-            raise Exception("Database connection is not established. Connect to the database first.")
+            raise ConnectionError("Database connection is not established. Connect to the database first.")
