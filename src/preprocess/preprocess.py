@@ -283,7 +283,7 @@ def preprocess_data(
     col_set = set(data.columns.to_list())
     for col in ESSENTIAL_COLUMNS:
         if col not in col_set and col in ENFORCE_COLUMNS:
-            raise KeyError(f"Column {col} does not exist in dataframe")
+            raise KeyError(f"Column {col} does not exist in dataframe.")
         elif col not in col_set:
             warnings.warn(
                 f"Column {col} not exist in dataframe, this may result in unexpected outcome when filtering.",
