@@ -329,13 +329,6 @@ def preprocess_data(
             continue
     # Added parameters for calculating VRAM metrics
     res.loc[:, "Queued"] = res["StartTime"] - res["SubmitTime"]
-    # res.loc[:, "vram_constraint"] = res.apply(
-    #     lambda row: _get_vram_constraint(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1
-    # ).astype(pd.Int64Dtype())  # Use Int64Dtype to allow for nullable integers
-    # res.loc[:, "allocated_vram"] = res.apply(
-    #     lambda row: _get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
-    #     axis=1,
-    # )
 
     # vram_constraint_calculation
     vram_constraints_series = res.apply(
