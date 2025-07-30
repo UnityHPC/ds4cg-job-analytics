@@ -113,6 +113,9 @@ def test_load_jobs_filter_day_back_include_all(mock_data):
 
 
 def test_load_jobs_custom_query(mock_data, recwarn):
+    """
+    Test if function fetches expected records when using custom sql query
+    """
     mock_csv, db_path = mock_data
     query = (
         "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage, Elapsed FROM Jobs "
