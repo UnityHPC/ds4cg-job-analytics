@@ -282,7 +282,7 @@ def preprocess_data(
         & (data["Status"] != StatusEnum.CANCELLED.value)
     ) | include_failed_cancelled_jobs
     # Filter out jobs that the type field of their partition type is not gpu, except when include_cpu_only_jobs is True
-    partition_info = PartitionInfoFetcher.get_partition_info()
+    partition_info = PartitionInfoFetcher().get_info()
     gpu_partitions = [p['name'] for p in partition_info if p['type'] == "gpu"]
     mask &= data["Partition"].isin(gpu_partitions) | include_cpu_only_jobs
 

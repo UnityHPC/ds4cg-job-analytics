@@ -1,53 +1,85 @@
+from abc import ABC, abstractmethod
 import json
 import requests
 from pathlib import Path
 
 
-class PartitionInfoFetcher:
+class InfoFetcher(ABC):
     """Class to fetch and parse partition information from a remote JSON file."""
 
-    url = "https://gitlab.rc.umass.edu/unity/education/documentation/unity-website/-/raw/main/data/partition_info.json"
-    local_path = Path("./snapshots/partition_info.json")
+    @property
+    @abstractmethod
+    def url(self) -> str:
+        """URL of the remote JSON file to fetch."""
+        pass
 
-    @classmethod
-    def get_partition_info(cls) -> dict:
-        """Fetch and save partition information from the JSON file on GitLab, or read from local file if fetch fails.
+    @property
+    @abstractmethod
+    def local_path(self) -> Path:
+        """Path where the local JSON file will be saved or read from."""
+        pass
+
+    @property
+    @abstractmethod
+    def info_name(self) -> str:
+        """Type of information being fetched (e.g., 'partition')."""
+        pass
+
+    # @classmethod
+    def get_info(self) -> dict:
+        """Fetch and save information from the remote JSON file, or read from local file if fetch fails.
 
         Raises:
             FileNotFoundError: If the local file does not exist and the fetch fails.
 
         Returns:
-            dict: Parsed JSON data containing partition information.
+            dict: Parsed JSON data.
         """
-        partition_info = None
+        remote_info = None
         try:
-            response = requests.get(cls.url, timeout=10)
+            response = requests.get(self.url, timeout=10)
             if response.status_code == 200:
-                partition_info = response.json()
+                remote_info = response.json()
                 # Ensure directory exists
-                cls.local_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(cls.local_path, "w") as f:
-                    json.dump(partition_info, f, indent=2)
-                print("Fetched and saved partition_info.json from GitLab.")
-                return partition_info
+                self.local_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(self.local_path, "w") as f:
+                    json.dump(remote_info, f, indent=2)
+                print(f"Fetched and saved {self.local_path.name} from remote URL.")
+                return remote_info
             else:
                 print(
-                    f"Failed to retrieve partition information. "
+                    f"Failed to retrieve {self.info_name} information. "
                     f"Status code: {response.status_code}\n"
-                    f"URL: {cls.url}\n"
+                    f"URL: {self.url}\n"
                     f"Response: {response.text}"
                 )
         except Exception as e:
-            print(f"An error occurred while fetching partition information: {e}")
+            print(f"An error occurred while fetching {self.info_name} information: {e}")
 
         # Fallback: read from local file if available
         try:
-            with open(cls.local_path) as file:
-                partition_info = json.load(file)
-            print("Loaded partition_info.json from local file.")
-            return partition_info
+            with open(self.local_path) as file:
+                remote_info = json.load(file)
+            print(f"Loaded {self.local_path.name} from local file.")
+            return remote_info
         except FileNotFoundError as e:
             raise FileNotFoundError(
-                f"partition_info.json not found locally at {cls.local_path}. "
+                f"{self.local_path.name} not found locally at {self.local_path}. "
                 "Please ensure the file exists."
             ) from e
+
+
+class PartitionInfoFetcher(InfoFetcher):
+    """Class to fetch and parse partition information from a remote JSON file."""
+
+    url = "https://gitlab.rc.umass.edu/unity/education/documentation/unity-website/-/raw/main/data/partition_info.json"
+    local_path = Path("./snapshots/partition_info.json")
+    info_name = "partition"
+
+
+class NodeInfoFetcher(InfoFetcher):
+    """Class to fetch and parse node information from a remote JSON file."""
+
+    url = "https://gitlab.rc.umass.edu/unity/education/documentation/unity-website/-/raw/main/data/node_info.json"
+    local_path = Path("./snapshots/node_info.json")
+    info_name = "node"
