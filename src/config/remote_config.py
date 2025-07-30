@@ -4,7 +4,7 @@ import requests
 from pathlib import Path
 
 
-class InfoFetcher(ABC):
+class RemoteConfigFetcher(ABC):
     """Class to fetch and parse partition information from a remote JSON file."""
 
     @property
@@ -25,7 +25,6 @@ class InfoFetcher(ABC):
         """Type of information being fetched (e.g., 'partition')."""
         pass
 
-    # @classmethod
     def get_info(self) -> dict:
         """Fetch and save information from the remote JSON file, or read from local file if fetch fails.
 
@@ -69,7 +68,7 @@ class InfoFetcher(ABC):
             ) from e
 
 
-class PartitionInfoFetcher(InfoFetcher):
+class PartitionInfoFetcher(RemoteConfigFetcher):
     """Class to fetch and parse partition information from a remote JSON file."""
 
     url = "https://gitlab.rc.umass.edu/unity/education/documentation/unity-website/-/raw/main/data/partition_info.json"
@@ -77,7 +76,7 @@ class PartitionInfoFetcher(InfoFetcher):
     info_name = "partition"
 
 
-class NodeInfoFetcher(InfoFetcher):
+class NodeInfoFetcher(RemoteConfigFetcher):
     """Class to fetch and parse node information from a remote JSON file."""
 
     url = "https://gitlab.rc.umass.edu/unity/education/documentation/unity-website/-/raw/main/data/node_info.json"
