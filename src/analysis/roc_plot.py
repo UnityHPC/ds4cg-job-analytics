@@ -1,18 +1,16 @@
 """
 TODO (Tan): consider writing tests for validate_input function
 
-Note somewhere: if we want to look at a user but with proportion metrics as some jobb metrics (jobs, job_hours),
-then we shuould use the multiple line plot job since that still calculate the job metrics but per user/ pi_group.
-THe group by thing for user and pi group maybe used for only number. of user/ pi_group metrics to inspect
-    aggregated score.
-
 Actions item:
 - Need to check if proportion metric = USER, PI_GROUP works corectly when we look at plot for users/ group of users
 - refactor roc_plot to use less arguments, consider printing out statistics info of thresholds
 - Maybe put own threshold metrics into a single dictionary parameter and validate_and_filter will modify min_threshold
+- Multiple line plot, but with proportion metrics as User for PI_Group
+- When plotting PI_Group, also consider how many pi_group have only 1 unique users.
+- When done, create a class visualization in visualization folder.
 
 - Issue: some new metric of user (user_job_hours, user_vram_hours) will be also on both x-axis and y-axis
- -> Need to add a bunch more to ProportionMetrics Enum, maybe best if we let it as jobs and vram_hours
+ -> Need to add a bunch more to ProportionMetrics Enum, maybe best if we let it as jobs and vram_hours -> discuss with Arda
 """
 
 from pathlib import Path
@@ -152,6 +150,10 @@ class ROCVisualizer(EfficiencyAnalysis):
         """
 
         # check if provided parameter is valid or not
+        if threshold_metric.value == proportion_metric.value:
+            # avoid same values for y-axis and x-axis
+            raise ValueError("threshold_metric and proportion_metric cannot have the same value.")
+
         if threshold_metric.value not in input_df.columns:
             raise KeyError(f"Threshold metric '{threshold_metric.value}' not found in DataFrame.")
         if (
@@ -526,7 +528,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         threshold_step: float = 1.0,
         threshold_metric: JobEfficiencyMetricsEnum = JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY,
         proportion_metric: Literal[
-            ProportionMetricsEnum.JOB_HOURS, ProportionMetricsEnum.JOBS
+            ProportionMetricsEnum.JOB_HOURS, ProportionMetricsEnum.JOBS, ProportionMetricsEnum.VRAM_HOURS
         ] = ProportionMetricsEnum.JOBS,
         plot_percentage: bool = True,
         clip_threshold_metric: tuple[bool, float] = (False, 0.0),
@@ -677,7 +679,6 @@ class ROCVisualizer(EfficiencyAnalysis):
         axe.set_ylabel(y_label)
         axe.set_xlabel(f"Threshold values ({threshold_metric.value})")
         axe.plot(thresholds_arr, proportions_data)
-        axe.legend()
 
         self._generate_num_marker(axe, thresholds_arr, proportions_data, num_markers)
 
