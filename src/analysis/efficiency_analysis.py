@@ -51,14 +51,6 @@ def load_preprocessed_jobs_dataframe_from_duckdb(
     except Exception as e:
         raise RuntimeError(f"Failed to load jobs DataFrame: {e}") from e
 
-    jobs_df = db.fetch_all_jobs(table_name=table_name) if query is None else db.fetch_query(query)
-    print(jobs_df)
-    processed_data = preprocess_data(
-        jobs_df, min_elapsed_seconds=0, include_failed_cancelled_jobs=False, include_cpu_only_jobs=False
-    )
-    if sample_size is not None:
-        processed_data = processed_data.sample(n=sample_size, random_state=random_state)
-    return processed_data
 
 class EfficiencyAnalysis:
     """

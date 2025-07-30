@@ -1,7 +1,9 @@
 import pandas as pd
 from pandas.api.typing import NAType
+from pandas.api.typing import NAType
 import numpy as np
 import re
+import warnings
 
 from ..config.constants import (
     VRAM_VALUES,
@@ -151,9 +153,9 @@ def _calculate_approx_vram_single_gpu_type(
         # calculate all VRAM for all nodes in the node_list
         node_values = set()  # to avoid duplicates
         for node in node_list:
-            node_vram = _get_multivalent_vram_based_on_node(gpu, node)
+            node_vram = _get_vram_from_node(gpu, node)
             if node_vram != 0:  # only consider nodes with non-zero VRAM
-                node_values.add(_get_multivalent_vram_based_on_node(gpu, node))
+                node_values.add(_get_vram_from_node(gpu, node))
 
         if not node_values:
             raise ValueError(f"No valid nodes found for multivalent GPU type '{gpu}' in node list: {node_list}")
@@ -346,11 +348,6 @@ def _get_approx_allocated_vram(
 
     Returns:
         int: Total allocated (estimate) VRAM for the job in GiB (gibibyte).
-
-    Notes:
-        - When `gpu_types` is a dictionary, the function calculates VRAM based on the counts of each GPU type.
-        - For multivalent GPUs, the VRAM is determined based on the nodes where the GPUs are located.
-        - If the exact number of GPUs is not known, the function uses the minimum VRAM value among the available GPUs.
     """
 
     # Handle cases with one type of GPU
@@ -375,13 +372,14 @@ def _get_approx_allocated_vram(
         return total_vram
 
     # estimate VRAM for multiple GPUs where exact number isn't known
+    # TODO (Ayush): update this based on the updated GPU types which specify exact number of GPUs
     allocated_vrams = set()
     for gpu in gpu_types:
         if gpu in MULTIVALENT_GPUS:
             for node in node_list:
-                node_vram = _get_multivalent_vram_based_on_node(gpu, node)
+                node_vram = _get_vram_from_node(gpu, node)
                 if node_vram != 0:
-                    allocated_vrams.add(_get_multivalent_vram_based_on_node(gpu, node))
+                    allocated_vrams.add(_get_vram_from_node(gpu, node))
         else:
             allocated_vrams.add(VRAM_VALUES[gpu])
 
@@ -409,7 +407,7 @@ def _fill_missing(res: pd.DataFrame) -> None:
     res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)
     res.loc[:, "Interactive"] = res["Interactive"].fillna("non-interactive")
     res.loc[:, "Constraints"] = (
-        res["Constraints"].fillna("").apply(lambda x: [] if isinstance(x, str) and x == "" else x)
+        res["Constraints"].fillna("").apply(lambda x: [] if isinstance(x, str) and x == "" else list(x))
     )
     res.loc[:, "GPUType"] = (
         res["GPUType"]
@@ -433,7 +431,7 @@ def preprocess_data(
     This function will take in a dataframe to create a new dataframe satisfying given criteria.
 
     Args:
-        data (pd.DataFrame): The input dataframe containing job data.
+        input_df (pd.DataFrame): The input dataframe containing job data.
         min_elapsed_seconds (int, optional): Minimum elapsed time in seconds to keep a job record. Defaults to 600.
         include_failed_cancelled_jobs (bool, optional): Whether to include jobs with status FAILED or CANCELLED.
         include_cpu_only_jobs (bool, optional): Whether to include jobs that do not use GPUs (CPU-only jobs).
@@ -510,4 +508,12 @@ def preprocess_data(
         unique_values = res[col].unique().tolist()
         all_categories = list(set(enum_values) | set(unique_values))
         res[col] = pd.Categorical(res[col], categories=all_categories, ordered=False)
+
+    # Raise warning if GPUMemUsage or CPUMemUsage having infinity values
+    mem_usage_columns = ["CPUMemUsage", "GPUMemUsage"]
+    for col_name in mem_usage_columns:
+        filtered = res[res[col_name] == np.inf].copy()
+        if len(filtered) > 0:
+            message = f"Some entries in {col_name} having infinity values. This may be caused by an overflow."
+            warnings.warn(message=message, stacklevel=2, category=UserWarning)
     return res
