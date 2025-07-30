@@ -3,53 +3,20 @@ from src.config.enum_constants import TimeUnitEnum
 import pandas as pd
 
 
-class FrequencyAnalyzer(EfficiencyAnalysis):
+class FrequencyAnalysis(EfficiencyAnalysis):
     """
     A class for performing frequency analysis on job metrics.
     Inherits from EfficiencyAnalysis to reuse its methods for calculating metrics.
     """
 
-    def __init__(self, jobs_df: pd.DataFrame):
+    def __init__(self, df: pd.DataFrame):
         """
         Initialize the FrequencyAnalyzer with a DataFrame of jobs.
 
         Args:
-            jobs_df (pd.DataFrame): DataFrame containing job data.
+            df (pd.DataFrame): DataFrame containing job data.
         """
-        super().__init__(jobs_df)
-
-    def find_inefficient_users(self, alloc_vram_efficiency_filter: int | float | dict | None, min_jobs: int = 5):
-        """
-        Identify inefficient users based on allocated VRAM efficiency.
-
-        Args:
-            alloc_vram_efficiency_filter: Filter for allocated VRAM efficiency.
-            min_jobs (int): Minimum number of jobs a user must have to be included.
-
-        Returns:
-            pd.DataFrame: DataFrame of inefficient users.
-        """
-        return self.find_inefficient_users_by_alloc_vram_efficiency(
-            alloc_vram_efficiency_filter=alloc_vram_efficiency_filter, min_jobs=min_jobs
-        )
-
-    def calculate_users_with_metrics(self):
-        """
-        Calculate users with efficiency metrics.
-
-        Returns:
-            pd.DataFrame: DataFrame of users with efficiency metrics.
-        """
-        return self.calculate_user_efficiency_metrics()
-
-    def calculate_jobs_with_metrics(self):
-        """
-        Calculate jobs with efficiency metrics.
-
-        Returns:
-            pd.DataFrame: DataFrame of jobs with efficiency metrics.
-        """
-        return self.calculate_job_efficiency_metrics(self.jobs_df)
+        super().__init__(df)
 
     def prepare_time_series_data(self, users, metric, time_unit, remove_zero_values=True):
         """
@@ -64,6 +31,7 @@ class FrequencyAnalyzer(EfficiencyAnalysis):
         Returns:
             tuple: (all_time_groups, all_time_groups_str, all_time_groups_datetime, user_dfs_dict)
         """
+
         data = self.jobs_df.copy()
         # Group jobs by the specified time unit
         if time_unit == "Months":
@@ -182,3 +150,40 @@ class FrequencyAnalyzer(EfficiencyAnalysis):
             raise ValueError(f"Invalid time unit {time_unit}. Choose 'Months', 'Weeks', or 'Days'.")
 
         return data
+
+    def trim_zero_job_time_groups(self, all_time_groups, time_group_job_counts, remove_zero_values):
+        """
+        Helper method to trim leading and trailing time groups with zero jobs.
+
+        Args:
+            all_time_groups (list): Sorted list of time groups
+            time_group_job_counts (dict): Dictionary mapping time groups to their job counts
+            remove_zero_values (bool): Whether to trim zero values
+
+        Returns:
+            list: Trimmed list of time groups
+        """
+        if not remove_zero_values or not all_time_groups:
+            return all_time_groups
+
+        # Find first non-zero month
+        first_non_zero_idx = 0
+        while (
+                first_non_zero_idx < len(all_time_groups)
+                and time_group_job_counts[all_time_groups[first_non_zero_idx]] == 0
+        ):
+            first_non_zero_idx += 1
+
+        # Find last non-zero month
+        last_non_zero_idx = len(all_time_groups) - 1
+        while last_non_zero_idx >= 0 and time_group_job_counts[all_time_groups[last_non_zero_idx]] == 0:
+            last_non_zero_idx -= 1
+
+        # If we found a valid range
+        if first_non_zero_idx <= last_non_zero_idx:
+            return all_time_groups[first_non_zero_idx: last_non_zero_idx + 1]
+        # If there are no non-zero months, keep at least the first month
+        elif len(all_time_groups) > 0:
+            return [all_time_groups[0]]
+        else:
+            return []

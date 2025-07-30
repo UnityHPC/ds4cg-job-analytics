@@ -174,7 +174,20 @@ class MetricsDataFrameNameEnum(Enum):
     PI_GROUPS = "pi_accounts_with_efficiency_metrics"
 
 
+@unique
 class TimeUnitEnum(Enum):
+    """
+    An enumeration representing different time units for efficiency metrics.
+
+    Attributes:
+        SECONDS: Represents time in seconds.
+        MINUTES: Represents time in minutes.
+        HOURS: Represents time in hours.
+        DAYS: Represents time in days.
+        WEEKS: Represents time in weeks.
+        MONTHS: Represents time in months.
+        YEARS: Represents time in years.
+    """
     SECONDS = "Seconds"
     MINUTES = "Minutes"
     HOURS = "Hours"
@@ -182,3 +195,49 @@ class TimeUnitEnum(Enum):
     WEEKS = "Weeks"
     MONTHS = "Months"
     YEARS = "Years"
+
+
+@unique
+class JobEfficiencyMetricsEnum(Enum):
+    """
+    Contains efficiency metrics for calculating efficiency of jobs.
+
+    These are used as jobs metrics (in EfficiencyAnalysis class) and also metrics for x-axis in ROC Plot.
+
+    For all members, if it is similar to a member in ProportionMetricsEnum (the member can be both
+        x-axis and y-axis in ROC), it must have the same value to that member in ProportionMetricsEnum.
+    """
+
+    JOB_HOURS = "job_hours"
+    VRAM_HOURS = "vram_hours"
+    ALLOC_VRAM_EFFICIENCY = "alloc_vram_efficiency"
+    VRAM_CONSTRAINT_EFFICIENCY = "vram_constraint_efficiency"
+    VRAM_CONSTRAINT_EFFICIENCY_SCORE = "vram_constraint_efficiency_score"
+    ALLOC_VRAM_EFFICIENCY_SCORE = "alloc_vram_efficiency_score"
+    CPU_MEM_EFFICIENCY = "cpu_mem_efficiency"
+    GPU_COUNT = "gpu_count"
+    USED_VRAM_GIB = "used_vram_gib"
+    # CPU column
+    USED_CPU_MEMORY_GIB = "used_cpu_mem_gib"
+    ALLOCATED_CPU_MEM_GIB = "allocated_cpu_mem_gib"
+
+
+@unique
+class UserEfficiencyMetricsEnum(Enum):
+    """
+    Contains efficiency metrics for calculating efficiency of users.
+
+    These are used as jobs metrics (in EfficiencyAnalysis class) and also metrics for x-axis in ROC Plot (for users).
+
+    For all members, if it is similar to a member in ProportionMetricsEnum (the member can be both
+        x-axis and y-axis in ROC), it must have the same value to that member in ProportionMetricsEnum.
+    """
+
+    JOB_HOURS = "job_hours"
+    VRAM_HOURS = "vram_hours"
+    JOBS = "job_count"
+    WEIGHTED_AVG_ALLOC_VRAM_EFFICIENCY = "expected_value_alloc_vram_efficiency"
+    WEIGHTED_AVG_VRAM_CONSTRAINTS_EFFICIENCY = "expected_value_vram_constraint_efficiency"
+    WEIGHTED_AVG_GPU_COUNT = "expected_value_gpu_count"
+    AVG_ALLOC_VRAM_EFFICIENCY_SCORE = "avg_alloc_vram_efficiency_score"
+    AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE = "avg_vram_constraint_efficiency_score"
