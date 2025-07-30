@@ -1,8 +1,10 @@
 import duckdb
 import os
+import pandas as pd
 
 
 class DatabaseConnection:
+    
     """
     A class to manage database connections using DuckDB.
 
@@ -10,7 +12,7 @@ class DatabaseConnection:
     It can be used to interact with the database and perform operations.
 
     """
-    def __init__(self, db_url: str):
+    def __init__(self, db_url: str) -> None:
         self.db_url = db_url
         self.connection = self._connect()
         print(f"Connected to {self.db_url}")
@@ -24,11 +26,11 @@ class DatabaseConnection:
         self.connection = duckdb.connect(self.db_url)
         return self.connection
 
-    def _disconnect(self):
+    def _disconnect(self) -> None:
         """Safely close the active database connection"""
         self.connection.close()
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Ensure the connection is closed when the object is deleted."""
         if self.is_connected():
             self._disconnect()
@@ -44,7 +46,7 @@ class DatabaseConnection:
         """
         return self.connection is not None
 
-    def fetch_all_column_names(self, table_name: str = "Jobs"):
+    def fetch_all_column_names(self, table_name: str = "Jobs") -> list[str]:
         """Fetch all column names from any table. By default, it fetches from a table named 'Jobs'.
         
         Args: 
@@ -62,12 +64,15 @@ class DatabaseConnection:
         else:
             raise ConnectionError("Database connection is not established.")
 
-    def get_schema(self, table_name: str = "Jobs"):
+    def get_schema(self, table_name: str = "Jobs") -> pd.DataFrame:
         """
         Fetch column information for the specified table (types, NULLABLE, etc.).
 
         Args:
             table_name (str): The name of the table to describe.
+
+        Raises:
+            Exception: If the connection is not active.
 
         Returns:
             pd.DataFrame: A DataFrame containing the column information.
@@ -78,7 +83,7 @@ class DatabaseConnection:
         else:
             raise Exception("Not connected")
 
-    def fetch_all_jobs(self, table_name="Jobs"):
+    def fetch_all_jobs(self, table_name: str = "Jobs") -> pd.DataFrame:
         """Fetch all data from the specified table. Table name is set to Jobs but can be changed accordingly.
 
         Args:
@@ -96,7 +101,7 @@ class DatabaseConnection:
         else:
             raise ConnectionError("Database connection is not established.")
 
-    def fetch_query(self, query: str):
+    def fetch_query(self, query: str) -> pd.DataFrame:
         """
         Fetch data based on a custom query.
 
