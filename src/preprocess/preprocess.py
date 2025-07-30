@@ -315,7 +315,6 @@ def preprocess_data(
             mask &= cond(data)
     res = data[mask].copy()
 
-    print("DEBUG")
     _fill_missing(res)
     # Type casting for columns involving time
     time_columns = ["StartTime", "SubmitTime"]

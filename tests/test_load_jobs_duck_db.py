@@ -7,14 +7,10 @@ from src.config.constants import ENFORCE_COLUMNS, ESSENTIAL_COLUMNS
 from datetime import datetime, timedelta
 
 
-"""
-Test for load_jobs_dataframe_from_duckdb.
-This test version assume that load_jobs_dataframe_from_duckdb will always ignore cpu only jobs 
-    and failed/ cancelled jobs.
-"""
-
-
 def test_load_jobs_correct_types(mock_data):
+    """
+    Basic test on return type of function
+    """
     res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=mock_data[1])
     assert isinstance(res, pandas.DataFrame)
 
