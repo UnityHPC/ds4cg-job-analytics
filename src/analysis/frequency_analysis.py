@@ -1,3 +1,5 @@
+import datetime
+
 from src.analysis.efficiency_analysis import EfficiencyAnalysis
 from src.config.enum_constants import TimeUnitEnum
 import pandas as pd
@@ -6,10 +8,11 @@ import pandas as pd
 class FrequencyAnalysis(EfficiencyAnalysis):
     """
     A class for performing frequency analysis on job metrics.
+
     Inherits from EfficiencyAnalysis to reuse its methods for calculating metrics.
     """
 
-    def __init__(self, df: pd.DataFrame):
+    def __init__(self, df: pd.DataFrame) -> None:
         """
         Initialize the FrequencyAnalyzer with a DataFrame of jobs.
 
@@ -18,18 +21,23 @@ class FrequencyAnalysis(EfficiencyAnalysis):
         """
         super().__init__(df)
 
-    def prepare_time_series_data(self, users, metric, time_unit, remove_zero_values=True):
+    def prepare_time_series_data(
+        self, users: list[str], metric: str, time_unit: TimeUnitEnum, remove_zero_values: bool = True
+    ) -> tuple[list[str], list[str], list[datetime.datetime], dict[str, pd.DataFrame]]:
         """
         Prepare time series data for visualization.
 
         Args:
             users (list[str]): List of usernames.
             metric (str): The metric used to calculate efficiency (e.g., alloc_vram_efficiency or vram_hours).
-            time_unit (str): Time unit for grouping (e.g., 'Months', 'Weeks', 'Days').
+            time_unit (TimeUnitEnum): Time unit for grouping (e.g., 'Months', 'Weeks', 'Days').
             remove_zero_values (bool): Whether to remove zero values.
 
         Returns:
             tuple: (all_time_groups, all_time_groups_str, all_time_groups_datetime, user_dfs_dict)
+
+        Raises:
+            ValueError: If an invalid time unit is provided.
         """
 
         data = self.jobs_df.copy()
@@ -43,7 +51,7 @@ class FrequencyAnalysis(EfficiencyAnalysis):
         else:
             raise ValueError(f"Invalid time unit {time_unit}. Choose 'Months', 'Weeks', or 'Days'.")
 
-        # Prepare time series data logic (moved from TimeSeriesVisualizer)
+        # Prepare time series data logic
         user_time_groups = set()
         user_time_groups_map = {}
         for user in users:
@@ -89,29 +97,32 @@ class FrequencyAnalysis(EfficiencyAnalysis):
                 grouped_vram_hours.append(user_vram_hours)
                 grouped_job_counts.append(group_data["JobID"].count() if not group_data.empty else 0)
 
-            user_df = pd.DataFrame(
-                {
-                    "TimeGroup": all_time_groups,
-                    "TimeGroup_Str": all_time_groups_str,
-                    "TimeGroup_Datetime": all_time_groups_datetime,
-                    "Efficiency": grouped_efficiency,
-                    "GPU_Hours": grouped_hours,
-                    "VRAM_Hours": grouped_vram_hours,
-                    "Job_Count": grouped_job_counts,
-                }
-            )
+            user_df = pd.DataFrame({
+                "TimeGroup": all_time_groups,
+                "TimeGroup_Str": all_time_groups_str,
+                "TimeGroup_Datetime": all_time_groups_datetime,
+                "Efficiency": grouped_efficiency,
+                "GPU_Hours": grouped_hours,
+                "VRAM_Hours": grouped_vram_hours,
+                "Job_Count": grouped_job_counts,
+            })
 
             user_dfs_dict[user] = user_df
 
         return all_time_groups, all_time_groups_str, all_time_groups_datetime, user_dfs_dict
 
-    def filter_jobs_by_date_range(self, start_date=None, end_date=None, days_back=None):
+    def filter_jobs_by_date_range(
+        self,
+        start_date: str | datetime.datetime | None = None,
+        end_date: str | datetime.datetime | None = None,
+        days_back: int | None = None,
+    ) -> pd.DataFrame:
         """
         Filter jobs based on a specific date range or relative days back.
 
         Args:
-            start_date (str): Start date in 'YYYY-MM-DD' format (optional).
-            end_date (str): End date in 'YYYY-MM-DD' format (optional).
+            start_date (str, datetime.datetime): Start date in 'YYYY-MM-DD' format (optional).
+            end_date (str, datetime.datetime): End date in 'YYYY-MM-DD' format (optional).
             days_back (int): Number of days back from today to filter jobs (optional).
 
         Returns:
@@ -129,16 +140,19 @@ class FrequencyAnalysis(EfficiencyAnalysis):
 
         return data
 
-    def group_jobs_by_time(self, data, time_unit):
+    def group_jobs_by_time(self, data: pd.DataFrame, time_unit: TimeUnitEnum) -> pd.DataFrame:
         """
         Group jobs by a specified time unit (Months, Weeks, Days).
 
         Args:
             data (pd.DataFrame): Jobs DataFrame.
-            time_unit (str): Time unit to group by ('Months', 'Weeks', 'Days').
+            time_unit (TimeUnitEnum): Time unit to group by ('Months', 'Weeks', 'Days').
 
         Returns:
             pd.DataFrame: Grouped jobs DataFrame.
+
+        Raises:
+            ValueError: If an invalid time unit is provided.
         """
         if time_unit == TimeUnitEnum.MONTHS.value:
             data["TimeGroup"] = pd.to_datetime(data["StartTime"]).dt.to_period("M")
@@ -151,7 +165,9 @@ class FrequencyAnalysis(EfficiencyAnalysis):
 
         return data
 
-    def trim_zero_job_time_groups(self, all_time_groups, time_group_job_counts, remove_zero_values):
+    def trim_zero_job_time_groups(
+        self, all_time_groups: list[str], time_group_job_counts: dict[str, int], remove_zero_values: bool = True
+    ) -> list[str]:
         """
         Helper method to trim leading and trailing time groups with zero jobs.
 
@@ -169,8 +185,8 @@ class FrequencyAnalysis(EfficiencyAnalysis):
         # Find first non-zero month
         first_non_zero_idx = 0
         while (
-                first_non_zero_idx < len(all_time_groups)
-                and time_group_job_counts[all_time_groups[first_non_zero_idx]] == 0
+            first_non_zero_idx < len(all_time_groups)
+            and time_group_job_counts[all_time_groups[first_non_zero_idx]] == 0
         ):
             first_non_zero_idx += 1
 
@@ -181,7 +197,7 @@ class FrequencyAnalysis(EfficiencyAnalysis):
 
         # If we found a valid range
         if first_non_zero_idx <= last_non_zero_idx:
-            return all_time_groups[first_non_zero_idx: last_non_zero_idx + 1]
+            return all_time_groups[first_non_zero_idx : last_non_zero_idx + 1]
         # If there are no non-zero months, keep at least the first month
         elif len(all_time_groups) > 0:
             return [all_time_groups[0]]

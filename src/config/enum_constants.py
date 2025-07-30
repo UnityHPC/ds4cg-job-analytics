@@ -188,6 +188,7 @@ class TimeUnitEnum(Enum):
         MONTHS: Represents time in months.
         YEARS: Represents time in years.
     """
+
     SECONDS = "Seconds"
     MINUTES = "Minutes"
     HOURS = "Hours"

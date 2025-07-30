@@ -750,16 +750,3 @@ class EfficiencyAnalysis:
         filtered_records = filtered_records.sort_values(sorting_key, ascending=ascending)
 
         return filtered_records
-
-
-    def visualize_time_series(self, users, **kwargs):
-        """
-        Visualize time series metrics (VRAM efficiency or VRAM hours) for specified users using TimeSeriesVisualizer.
-
-        Args:
-            users (list[str]): List of user names to plot.
-            **kwargs: Additional keyword arguments for visualization (see TimeSeriesVisualizer).
-        """
-        from src.visualization.time_series import TimeSeriesVisualizer
-        visualizer = TimeSeriesVisualizer(self.jobs_with_efficiency_metrics)
-        visualizer.plot_vram_efficiency(users=users, **kwargs)

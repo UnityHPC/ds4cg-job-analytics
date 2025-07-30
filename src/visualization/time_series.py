@@ -2,6 +2,7 @@ from abc import ABC
 from typing import Any
 
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 import pandas as pd
 from pydantic import ValidationError
 
@@ -13,9 +14,11 @@ from .visualization import DataVisualizer
 class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], ABC):
     """
     Visualizer for plotting VRAM efficiency and VRAM hours over time for users.
+
     Can be used standalone with a DataFrame or with an EfficiencyAnalysis instance.
     """
-    def __init__(self, df: pd.DataFrame):
+
+    def __init__(self, df: pd.DataFrame) -> None:
         super().__init__(df)
 
     def validate_visualize_kwargs(
@@ -45,27 +48,24 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
             allowed_fields = {name: str(field.annotation) for name, field in kwargs_model.model_fields.items()}
             allowed_fields_str = "\n".join(f"  {k}: {v}" for k, v in allowed_fields.items())
             raise TypeError(
-                f"Invalid metrics visualization kwargs: {e.json(indent=2)}\n"
+                f"Invalid time series visualization kwargs: {e.json(indent=2)}\n"
                 f"Allowed fields and types:\n{allowed_fields_str}"
             ) from e
 
-        self.validate_column_argument(col_kwargs.column, validated_jobs_df)
-        self.validate_columns(col_kwargs.bar_label_columns, validated_jobs_df)
-        self.validate_figsize(col_kwargs.figsize)
         return col_kwargs
 
     def plot_vram_efficiency(
-            self,
-            users: list[str],
-            start_date: str | None = None,
-            end_date: str | None = None,
-            days_back: int | None = None,
-            time_unit: str | TimeUnitEnum = TimeUnitEnum.MONTHS.value,
-            remove_zero_values: bool = True,
-            max_points: int = 100,
-            annotation_style: str = "hover",  # "hover", "combined", "table", "none"
-            show_secondary_y: bool = False,  # Show job counts on secondary y-axis
-            exclude_fields: list[str] | None = None,  # List of fields to exclude from annotation text box
+        self,
+        users: list[str],
+        start_date: str | None = None,
+        end_date: str | None = None,
+        days_back: int | None = None,
+        time_unit: str | TimeUnitEnum = TimeUnitEnum.MONTHS.value,
+        remove_zero_values: bool = True,
+        max_points: int = 100,
+        annotation_style: str = "hover",  # "hover", "combined", "table", "none"
+        show_secondary_y: bool = False,  # Show job counts on secondary y-axis
+        exclude_fields: list[str] | None = None,  # List of fields to exclude from annotation text box
     ) -> pd.DataFrame:
         """
         Plot VRAM efficiency over time for specific users with improved annotation options.
@@ -166,15 +166,13 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
                 grouped_efficiency.append(efficiency)
                 grouped_hours.append(user_gpu_hours)
                 grouped_job_counts.append(group_data["JobID"].count() if not group_data.empty else 0)
-            user_df = pd.DataFrame(
-                {
-                    "TimeGroup": all_time_groups,
-                    "TimeGroup_Str": all_time_groups_str,
-                    "Efficiency": grouped_efficiency,
-                    "GPU_Hours": grouped_hours,
-                    "Job_Count": grouped_job_counts,
-                }
-            )
+            user_df = pd.DataFrame({
+                "TimeGroup": all_time_groups,
+                "TimeGroup_Str": all_time_groups_str,
+                "Efficiency": grouped_efficiency,
+                "GPU_Hours": grouped_hours,
+                "Job_Count": grouped_job_counts,
+            })
 
             if not user_df.empty:
                 any_nonzero_efficiency = True
@@ -287,17 +285,17 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
         return table_df
 
     def plot_vram_hours(
-            self,
-            users: list[str],
-            start_date: str | None = None,
-            end_date: str | None = None,
-            days_back: int | None = None,
-            time_unit: str | TimeUnitEnum = TimeUnitEnum.MONTHS.value,
-            remove_zero_values: bool = True,
-            max_points: int = 100,
-            show_secondary_y: bool = False,
-            exclude_fields: list[str] | None = None,
-            annotation_style: str = "hover",
+        self,
+        users: list[str],
+        start_date: str | None = None,
+        end_date: str | None = None,
+        days_back: int | None = None,
+        time_unit: str | TimeUnitEnum = TimeUnitEnum.MONTHS.value,
+        remove_zero_values: bool = True,
+        max_points: int = 100,
+        show_secondary_y: bool = False,
+        exclude_fields: list[str] | None = None,
+        annotation_style: str = "hover",
     ) -> pd.DataFrame:
         """
         Plot VRAM Hours over time for specific users (non-interactive version).
@@ -354,14 +352,12 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
                 user_gpu_hours = group_data["job_hours"].sum() if not group_data.empty else 0
                 grouped_hours.append(user_gpu_hours)
                 grouped_job_counts.append(group_data["JobID"].count() if not group_data.empty else 0)
-            user_df = pd.DataFrame(
-                {
-                    "TimeGroup": all_time_groups,
-                    "TimeGroup_Str": all_time_groups_str,
-                    "VRAM_Hours": grouped_hours,
-                    "Job_Count": grouped_job_counts,
-                }
-            )
+            user_df = pd.DataFrame({
+                "TimeGroup": all_time_groups,
+                "TimeGroup_Str": all_time_groups_str,
+                "VRAM_Hours": grouped_hours,
+                "Job_Count": grouped_job_counts,
+            })
 
             # Additional filtering for VRAM_Hours if needed
             if remove_zero_values:
@@ -456,15 +452,15 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
         return table_df
 
     def _add_user_time_series_traces(
-            self,
-            fig,
-            users,
-            user_dfs,
-            hover_texts,
-            y_key: str,
-            colors,
-            job_count_trace: bool = False,
-    ):
+        self,
+        fig: go.Figure,
+        users: list[str],
+        user_dfs: list[pd.DataFrame],
+        hover_texts: list[list[str]],
+        y_key: str,
+        colors: list[str],
+        job_count_trace: bool = False,
+    ) -> None:
         """
         Helper to add user time series traces to a plotly figure.
 
@@ -477,12 +473,6 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
             colors: list of color hex codes
             job_count_trace: bool, whether to add job count trace
         """
-        try:
-            import plotly.graph_objects as go
-        except ImportError:
-            raise ImportError(
-                "plotly is required for interactive plotting. Please install it with 'pip install plotly'."
-            ) from None
 
         for idx, (user_df, hover_text, user) in enumerate(zip(user_dfs, hover_texts, users, strict=True)):
             if user_df is None or user_df.empty:
@@ -519,17 +509,17 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
                 )
 
     def plot_vram_efficiency_interactive(
-            self,
-            users: list[str],
-            start_date: str | None = None,
-            end_date: str | None = None,
-            days_back: int | None = None,
-            time_unit: TimeUnitEnum | str = TimeUnitEnum.MONTHS.value,
-            remove_zero_values: bool = True,
-            max_points: int = 100,
-            exclude_fields: list[str] | None = None,
-            job_count_trace: bool = False,
-    ):
+        self,
+        users: list[str],
+        start_date: str | None = None,
+        end_date: str | None = None,
+        days_back: int | None = None,
+        time_unit: TimeUnitEnum | str = TimeUnitEnum.MONTHS.value,
+        remove_zero_values: bool = True,
+        max_points: int = 100,
+        exclude_fields: list[str] | None = None,
+        job_count_trace: bool = False,
+    ) -> go.Figure:
         """
         Create an interactive plot with tooltips showing detailed metrics.
 
@@ -546,7 +536,7 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
                 y-axis. False by default.
 
         Returns:
-            None: Generates an interactive plot with detailed tooltips.
+             go.Figure: The interactive plot with detailed tooltips.
         """
         try:
             from plotly.subplots import make_subplots
@@ -677,16 +667,16 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
         return fig
 
     def plot_vram_hours_interactive(
-            self,
-            users: list[str],
-            start_date: str | None = None,
-            end_date: str | None = None,
-            days_back: int | None = None,
-            time_unit: TimeUnitEnum | str = TimeUnitEnum.MONTHS.value,
-            max_points: int = 100,
-            exclude_fields: list[str] | None = None,
-            job_count_trace: bool = False,
-    ):
+        self,
+        users: list[str],
+        start_date: str | None = None,
+        end_date: str | None = None,
+        days_back: int | None = None,
+        time_unit: TimeUnitEnum | str = TimeUnitEnum.MONTHS.value,
+        max_points: int = 100,
+        exclude_fields: list[str] | None = None,
+        job_count_trace: bool = False,
+    ) -> go.Figure:
         """
         Create an interactive plot of VRAM Hours over time for users.
 
@@ -701,7 +691,7 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
             job_count_trace (bool, optional): Whether to add a trace for job counts on secondary y-axis.
 
         Returns:
-            None: Generates an interactive plot of VRAM Hours.
+             go.Figure: The interactive plot with detailed tooltips.
         """
         try:
             from plotly.subplots import make_subplots
@@ -792,4 +782,3 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
         fig.update_yaxes(title_text="Job Count", secondary_y=True)
         fig.show()
         return fig
-
