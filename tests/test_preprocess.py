@@ -5,7 +5,7 @@ from src.config.enum_constants import (
     QOSEnum,
     StatusEnum,
     ExitCodeEnum,
-    PartitionEnum,
+    AdminPartitionEnum,
     AdminsAccountEnum,
 )
 
@@ -31,7 +31,7 @@ def _helper_filter_irrelevant_records(input_df: pd.DataFrame, min_elapsed_second
     res = input_df[
         (input_df["Elapsed"] >= min_elapsed_seconds)
         & (input_df["Account"] != AdminsAccountEnum.ROOT.value)
-        & (input_df["Partition"] != PartitionEnum.BUILDING.value)
+        & (input_df["Partition"] != AdminPartitionEnum.BUILDING.value)
         & (input_df["QOS"] != QOSEnum.UPDATES.value)
     ]
 
@@ -102,7 +102,7 @@ def test_preprocess_data_filtered_root_account(mock_data_frame):
     Test that the preprocessed data does not contain jobs with root account, partition building, or qos updates.
     """
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
-    partition_building = data["Partition"] == PartitionEnum.BUILDING.value
+    partition_building = data["Partition"] == AdminPartitionEnum.BUILDING.value
     qos_updates = data["QOS"] == QOSEnum.UPDATES.value
     account_root = data["Account"] == AdminsAccountEnum.ROOT.value
     assert not any(account_root)
@@ -323,7 +323,7 @@ def test_category_partition(mock_data_frame):
         & (ground_truth["Status"] != StatusEnum.FAILED.value)
         & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
     ]
-    expected = set(ground_truth_filtered["Partition"].dropna().to_numpy()) | set([e.value for e in PartitionEnum])
+    expected = set(ground_truth_filtered["Partition"].dropna().to_numpy()) | set([e.value for e in AdminPartitionEnum])
 
     assert data["Partition"].dtype == "category"
     assert expected.issubset(set(data["Partition"].cat.categories))

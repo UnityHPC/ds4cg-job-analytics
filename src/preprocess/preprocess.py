@@ -10,7 +10,7 @@ from ..config.constants import (
     ATTRIBUTE_CATEGORIES,
     MULTIVALENT_GPUS,
 )
-from ..config.enum_constants import StatusEnum, AdminsAccountEnum, PartitionEnum, QOSEnum
+from ..config.enum_constants import StatusEnum, AdminsAccountEnum, AdminPartitionEnum, QOSEnum
 from ..config.remote_config import PartitionInfoFetcher
 
 
@@ -270,7 +270,7 @@ def preprocess_data(
 
     mask &= data["Elapsed"] >= min_elapsed_seconds
     mask &= data["Account"] != AdminsAccountEnum.ROOT.value
-    mask &= data["Partition"] != PartitionEnum.BUILDING.value
+    mask &= data["Partition"] != AdminPartitionEnum.BUILDING.value
     mask &= data["QOS"] != QOSEnum.UPDATES.value
     # Filter out GPUs is null, except when include_CPU_only_job is True
     mask &= data["GPUs"].notna() | include_cpu_only_jobs
