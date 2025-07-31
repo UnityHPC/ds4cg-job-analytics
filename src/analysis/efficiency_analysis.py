@@ -41,7 +41,7 @@ def load_preprocessed_jobs_dataframe_from_duckdb(
     try:
         db = DatabaseConnection(str(db_path))
 
-        jobs_df = db.fetch_all_jobs(table_name=table_name)
+        jobs_df = db.fetch_all_jobs(table_name=table_name) if query is None else db.fetch_query(query=query)
         processed_data = preprocess_data(
             jobs_df, min_elapsed_seconds=0, include_failed_cancelled_jobs=False, include_cpu_only_jobs=False
         )
@@ -165,6 +165,7 @@ class EfficiencyAnalysis:
                     else:
                         raise ValueError(f"{filter_name} must be a numeric type.")
         return mask
+
     def get_unique_gpu_types(self) -> pd.Series:
         """
         Get unique GPU types from the jobs DataFrame.
@@ -172,8 +173,6 @@ class EfficiencyAnalysis:
         Returns:
             pd.Series: Unique GPU types as a pandas Series.
         """
-        if "GPUType" not in self.jobs_df.columns:
-            raise ValueError("The jobs DataFrame does not contain a 'GPUType' column.")
         return (
             self.jobs_df["GPUType"]
             .dropna()
@@ -183,6 +182,7 @@ class EfficiencyAnalysis:
             .str.lower()
             .unique()
         )
+    
     def filter_jobs_for_analysis(
         self,
         vram_constraint_filter: int | float | list | set | tuple | dict | pd.api.typing.NAType | None = None,
@@ -698,6 +698,76 @@ class EfficiencyAnalysis:
         # Sort by the metric descending (higher is worse)
         inefficient_pi_accounts = inefficient_pi_accounts.sort_values("pi_acc_vram_hours", ascending=False)
         return inefficient_pi_accounts
+    
+    def sort_and_filter_records_with_metrics(
+        self,
+        metrics_df_name_enum: MetricsDataFrameNameEnum,
+        sorting_key: str,
+        ascending: bool,
+        filter_criteria: dict[str, int | float | dict | pd.api.typing.NAType],
+    ) -> pd.DataFrame:
+        """
+        Sort and filter records based on specified criteria.
+
+        Args:
+            metrics_df_name_enum (MetricsDataFrameNameEnum): The type of metrics DataFrame to use.
+            sorting_key (str): Column name to sort the results by
+            ascending (bool): Whether to sort in ascending order
+            filter_criteria (dict[str, int | float | dict | pd.NA]): Dictionary of filter criteria to apply.
+                Each key is a column name, and the value is the filter to apply to that column. The filter can be:
+                    - int | float: select rows where the column value equals the filter value
+                    - dict with 'min'/'max' and required 'inclusive' (bool): select rows in the range
+                    - pd.NA: select rows where the column value is pd.NA
+
+        Returns:
+            pd.DataFrame: DataFrame with the filtered records sorted by the specified key and their order
+
+        Raises:
+            ValueError: If the sorting key is not valid or if ascending is not a boolean value
+            ValueError: If the filter criteria are invalid
+        """
+        if not isinstance(metrics_df_name_enum, MetricsDataFrameNameEnum):
+            raise ValueError(
+                f"Invalid efficiency metric type: {metrics_df_name_enum}. "
+                f"Must be a member of MetricsDataFrameNameEnum."
+            )
+        metrics_df = getattr(self, metrics_df_name_enum.value)
+
+        if metrics_df is None:
+            print(
+                f"The {metrics_df_name_enum.value} DataFrame is not available. "
+                "Calculating it by running all metrics calculations:"
+            )
+            self.calculate_all_efficiency_metrics(self.jobs_df)
+
+        if sorting_key not in getattr(self, metrics_df_name_enum.value).columns:
+            raise ValueError(f"Sorting key '{sorting_key}' is not a valid column in the DataFrame.")
+        if not isinstance(ascending, bool):
+            raise ValueError("ascending must be a boolean value.")
+
+        mask = pd.Series(
+            [True] * len(getattr(self, metrics_df_name_enum.value)),
+            index=getattr(self, metrics_df_name_enum.value).index,
+        )
+
+        for column, filter in filter_criteria.items():
+            try:
+                mask &= EfficiencyAnalysis.apply_numeric_filter(
+                    getattr(self, metrics_df_name_enum.value)[column],
+                    filter,
+                    {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY, FilterTypeEnum.PD_NA},
+                    filter_name=f"{column}_filter",
+                )
+            except ValueError as e:
+                raise ValueError(f"Invalid filter for {column}.") from e
+
+        filtered_records = getattr(self, metrics_df_name_enum.value)[mask]
+
+        # Sort by the specified key and order
+
+        filtered_records = filtered_records.sort_values(sorting_key, ascending=ascending)
+
+        return filtered_records
     def compare_job_metrics_by_gpu_type(self) -> pd.DataFrame:
         """
         Aggregate and display metrics for each GPU type for jobs matching a SQL query.
@@ -709,9 +779,6 @@ class EfficiencyAnalysis:
             pd.DataFrame: Aggregated metrics by GPU type
         """
         
-
-       
-
         # Get unique GPU types
         unique_gpu_types = self.get_unique_gpu_types()
 
@@ -731,7 +798,6 @@ class EfficiencyAnalysis:
         for gpu_type in unique_gpu_types:
             # Filter rows with this GPU type
             gpu_jobs = job_efficiency_metrics[job_efficiency_metrics['GPUType'].apply(lambda x: isinstance(x, dict) and gpu_type in x)]
-
 
             if gpu_jobs.empty:
                 results[gpu_type.upper()] = [None] * len(metrics)
@@ -754,18 +820,7 @@ class EfficiencyAnalysis:
         # Create summary DataFrame
         summary_df = pd.DataFrame(results, index=metrics)
         return summary_df
-    def identify_underutilized_gpu_types(self, gpu_metrics: pd.DataFrame, thresholds: dict) -> pd.DataFrame:
-        """
-        args: metrics (pd.DataFrame): DataFrame containing GPU metrics, thresholds (dict): Dictionary of thresholds for each metric.
         
-        We want to identify underutilized users and PI groups based on a thresholds. 
-        Returns:
-            pd.DataFrame: DataFrame with underutilized GPU types and their metrics.
-        
-        """
-        
-        
-        return pd.DataFrame()  # Placeholder for future implementation
     def user_gpu_preference_analysis(self):
         """
         Determine which users favor each GPU type (A100 vs H100) 
@@ -826,14 +881,6 @@ class EfficiencyAnalysis:
         ).reset_index()
 
         return efficiency_differential
-    def temporal_efficiency_trend_by_gpu_type(
-        self,   
-        gpu_type: str,
-        start_date: str | None = None,  
-        end_date: str | None = None
-    ) -> pd.DataFrame:  
-        
-        return 0  # Placeholder for future implementation
     
 
 
