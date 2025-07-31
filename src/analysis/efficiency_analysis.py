@@ -608,14 +608,18 @@ class EfficiencyAnalysis:
         )
 
         # rename to follow enums
-        pi_efficiency_metrics = pi_efficiency_metrics.rename({
-            "job_count": PIEfficiencyMetricsEnum.JOBS.value,
-            "pi_acc_job_hours": PIEfficiencyMetricsEnum.JOB_HOURS.value,
-            "user_count": PIEfficiencyMetricsEnum.USERS.value,
-            "pi_acc_vram_hours": PIEfficiencyMetricsEnum.VRAM_HOURS.value,
-            "avg_alloc_vram_efficiency_score": PIEfficiencyMetricsEnum.AVG_ALLOC_VRAM_EFFICIENCY_SCORE.value,
-            "avg_vram_constraint_efficiency_score": PIEfficiencyMetricsEnum.AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE.value,
-        })
+        pi_efficiency_metrics = pi_efficiency_metrics.rename(
+            columns={
+                "job_count": PIEfficiencyMetricsEnum.JOBS.value,
+                "pi_acc_job_hours": PIEfficiencyMetricsEnum.JOB_HOURS.value,
+                "user_count": PIEfficiencyMetricsEnum.USERS.value,
+                "pi_acc_vram_hours": PIEfficiencyMetricsEnum.VRAM_HOURS.value,
+                "avg_alloc_vram_efficiency_score": PIEfficiencyMetricsEnum.AVG_ALLOC_VRAM_EFFICIENCY_SCORE.value,
+                "avg_vram_constraint_efficiency_score": (
+                    PIEfficiencyMetricsEnum.AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE.value
+                ),
+            }
+        )
 
         # declare user columns that would be used throughout the calculation
         user_vram_hours_col = UserEfficiencyMetricsEnum.VRAM_HOURS.value

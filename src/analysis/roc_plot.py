@@ -10,10 +10,12 @@ Actions item:
 - When done, create a class visualization in visualization folder.
 
 - Issue: some new metric of user (user_job_hours, user_vram_hours) will be also on both x-axis and y-axis
- -> Need to add a bunch more to ProportionMetrics Enum, maybe best if we let it as jobs and vram_hours -> discuss with Arda
+ -> Need to add a bunch more to ProportionMetrics Enum, maybe best if we let it as jobs and vram_hours
+    -> discuss with Arda
 
  Vram_hours
-Log_scores, vram_constraints_efficiency (for partition which has vram_constraints), for partition without constraints other metrics as log_score and allloc_vram_efficiency
+Log_scores, vram_constraints_efficiency (for partition which has vram_constraints), for partition without constraints
+    other metrics as log_score and allloc_vram_efficiency
 General User plot
 
 """
@@ -26,13 +28,14 @@ from matplotlib.axes import Axes
 import numpy as np
 import sys
 from .efficiency_analysis import EfficiencyAnalysis
-from typing import Literal
+from typing import Literal, cast
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 from src.config.enum_constants import (
     ProportionMetricsEnum,
     JobEfficiencyMetricsEnum,
     UserEfficiencyMetricsEnum,
+    PIEfficiencyMetricsEnum,
     ROCPlotTypes,
 )
 import warnings
@@ -42,6 +45,38 @@ class ROCVisualizer(EfficiencyAnalysis):
     """
     A class for visualizing ROC plots, inheriting from EfficiencyAnalysis.
     """
+
+    # map types to the its associate proportion metric
+    TYPE_TO_ASSOCIATE_METRIC: dict[ROCPlotTypes, ProportionMetricsEnum] = {
+        ROCPlotTypes.JOB: ProportionMetricsEnum.JOBS,
+        ROCPlotTypes.USER: ProportionMetricsEnum.USERS,
+        ROCPlotTypes.PI_GROUP: ProportionMetricsEnum.PI_GROUPS,
+    }
+
+    # For counting user/ pi group that has at least 1 job/user that falls under threshold
+    TYPE_TO_COUNT_UNIQUE_METRIC: dict[ROCPlotTypes, set[ProportionMetricsEnum]] = {
+        ROCPlotTypes.JOB: {
+            ProportionMetricsEnum.USERS,
+            ProportionMetricsEnum.PI_GROUPS,
+        },  # JOB can have unique count of User/ pi_group that has at least 1 job under thresholds
+        ROCPlotTypes.USER: {ProportionMetricsEnum.PI_GROUPS},
+        # User can have unique count of pi_group that has at least 1 user under thresholds
+        ROCPlotTypes.PI_GROUP: cast(set[ProportionMetricsEnum], {}),
+    }
+
+    # metrics that may contain NULL or -inf values
+    # METRIC_TO_FILTER = {
+    #     JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY,
+    #     JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE,
+    #     JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY_SCORE,
+    #     UserEfficiencyMetricsEnum.WEIGHTED_AVG_VRAM_CONSTRAINTS_EFFICIENCY,
+    #     UserEfficiencyMetricsEnum.WEIGHTED_AVG_ALLOC_VRAM_EFFICIENCY,
+    #     UserEfficiencyMetricsEnum.AVG_ALLOC_VRAM_EFFICIENCY_SCORE,
+    #     UserEfficiencyMetricsEnum.AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE,
+    #     PIEfficiencyMetricsEnum.WEIGHTED_AVG_VRAM_CONSTRAINTS_EFFICIENCY,
+    #     PIEfficiencyMetricsEnum.AVG_ALLOC_VRAM_EFFICIENCY_SCORE,
+    #     PIEfficiencyMetricsEnum.AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE,
+    # }
 
     def __init__(self, jobs_df: pd.DataFrame) -> None:
         super().__init__(jobs_df)
@@ -80,7 +115,9 @@ class ROCVisualizer(EfficiencyAnalysis):
         return res
 
     def _helper_filter_invalid_records(
-        self, plot_data_frame: pd.DataFrame, threshold_metric: JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum
+        self,
+        plot_data_frame: pd.DataFrame,
+        threshold_metric: JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum | PIEfficiencyMetricsEnum,
     ) -> pd.DataFrame:
         """
         Filter out invalid records from the DataFrame based on the threshold metric.
@@ -97,19 +134,7 @@ class ROCVisualizer(EfficiencyAnalysis):
 
         """
         # contain all metrics we want to filter out invalid record
-        metric_to_filters = {
-            JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY,
-            JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE,
-            JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY_SCORE,
-            UserEfficiencyMetricsEnum.WEIGHTED_AVG_VRAM_CONSTRAINTS_EFFICIENCY,
-            UserEfficiencyMetricsEnum.WEIGHTED_AVG_ALLOC_VRAM_EFFICIENCY,
-            UserEfficiencyMetricsEnum.AVG_ALLOC_VRAM_EFFICIENCY_SCORE,
-            UserEfficiencyMetricsEnum.AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE,
-        }
 
-        # no filter needed
-        if threshold_metric not in metric_to_filters:
-            return plot_data_frame.copy()
         col = plot_data_frame[threshold_metric.value]
         mask = pd.Series([True] * len(col), index=col.index)
         mask &= col.notna()
@@ -123,7 +148,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         min_threshold: float,
         max_threshold: float,
         threshold_step: float,
-        threshold_metric: JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum,
+        threshold_metric: JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum | PIEfficiencyMetricsEnum,
         proportion_metric: ProportionMetricsEnum,
         plot_type: ROCPlotTypes = ROCPlotTypes.JOB,
     ) -> tuple[pd.DataFrame, float, float | int, float]:
@@ -162,7 +187,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         if threshold_metric.value not in input_df.columns:
             raise KeyError(f"Threshold metric '{threshold_metric.value}' not found in DataFrame.")
         if (
-            proportion_metric.value != ProportionMetricsEnum.JOBS.value
+            proportion_metric.value != self.TYPE_TO_ASSOCIATE_METRIC[plot_type].value
             and proportion_metric.value not in input_df.columns
         ):
             raise KeyError(f"Proportion metric '{proportion_metric.value}' not found in DataFrame.")
@@ -177,6 +202,8 @@ class ROCVisualizer(EfficiencyAnalysis):
             JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY_SCORE,
             UserEfficiencyMetricsEnum.AVG_ALLOC_VRAM_EFFICIENCY_SCORE,
             UserEfficiencyMetricsEnum.AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE,
+            PIEfficiencyMetricsEnum.AVG_ALLOC_VRAM_EFFICIENCY_SCORE,
+            PIEfficiencyMetricsEnum.AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE,
         }
 
         # handle filtering invalid values
@@ -208,16 +235,10 @@ class ROCVisualizer(EfficiencyAnalysis):
         # calculate percentage of plot_data in comparison to total dataset
         remain_percentage = (len(input_df) - filtered_out_records) / len(input_df) * 100
 
-        type_to_associate_metric: dict[ROCPlotTypes, ProportionMetricsEnum] = {
-            ROCPlotTypes.JOB: ProportionMetricsEnum.JOBS,
-            ROCPlotTypes.USER: ProportionMetricsEnum.USERS,
-            ROCPlotTypes.PI_GROUP: ProportionMetricsEnum.PI_GROUPS,
-        }
-
         # caculate the total value of proportion metrics to declare in title
-        if proportion_metric == type_to_associate_metric[plot_type]:
+        if proportion_metric == self.TYPE_TO_ASSOCIATE_METRIC[plot_type]:
             total_raw_value = len(plot_data)
-        elif proportion_metric in {ProportionMetricsEnum.USERS, ProportionMetricsEnum.PI_GROUPS}:
+        elif proportion_metric in self.TYPE_TO_COUNT_UNIQUE_METRIC[plot_type]:
             total_raw_value = len(np.unique(plot_data[proportion_metric.value]))
         else:
             total_raw_value = plot_data[proportion_metric.value].sum()
@@ -276,7 +297,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         self,
         clip_threshold_metric: tuple,
         plot_data_frame: pd.DataFrame,
-        threshold_metric: JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum,
+        threshold_metric: JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum | PIEfficiencyMetricsEnum,
     ) -> None:
         """
         Clip the column values down to the given upper bound.
@@ -361,9 +382,9 @@ class ROCVisualizer(EfficiencyAnalysis):
     def _roc_calculate_proportion(
         self,
         plot_data_frame: pd.DataFrame,
-        proportion_metric: ProportionMetricsEnum,
         thresholds_arr: np.ndarray,
-        threshold_metric: JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum,
+        proportion_metric: ProportionMetricsEnum,
+        threshold_metric: JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum | PIEfficiencyMetricsEnum,
         plot_percentage: bool = True,
         plot_type: ROCPlotTypes = ROCPlotTypes.JOB,
     ) -> np.ndarray:
@@ -375,8 +396,8 @@ class ROCVisualizer(EfficiencyAnalysis):
 
         Args:
             plot_data_frame (pd.DataFrame): DataFrame containing the data to plot.
-            proportion_metric (ROCMetricsEnum): The metric to calculate proportions for.
             thresholds_arr (np.ndarray): List of predefined threshold values.
+            proportion_metric (ROCMetricsEnum): The metric to calculate proportions for.
             threshold_metric (EfficiencyMetricsJobsEnum): The specific efficiency metric used as thresholds_arr.
             plot_percentage (bool): Whether to return the proportion as percentage or as raw value. Defaults to True.
 
@@ -384,28 +405,11 @@ class ROCVisualizer(EfficiencyAnalysis):
             np.ndarray: List of proportions corresponding to each threshold.
 
         """
-        # TODO: ensure that this works as expected for pi_group plot
 
-        # map types to the its associate proportion metric
-        type_to_associate_metric: dict[ROCPlotTypes, ProportionMetricsEnum] = {
-            ROCPlotTypes.JOB: ProportionMetricsEnum.JOBS,
-            ROCPlotTypes.USER: ProportionMetricsEnum.USERS,
-            ROCPlotTypes.PI_GROUP: ProportionMetricsEnum.PI_GROUPS,
-        }
-
-        # For counting user/ pi group that has at least 1 job/user that falls under threshold
-        type_to_count_unique_metric: dict[ROCPlotTypes, set[ProportionMetricsEnum]] = {
-            ROCPlotTypes.JOB: {
-                ProportionMetricsEnum.USERS,
-                ProportionMetricsEnum.PI_GROUPS,
-            },  # JOB can have unique count of User/ pi_group that has at least 1 job under thresholds
-            ROCPlotTypes.USER: {ProportionMetricsEnum.PI_GROUPS},
-            # User can have unique count of pi_group that has at least 1 user under thresholds
-        }
         threshold_values = plot_data_frame[threshold_metric.value].to_numpy(dtype=float)
 
         # if proportion metric is associated to the plot type
-        if proportion_metric == type_to_associate_metric[plot_type]:
+        if proportion_metric == self.TYPE_TO_ASSOCIATE_METRIC[plot_type]:
             total_count = len(plot_data_frame)
             if plot_percentage:
                 proportions = [
@@ -416,7 +420,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         else:
             proportions = []
             metric_values = plot_data_frame[proportion_metric.value].to_numpy()
-            if proportion_metric in type_to_count_unique_metric[plot_type]:
+            if proportion_metric in self.TYPE_TO_COUNT_UNIQUE_METRIC[plot_type]:
                 total_unique = len(np.unique(metric_values))
                 for threshold in thresholds_arr:
                     mask = threshold_values <= threshold
@@ -506,7 +510,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         axe_list = [axe]
         # calculate proportion for each threshold
         proportions_data = self._roc_calculate_proportion(
-            plot_data, proportion_metric, thresholds_arr, threshold_metric, plot_percentage, plot_type=ROCPlotTypes.JOB
+            plot_data, thresholds_arr, proportion_metric, threshold_metric, plot_percentage, plot_type=ROCPlotTypes.JOB
         )
 
         if title is None:
@@ -604,8 +608,8 @@ class ROCVisualizer(EfficiencyAnalysis):
             filtered = plot_data[plot_data[object_column_type.value] == target].copy()
             proportion_data = self._roc_calculate_proportion(
                 filtered,
-                proportion_metric,
                 thresholds_arr,
+                proportion_metric,
                 threshold_metric,
                 plot_percentage,
             )
@@ -628,7 +632,6 @@ class ROCVisualizer(EfficiencyAnalysis):
         axe.legend()
         return fig, [axe]
 
-    # TODO: we should allow JOBS to be an appropriate metrics here as well
     def plot_roc_users(
         self,
         title: str | None = None,
@@ -669,8 +672,8 @@ class ROCVisualizer(EfficiencyAnalysis):
         # calculate proportion for each threshold
         proportions_data = self._roc_calculate_proportion(
             plot_data,
-            proportion_metric,
             thresholds_arr,
+            proportion_metric,
             threshold_metric,
             plot_percentage,
             plot_type=ROCPlotTypes.USER,
@@ -684,6 +687,73 @@ class ROCVisualizer(EfficiencyAnalysis):
         title += (
             f"\n Total {proportion_metric.value}: {self._format_number_for_display(total_raw_value)} "
             f"(in {self._format_number_for_display(remain_percentage)}% of aggregated User dataset)"
+        )
+
+        y_label = f"{'Percentage' if plot_percentage else 'Count'} of {proportion_metric.value} below threshold"
+        axe.set_title(title)
+        axe.set_ylabel(y_label)
+        axe.set_xlabel(f"Threshold values ({threshold_metric.value})")
+        axe.plot(thresholds_arr, proportions_data)
+
+        self._generate_num_marker(axe, thresholds_arr, proportions_data, num_markers)
+
+        return fig, axe_list
+
+    def plot_roc_pi_groups(
+        self,
+        title: str | None = None,
+        min_threshold: float = 0.0,
+        max_threshold: float = 100.0,
+        threshold_step: float = 1.0,
+        threshold_metric: PIEfficiencyMetricsEnum = PIEfficiencyMetricsEnum.WEIGHTED_AVG_ALLOC_VRAM_EFFICIENCY,
+        proportion_metric: ProportionMetricsEnum = ProportionMetricsEnum.JOBS,
+        plot_percentage: bool = True,
+        num_markers: int = 10,
+        clip_threshold_metric: tuple[bool, float] = (False, 0.0),
+    ) -> tuple[Figure, list[Axes]]:
+        if self.pi_accounts_with_efficiency_metrics is None:
+            raise ValueError(
+                "Attribute pi_accounts_with_efficiency_metrics is not calculated, "
+                "use calculate_all_efficiency_metrics() to calculate the dataframe before plotting."
+            )
+
+        data = self.pi_accounts_with_efficiency_metrics
+
+        plot_data, remain_percentage, total_raw_value, min_threshold = self._validate_and_filter_inputs(
+            data,
+            min_threshold,
+            max_threshold,
+            threshold_step,
+            threshold_metric,
+            proportion_metric,
+            plot_type=ROCPlotTypes.PI_GROUP,
+        )
+
+        # clip threshold_metrics to defined value
+        self._clip_upper_threshold_metric(clip_threshold_metric, plot_data, threshold_metric)
+
+        # calculate threshold
+        thresholds_arr: np.ndarray = np.arange(min_threshold, max_threshold + threshold_step, threshold_step)
+        fig, axe = plt.subplots(1, 1, figsize=(16, 7))
+        axe_list = [axe]
+        # calculate proportion for each threshold
+        proportions_data = self._roc_calculate_proportion(
+            plot_data,
+            thresholds_arr,
+            proportion_metric,
+            threshold_metric,
+            plot_percentage,
+            plot_type=ROCPlotTypes.PI_GROUP,
+        )
+
+        if title is None:
+            title = (
+                f"ROC plot (PI GRoup) for {'proportion' if plot_percentage else 'amounts'} of "
+                f"{proportion_metric.value} by threshold {threshold_metric.value}"
+            )
+        title += (
+            f"\n Total {proportion_metric.value}: {self._format_number_for_display(total_raw_value)} "
+            f"(in {self._format_number_for_display(remain_percentage)}% of aggregated PI Group dataset)"
         )
 
         y_label = f"{'Percentage' if plot_percentage else 'Count'} of {proportion_metric.value} below threshold"
