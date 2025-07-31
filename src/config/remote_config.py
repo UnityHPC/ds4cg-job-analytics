@@ -40,7 +40,7 @@ class RemoteConfigFetcher(ABC):
             if response.status_code == 200:
                 remote_info = response.json()
                 # Ensure directory exists
-                # self.local_path.parent.mkdir(parents=True, exist_ok=True)
+                self.local_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(self.local_path, "w") as f:
                     json.dump(remote_info, f, indent=2)
                 print(f"Fetched and saved {self.local_path.name} from remote URL.")
