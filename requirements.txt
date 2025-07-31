@@ -8,3 +8,4 @@ seaborn
 jupyterlab
 jq
 pydantic
+requests
