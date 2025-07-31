@@ -1,12 +1,14 @@
 from abc import ABC, abstractmethod
 import json
 import os
-import requests
+from requests_cache import CachedSession
 from pathlib import Path
 
 
 class RemoteConfigFetcher(ABC):
     """Class to fetch and parse partition information from a remote JSON file."""
+
+    session = CachedSession('fetch_cache', expire_after=60)  # Cache for 60 seconds
 
     @property
     @abstractmethod
@@ -40,7 +42,7 @@ class RemoteConfigFetcher(ABC):
         """
         if not offline:
             try:
-                response = requests.get(self.url, timeout=10)
+                response = self.session.get(self.url, timeout=10)
                 if response.status_code == 200:
                     remote_info = response.json()
                     if not os.getenv("PYTEST_VERSION"):
