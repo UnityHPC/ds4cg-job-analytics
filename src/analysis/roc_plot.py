@@ -11,6 +11,11 @@ Actions item:
 
 - Issue: some new metric of user (user_job_hours, user_vram_hours) will be also on both x-axis and y-axis
  -> Need to add a bunch more to ProportionMetrics Enum, maybe best if we let it as jobs and vram_hours -> discuss with Arda
+
+ Vram_hours
+Log_scores, vram_constraints_efficiency (for partition which has vram_constraints), for partition without constraints other metrics as log_score and allloc_vram_efficiency
+General User plot
+
 """
 
 from pathlib import Path
