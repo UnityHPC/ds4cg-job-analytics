@@ -42,10 +42,6 @@ def _helper_filter_irrelevant_records(
     mask &= input_df["Account"] != AdminsAccountEnum.ROOT.value
     mask &= input_df["Partition"] != AdminPartitionEnum.BUILDING.value
     mask &= input_df["QOS"] != QOSEnum.UPDATES.value
-    # Filter out GPUs is null, except when include_CPU_only_job is True
-    mask &= input_df["GPUs"].notna() | include_cpu_only_jobs
-    # Filter out GPUType is null, except when include_CPU_only_job is True
-    mask &= input_df["GPUType"].notna() | include_cpu_only_jobs
     # Filter out jobs whose partition type is not 'gpu', unless include_cpu_only_jobs is True.
     partition_info = PartitionInfoFetcher().get_info()
     gpu_partitions = [p['name'] for p in partition_info if p['type'] == PartitionTypeEnum.GPU.value]

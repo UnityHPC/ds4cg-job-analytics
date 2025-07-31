@@ -272,10 +272,6 @@ def preprocess_data(
     mask &= data["Account"] != AdminsAccountEnum.ROOT.value
     mask &= data["Partition"] != AdminPartitionEnum.BUILDING.value
     mask &= data["QOS"] != QOSEnum.UPDATES.value
-    # Filter out GPUs is null, except when include_CPU_only_job is True
-    mask &= data["GPUs"].notna() | include_cpu_only_jobs
-    # Filter out GPUType is null, except when include_CPU_only_job is True
-    mask &= data["GPUType"].notna() | include_cpu_only_jobs
     # Filter out failed or cancelled jobs, except when include_failed_cancel_jobs is True
     mask &= (
         (data["Status"] != StatusEnum.FAILED.value)
