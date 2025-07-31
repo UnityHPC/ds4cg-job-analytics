@@ -7,6 +7,7 @@ def test_approx_allocated_vram_single_node():
     gpu_usage = [20, 10, 50, 200, 5, 80]  # in GB
     gpu_usage_bytes = [usage * (2**30) for usage in gpu_usage]  # convert to bytes
     mock_data = pd.DataFrame({
+        "JobID": [1, 2, 3, 4, 5, 6],
         "GPUType": [["a100"], ["v100"], ["v100"], ["a100"], ["2080_ti"], ["a40"]],
         "NodeList": [
             ["ece-gpu001"],  # A100 with 40GB
@@ -23,7 +24,9 @@ def test_approx_allocated_vram_single_node():
     expected_allocated_vram = [40, 16, 64, 320, 11, 96]
 
     mock_data["AllocatedVRAM"] = mock_data.apply(
-        lambda row: _get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
+        lambda row: _get_approx_allocated_vram(
+            row["JobID"], row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]
+        ),
         axis=1,
     )
 
@@ -35,6 +38,7 @@ def test_approx_allocated_vram_mixed_nodes_below_minimum():
     gpu_usage = [100]
     gpu_usage_bytes = [usage * (2**30) for usage in gpu_usage]  # convert to bytes
     mock_data = pd.DataFrame({
+        "JobID": [1],
         "GPUType": [["a100"]],
         "NodeList": [["ece-gpu001", "gpu014"]],
         "GPUs": [3],
@@ -44,7 +48,9 @@ def test_approx_allocated_vram_mixed_nodes_below_minimum():
     expected_allocated_vram = [120]  # Minimum VRAM (40 GB per GPU) * 3 GPUs
 
     mock_data["AllocatedVRAM"] = mock_data.apply(
-        lambda row: _get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
+        lambda row: _get_approx_allocated_vram(
+            row["JobID"], row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]
+        ),
         axis=1,
     )
 
@@ -56,6 +62,7 @@ def test_approx_allocated_vram_mixed_nodes_exceeding_minimum():
     gpu_usage = [150]  # in GB
     gpu_usage_bytes = [usage * (2**30) for usage in gpu_usage]  # convert to bytes
     mock_data = pd.DataFrame({
+        "JobID": [1],
         "GPUType": [["a100"]],
         "NodeList": [["ece-gpu001", "gpu014"]],
         "GPUs": [3],
@@ -65,7 +72,9 @@ def test_approx_allocated_vram_mixed_nodes_exceeding_minimum():
     expected_allocated_vram = [240]  # Higher VRAM (80 GB per GPU) * 3 GPUs
 
     mock_data["AllocatedVRAM"] = mock_data.apply(
-        lambda row: _get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
+        lambda row: _get_approx_allocated_vram(
+            row["JobID"], row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]
+        ),
         axis=1,
     )
 
@@ -75,6 +84,7 @@ def test_approx_allocated_vram_mixed_nodes_exceeding_minimum():
 def test_multivalent_vram_allocation_a100_only():
     gpu_usage = [100 * (2**30)]  # 100 GiB usage
     mock_data = pd.DataFrame({
+        "JobID": [1],
         "GPUType": [{"a100": 3}],  # total 3 A100s
         "NodeList": [["ece-gpu001", "ece-gpu002"]],  # 2 A100 nodes
         "GPUs": [3],
@@ -86,7 +96,9 @@ def test_multivalent_vram_allocation_a100_only():
     expected_allocated_vram = [120]
 
     mock_data["AllocatedVRAM"] = mock_data.apply(
-        lambda row: _get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
+        lambda row: _get_approx_allocated_vram(
+            row["JobID"], row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]
+        ),
         axis=1,
     )
 
@@ -96,6 +108,7 @@ def test_multivalent_vram_allocation_a100_only():
 def test_multivalent_vram_allocation_mixed_a100_v100():
     gpu_usage = [200 * (2**30)]  # 200 GiB usage
     mock_data = pd.DataFrame({
+        "JobID": [1],
         "GPUType": [{"a100": 3, "v100": 2}],
         "NodeList": [["ece-gpu001", "gpu013", "gpu011"]],
         "GPUs": [5],
@@ -108,7 +121,9 @@ def test_multivalent_vram_allocation_mixed_a100_v100():
     expected_allocated_vram = [224]
 
     mock_data["AllocatedVRAM"] = mock_data.apply(
-        lambda row: _get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
+        lambda row: _get_approx_allocated_vram(
+            row["JobID"], row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]
+        ),
         axis=1,
     )
 
