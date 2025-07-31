@@ -72,7 +72,7 @@ class DatabaseConnection:
             table_name (str): The name of the table to describe.
 
         Raises:
-            Exception: If the connection is not active.
+            ConnectionError: If the connection is not established.
 
         Returns:
             pd.DataFrame: A DataFrame containing the column information.
@@ -81,7 +81,7 @@ class DatabaseConnection:
             query = f"DESCRIBE {table_name}"
             return self.connection.execute(query).fetchdf()
         else:
-            raise Exception("Not connected")
+            raise ConnectionError("Database connection is not established.")
 
     def fetch_all_jobs(self, table_name: str = "Jobs") -> pd.DataFrame:
         """Fetch all data from the specified table. Table name is set to Jobs but can be changed accordingly.
