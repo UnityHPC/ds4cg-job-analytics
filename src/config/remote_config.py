@@ -71,14 +71,36 @@ class RemoteConfigFetcher(ABC):
 class PartitionInfoFetcher(RemoteConfigFetcher):
     """Class to fetch and parse partition information from a remote JSON file."""
 
-    url = "https://gitlab.rc.umass.edu/unity/education/documentation/unity-website/-/raw/main/data/partition_info.json"
-    local_path = Path(__file__).parent / "snapshots/partition_info.json"
-    info_name = "partition"
+    @property
+    def url(self) -> str:
+        """URL of the remote JSON file to fetch."""
+        return "https://gitlab.rc.umass.edu/unity/education/documentation/unity-website/-/raw/main/data/partition_info.json"
+
+    @property
+    def local_path(self) -> Path:
+        """Path where the local JSON file will be saved or read from."""
+        return Path(__file__).parent / "snapshots/partition_info.json"
+
+    @property
+    def info_name(self) -> str:
+        """Type of information being fetched."""
+        return "partition"
 
 
 class NodeInfoFetcher(RemoteConfigFetcher):
     """Class to fetch and parse node information from a remote JSON file."""
 
-    url = "https://gitlab.rc.umass.edu/unity/education/documentation/unity-website/-/raw/main/data/node_info.json"
-    local_path = Path(__file__).parent / "snapshots/node_info.json"
-    info_name = "node"
+    @property
+    def url(self) -> str:
+        """URL of the remote JSON file to fetch."""
+        return "https://gitlab.rc.umass.edu/unity/education/documentation/unity-website/-/raw/main/data/node_info.json"
+
+    @property
+    def local_path(self) -> Path:
+        """Path where the local JSON file will be saved or read from."""
+        return Path(__file__).parent / "snapshots/node_info.json"
+
+    @property
+    def info_name(self) -> str:
+        """Type of information being fetched."""
+        return "node"
