@@ -10,7 +10,7 @@ from ..config.constants import (
     ATTRIBUTE_CATEGORIES,
     MULTIVALENT_GPUS,
 )
-from ..config.enum_constants import StatusEnum, AdminsAccountEnum, AdminPartitionEnum, QOSEnum
+from ..config.enum_constants import StatusEnum, AdminsAccountEnum, AdminPartitionEnum, QOSEnum, PartitionTypeEnum
 from ..config.remote_config import PartitionInfoFetcher
 
 
@@ -273,17 +273,17 @@ def preprocess_data(
     mask &= data["Partition"] != AdminPartitionEnum.BUILDING.value
     mask &= data["QOS"] != QOSEnum.UPDATES.value
     # Filter out GPUs is null, except when include_CPU_only_job is True
-    mask &= data["GPUs"].notna()
+    mask &= data["GPUs"].notna() | include_cpu_only_jobs
     # Filter out GPUType is null, except when include_CPU_only_job is True
-    mask &= data["GPUType"].notna()
+    mask &= data["GPUType"].notna() | include_cpu_only_jobs
     # Filter out failed or cancelled jobs, except when include_failed_cancel_jobs is True
     mask &= (
         (data["Status"] != StatusEnum.FAILED.value)
         & (data["Status"] != StatusEnum.CANCELLED.value)
     ) | include_failed_cancelled_jobs
-    # Filter out jobs that the type field of their partition type is not gpu, except when include_cpu_only_jobs is True
+    # Filter out jobs whose partition type is not 'gpu', unless include_cpu_only_jobs is True.
     partition_info = PartitionInfoFetcher().get_info()
-    gpu_partitions = [p['name'] for p in partition_info if p['type'] == "gpu"]
+    gpu_partitions = [p['name'] for p in partition_info if p['type'] == PartitionTypeEnum.GPU.value]
     mask &= data["Partition"].isin(gpu_partitions) | include_cpu_only_jobs
 
     data = data[mask].copy()

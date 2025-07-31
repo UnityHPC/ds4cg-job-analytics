@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import json
+import os
 import requests
 from pathlib import Path
 
@@ -25,8 +26,11 @@ class RemoteConfigFetcher(ABC):
         """Type of information being fetched (e.g., 'partition')."""
         pass
 
-    def get_info(self) -> dict:
+    def get_info(self, offline: bool = False) -> dict:
         """Fetch and save information from the remote JSON file, or read from local file if fetch fails.
+
+        Args:
+            offline (bool): If True, skip fetching from remote and only read from local file.
 
         Raises:
             FileNotFoundError: If the local file does not exist and the fetch fails.
@@ -34,33 +38,34 @@ class RemoteConfigFetcher(ABC):
         Returns:
             dict: Parsed JSON data.
         """
-        remote_info = None
-        try:
-            response = requests.get(self.url, timeout=10)
-            if response.status_code == 200:
-                remote_info = response.json()
-                # Ensure directory exists
-                self.local_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(self.local_path, "w") as f:
-                    json.dump(remote_info, f, indent=2)
-                print(f"Fetched and saved {self.local_path.name} from remote URL.")
-                return remote_info
-            else:
-                print(
-                    f"Failed to retrieve {self.info_name} information. "
-                    f"Status code: {response.status_code}\n"
-                    f"URL: {self.url}\n"
-                    f"Response: {response.text}"
-                )
-        except Exception as e:
-            print(f"An error occurred while fetching {self.info_name} information: {e}")
+        if not offline:
+            try:
+                response = requests.get(self.url, timeout=10)
+                if response.status_code == 200:
+                    remote_info = response.json()
+                    if not os.getenv("PYTEST_VERSION"):
+                        # Ensure directory exists
+                        self.local_path.parent.mkdir(parents=True, exist_ok=True)
+                        with open(self.local_path, "w") as f:
+                            json.dump(remote_info, f, indent=2)
+                        print(f"Fetched and saved {self.local_path.name} from remote URL.")
+                    return remote_info
+                else:
+                    print(
+                        f"Failed to retrieve {self.info_name} information. "
+                        f"Status code: {response.status_code}\n"
+                        f"URL: {self.url}\n"
+                        f"Response: {response.text}"
+                    )
+            except Exception as e:
+                print(f"An error occurred while fetching {self.info_name} information: {e}")
 
         # Fallback: read from local file if available
         try:
             with open(self.local_path) as file:
-                remote_info = json.load(file)
+                local_info = json.load(file)
             print(f"Loaded {self.local_path.name} from local file.")
-            return remote_info
+            return local_info
         except FileNotFoundError as e:
             raise FileNotFoundError(
                 f"{self.local_path.name} not found locally at {self.local_path}. "

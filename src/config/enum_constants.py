@@ -128,6 +128,20 @@ class FilterTypeEnum(Enum):
 
 
 @unique
+class PartitionTypeEnum(Enum):
+    """
+    An enumeration representing different types of partitions.
+
+    Attributes:
+        CPU: Represents CPU partitions.
+        GPU: Represents GPU partitions.
+    """
+
+    CPU = "cpu"
+    GPU = "gpu"
+
+
+@unique
 class MetricsDataFrameNameEnum(Enum):
     """
     An enumeration representing the names of DataFrames containing efficiency metrics.
