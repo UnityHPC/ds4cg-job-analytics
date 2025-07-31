@@ -393,6 +393,15 @@ class ROCVisualizer(EfficiencyAnalysis):
             ROCPlotTypes.PI_GROUP: ProportionMetricsEnum.PI_GROUPS,
         }
 
+        # For counting user/ pi group that has at least 1 job/user that falls under threshold
+        type_to_count_unique_metric: dict[ROCPlotTypes, set[ProportionMetricsEnum]] = {
+            ROCPlotTypes.JOB: {
+                ProportionMetricsEnum.USERS,
+                ProportionMetricsEnum.PI_GROUPS,
+            },  # JOB can have unique count of User/ pi_group that has at least 1 job under thresholds
+            ROCPlotTypes.USER: {ProportionMetricsEnum.PI_GROUPS},
+            # User can have unique count of pi_group that has at least 1 user under thresholds
+        }
         threshold_values = plot_data_frame[threshold_metric.value].to_numpy(dtype=float)
 
         # if proportion metric is associated to the plot type
@@ -407,9 +416,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         else:
             proportions = []
             metric_values = plot_data_frame[proportion_metric.value].to_numpy()
-            count_unique_proportion_metric = {ProportionMetricsEnum.USERS, ProportionMetricsEnum.PI_GROUPS}
-            # check if we are dealing with USER metrics
-            if proportion_metric in count_unique_proportion_metric:
+            if proportion_metric in type_to_count_unique_metric[plot_type]:
                 total_unique = len(np.unique(metric_values))
                 for threshold in thresholds_arr:
                     mask = threshold_values <= threshold

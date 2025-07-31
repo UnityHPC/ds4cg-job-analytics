@@ -219,7 +219,7 @@ class UserEfficiencyMetricsEnum(Enum):
     """
     Contains efficiency metrics for calculating efficiency of users.
 
-    These are used as jobs metrics (in EfficiencyAnalysis class) and also metrics for x-axis in ROC Plot (for users).
+    These are used as users metrics (in EfficiencyAnalysis class) and also metrics for x-axis in ROC Plot (for users).
 
     For all members, if it is similar to a member in ProportionMetricsEnum (the member can be both
         x-axis and y-axis in ROC), it must have the same value to that member in ProportionMetricsEnum.
@@ -228,6 +228,29 @@ class UserEfficiencyMetricsEnum(Enum):
     JOB_HOURS = "job_hours"
     VRAM_HOURS = "vram_hours"
     JOBS = "job_count"
+    WEIGHTED_AVG_ALLOC_VRAM_EFFICIENCY = "expected_value_alloc_vram_efficiency"
+    WEIGHTED_AVG_VRAM_CONSTRAINTS_EFFICIENCY = "expected_value_vram_constraint_efficiency"
+    WEIGHTED_AVG_GPU_COUNT = "expected_value_gpu_count"
+    AVG_ALLOC_VRAM_EFFICIENCY_SCORE = "avg_alloc_vram_efficiency_score"
+    AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE = "avg_vram_constraint_efficiency_score"
+
+
+@unique
+class PIEfficiencyMetricsEnum(Enum):
+    """
+    Contains efficiency metrics for calculating efficiency of pi groups.
+
+    These are used as pi groups metrics (in EfficiencyAnalysis class) and also metrics for x-axis
+        in ROC Plot (for pi groups).
+
+    For all members, if it is similar to a member in ProportionMetricsEnum (the member can be both
+        x-axis and y-axis in ROC), it must have the same value to that member in ProportionMetricsEnum.
+    """
+
+    JOB_HOURS = "job_hours"
+    VRAM_HOURS = "vram_hours"
+    JOBS = "job_count"
+    USERS = "User"
     WEIGHTED_AVG_ALLOC_VRAM_EFFICIENCY = "expected_value_alloc_vram_efficiency"
     WEIGHTED_AVG_VRAM_CONSTRAINTS_EFFICIENCY = "expected_value_vram_constraint_efficiency"
     WEIGHTED_AVG_GPU_COUNT = "expected_value_gpu_count"
