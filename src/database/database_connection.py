@@ -53,7 +53,7 @@ class DatabaseConnection:
             table_name (str): The name of the table to fetch all the column names from. Defaults to "Jobs"  
 
         Raises:
-            ConnectionError: If the connection is not active.
+            ConnectionError: If the connection is not established.
 
         Returns:
             list: A list of column names from the specified table.    
