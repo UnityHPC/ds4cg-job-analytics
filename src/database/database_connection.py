@@ -12,7 +12,7 @@ class DatabaseConnection:
     It can be used to interact with the database and perform operations.
 
     """
-    def __init__(self, db_url: str) -> None:
+    def __init__(self, db_url: str, read_only: bool = True) -> None:
         self.db_url = db_url
         self.connection = self._connect(read_only=read_only)
         print(f"Connected to {self.db_url}")
