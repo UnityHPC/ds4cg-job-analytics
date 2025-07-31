@@ -79,7 +79,6 @@ ignore = [
 
 # TODO (Arda): Remove these ignores once the code is fixed
 "tests/*" = ["ANN"]
-"src/database/*" = ["ANN", "DOC"]
 
 [tool.ruff.lint.isort]
 # Combine multiple 'as' imports on a single line (e.g., import foo as bar, baz as qux)
