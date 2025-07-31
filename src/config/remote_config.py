@@ -40,7 +40,7 @@ class RemoteConfigFetcher(ABC):
             if response.status_code == 200:
                 remote_info = response.json()
                 # Ensure directory exists
-                self.local_path.parent.mkdir(parents=True, exist_ok=True)
+                # self.local_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(self.local_path, "w") as f:
                     json.dump(remote_info, f, indent=2)
                 print(f"Fetched and saved {self.local_path.name} from remote URL.")
@@ -72,7 +72,7 @@ class PartitionInfoFetcher(RemoteConfigFetcher):
     """Class to fetch and parse partition information from a remote JSON file."""
 
     url = "https://gitlab.rc.umass.edu/unity/education/documentation/unity-website/-/raw/main/data/partition_info.json"
-    local_path = Path("./snapshots/partition_info.json")
+    local_path = Path(__file__).parent / "snapshots/partition_info.json"
     info_name = "partition"
 
 
@@ -80,5 +80,5 @@ class NodeInfoFetcher(RemoteConfigFetcher):
     """Class to fetch and parse node information from a remote JSON file."""
 
     url = "https://gitlab.rc.umass.edu/unity/education/documentation/unity-website/-/raw/main/data/node_info.json"
-    local_path = Path("./snapshots/node_info.json")
+    local_path = Path(__file__).parent / "snapshots/node_info.json"
     info_name = "node"

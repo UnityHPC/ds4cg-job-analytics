@@ -128,7 +128,7 @@
   {
     "name": "gpu",
     "type": "gpu",
-    "node_count": 154,
+    "node_count": 153,
     "maxtime": "2 days",
     "deftime": "1 hour",
     "max_ram": 2010,
