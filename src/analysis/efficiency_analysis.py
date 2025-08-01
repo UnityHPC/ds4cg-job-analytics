@@ -768,6 +768,7 @@ class EfficiencyAnalysis:
         filtered_records = filtered_records.sort_values(sorting_key, ascending=ascending)
 
         return filtered_records
+    
     def compare_job_metrics_by_gpu_type(self) -> pd.DataFrame:
         """
         Aggregate and display metrics for each GPU type for jobs matching a SQL query.
@@ -820,69 +821,38 @@ class EfficiencyAnalysis:
         # Create summary DataFrame
         summary_df = pd.DataFrame(results, index=metrics)
         return summary_df
+    
+    def compare_gpu_utilization_patterns(self):
+        if self.jobs_with_efficiency_metrics is None:
+            self.calculate_job_efficiency_metrics(self.jobs_df)
+        gpu_types = self.get_unique_gpu_types()
+        print(gpu_types)
+        for gpu_type in gpu_types:
+            print(gpu_type)
+            gpu_jobs = self.jobs_with_efficiency_metrics[
+                self.jobs_with_efficiency_metrics['GPUType'].apply(
+                    lambda x: isinstance(x, dict) and gpu_type.lower() in [k.lower() for k in x.keys()]
+                )
+            ]
+        results = {}
+        print(f"Sample efficiency values for {gpu_type}:")
+        print(gpu_jobs['alloc_vram_efficiency'].describe())
+        print(f"Any NaN values: {gpu_jobs['alloc_vram_efficiency'].isna().sum()}")
+
+        # Calculate utilization bins
+        efficiency_bins = pd.cut(gpu_jobs['alloc_vram_efficiency'], 
+                               bins=[0, 0.1, 0.3, 0.5, 0.7, 0.9, 1.0], 
+                               labels=['0-10%', '10-30%', '30-50%', '50-70%', '70-90%', '90-100%'])
         
-    def user_gpu_preference_analysis(self):
-        """
-        Determine which users favor each GPU type (A100 vs H100) 
-
-        Returns:
-            int: Number of users who prefer A100s.
-            int: Number of users who prefer H100s.  
-        """
-        if self.jobs_with_efficiency_metrics is None:
-            self.calculate_job_efficiency_metrics(self.jobs_df)
-            print(
-                "Jobs DataFrame with efficiency metrics was not available. "
-                "Calculated it using the input jobs DataFrame."
-            )
-        unique_gpu_types = self.get_unique_gpu_types()
-
-        #within the query we want to return the number of users who have used each GPU type
-        if not unique_gpu_types:
-            print("No unique GPU types found in the jobs DataFrame.")
-            return 0, 0
-        return_list = [] 
-        for gpu_type in unique_gpu_types:
-            gpu_type_count = self.jobs_with_efficiency_metrics[self.jobs_with_efficiency_metrics['GPUType'].apply(lambda x: isinstance(x, dict) and gpu_type in x)].groupby('User').size()
-            return_list.append((gpu_type, gpu_type_count.count()))
-        # Convert the list of tuples to a DataFrame
-        gpu_preference_df = pd.DataFrame(return_list, columns=['GPUType', 'UserCount']) 
-        # Sort the DataFrame by UserCount in descending order
-        gpu_preference_df = gpu_preference_df.sort_values(by='UserCount', ascending=False)
-        return gpu_preference_df
-    
-
-    def user_gpu_efficiency_differential(self, gpu_type: str) -> pd.DataFrame:
-        """
-        Calculate the efficiency differential for users based on GPU type.
-
-        Args:
-            gpu_type (str): The GPU type to analyze (e.g., 'a100', 'h100').
-
-        Returns:
-            pd.DataFrame: DataFrame with users and their efficiency differential.
-        """
-        if self.jobs_with_efficiency_metrics is None:
-            self.calculate_job_efficiency_metrics(self.jobs_df)
-            print(
-                "Jobs DataFrame with efficiency metrics was not available. "
-                "Calculated it using the input jobs DataFrame."
-            )
-
-        # Filter jobs by GPU type
-        gpu_jobs = self.jobs_with_efficiency_metrics[
-            self.jobs_with_efficiency_metrics['GPUType'].apply(lambda x: isinstance(x, dict) and gpu_type in x)
-        ]
-
-        # Calculate efficiency differential
-        efficiency_differential = gpu_jobs.groupby('User').agg(
-            mean_alloc_vram_efficiency=('alloc_vram_efficiency', 'mean'),
-            mean_vram_constraint_efficiency=('vram_constraint_efficiency', 'mean')
-        ).reset_index()
-
-        return efficiency_differential
-    
-
-
-
-    
+        bin_counts = efficiency_bins.value_counts().reindex(['0-10%', '10-30%', '30-50%', '50-70%', '70-90%', '90-100%'], fill_value=0)
+        bin_percentages = (bin_counts / len(gpu_jobs) * 100).round(2)
+        
+        results[gpu_type.upper()] = {
+            'total_jobs': len(gpu_jobs),
+            'underutilized_jobs_pct': ((gpu_jobs['alloc_vram_efficiency'] < 0.3).sum() / len(gpu_jobs) * 100).round(2),
+            'well_utilized_jobs_pct': ((gpu_jobs['alloc_vram_efficiency'] >= 0.7).sum() / len(gpu_jobs) * 100).round(2),
+            **{f'efficiency_{label}': pct for label, pct in bin_percentages.items()}
+        }
+        print(results)
+        return pd.DataFrame(results).T
+            
