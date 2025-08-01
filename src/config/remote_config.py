@@ -45,7 +45,7 @@ class RemoteConfigFetcher(ABC):
                 response = self.session.get(self.url, timeout=10)
                 if response.status_code == 200:
                     remote_info = response.json()
-                    if not os.getenv("PYTEST_VERSION"):
+                    if os.getenv("RUN_ENV") != "TEST":
                         # Ensure directory exists
                         self.local_path.parent.mkdir(parents=True, exist_ok=True)
                         with open(self.local_path, "w") as f:

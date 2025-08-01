@@ -248,7 +248,6 @@ def test_preprocess_data_fill_missing_gpu_type(mock_data_frame):
     expect_gpu_type_null = len(ground_truth[(ground_truth["GPUType"].isna())])
     expect_gpus_null = len(ground_truth[(ground_truth["GPUs"].isna())])
     gpus_stat = data["GPUs"].value_counts()
-    print(ground_truth[(ground_truth["GPUs"].isna())])
 
     assert sum(x == ["cpu"] for x in data["GPUType"]) == expect_gpu_type_null
     assert gpus_stat[0] == expect_gpus_null, (
