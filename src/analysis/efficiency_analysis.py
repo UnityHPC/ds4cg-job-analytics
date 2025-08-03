@@ -794,7 +794,9 @@ class EfficiencyAnalysis:
             "Mean Weighted VRAM Efficiency",
             "Median Weighted VRAM Efficiency"
         ]
+
         job_efficiency_metrics = self.calculate_job_efficiency_metrics(self.jobs_df)
+            
         results = {gpu_type.upper(): [] for gpu_type in unique_gpu_types}
         for gpu_type in unique_gpu_types:
             # Filter rows with this GPU type
@@ -823,36 +825,29 @@ class EfficiencyAnalysis:
         return summary_df
     
     def compare_gpu_utilization_patterns(self):
-        if self.jobs_with_efficiency_metrics is None:
-            self.calculate_job_efficiency_metrics(self.jobs_df)
-        gpu_types = self.get_unique_gpu_types()
-        print(gpu_types)
-        for gpu_type in gpu_types:
-            print(gpu_type)
-            gpu_jobs = self.jobs_with_efficiency_metrics[
-                self.jobs_with_efficiency_metrics['GPUType'].apply(
-                    lambda x: isinstance(x, dict) and gpu_type.lower() in [k.lower() for k in x.keys()]
-                )
-            ]
-        results = {}
-        print(f"Sample efficiency values for {gpu_type}:")
-        print(gpu_jobs['alloc_vram_efficiency'].describe())
-        print(f"Any NaN values: {gpu_jobs['alloc_vram_efficiency'].isna().sum()}")
+        """
+        Compare GPU utilization patterns across different GPU types.
 
-        # Calculate utilization bins
-        efficiency_bins = pd.cut(gpu_jobs['alloc_vram_efficiency'], 
-                               bins=[0, 0.1, 0.3, 0.5, 0.7, 0.9, 1.0], 
-                               labels=['0-10%', '10-30%', '30-50%', '50-70%', '70-90%', '90-100%'])
-        
-        bin_counts = efficiency_bins.value_counts().reindex(['0-10%', '10-30%', '30-50%', '50-70%', '70-90%', '90-100%'], fill_value=0)
-        bin_percentages = (bin_counts / len(gpu_jobs) * 100).round(2)
-        
-        results[gpu_type.upper()] = {
-            'total_jobs': len(gpu_jobs),
-            'underutilized_jobs_pct': ((gpu_jobs['alloc_vram_efficiency'] < 0.3).sum() / len(gpu_jobs) * 100).round(2),
-            'well_utilized_jobs_pct': ((gpu_jobs['alloc_vram_efficiency'] >= 0.7).sum() / len(gpu_jobs) * 100).round(2),
-            **{f'efficiency_{label}': pct for label, pct in bin_percentages.items()}
-        }
-        print(results)
-        return pd.DataFrame(results).T
-            
+        Returns:
+            pd.DataFrame: DataFrame with GPU utilization patterns by GPU type.
+        """
+        job_metrics_by_gpu_type = self.compare_job_metrics_by_gpu_type()
+
+        # Create a DataFrame to hold the GPU utilization patterns
+        gpu_utilization_patterns = pd.DataFrame({
+            "GPU Type": job_metrics_by_gpu_type.columns,
+            "Mean Used GPU Memory (GiB)": job_metrics_by_gpu_type.loc["Mean Used GPU Memory (GiB)"],
+            "Median Used GPU Memory (GiB)": job_metrics_by_gpu_type.loc["Median Used GPU Memory (GiB)"],
+            "Mean Requested VRAM Efficiency": job_metrics_by_gpu_type.loc["Mean Requested VRAM Efficiency"],
+            "Median Requested VRAM Efficiency": job_metrics_by_gpu_type.loc["Median Requested VRAM Efficiency"],
+            "Mean Allocated VRAM Efficiency": job_metrics_by_gpu_type.loc["Mean Allocated VRAM Efficiency"],
+            "Median Allocated VRAM Efficiency": job_metrics_by_gpu_type.loc["Median Allocated VRAM Efficiency"],
+            "Total GPU Hours": job_metrics_by_gpu_type.loc["Total GPU Hours"],
+            "Mean Weighted VRAM Efficiency": job_metrics_by_gpu_type.loc["Mean Weighted VRAM Efficiency"],
+            "Median Weighted VRAM Efficiency": job_metrics_by_gpu_type.loc["Median Weighted VRAM Efficiency"]
+        })
+
+        # Sort by Total GPU Hours in descending order
+        gpu_utilization_patterns = gpu_utilization_patterns.sort_values(by="Total GPU Hours", ascending=False)
+
+        return gpu_utilization_patterns
