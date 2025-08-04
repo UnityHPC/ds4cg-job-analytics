@@ -28,7 +28,25 @@ class RemoteConfigFetcher(ABC):
         """Type of information being fetched (e.g., 'partition')."""
         pass
 
-    def get_info(self, offline: bool = False) -> dict:
+    def _validate_info(self, info: list[dict]) -> bool:
+        """Validate that the fetched information is a list of dictionaries.
+        
+        Args:
+            info (list[dict]): The fetched information to validate.
+            
+        Raises:
+                ValueError: If the fetched data is not in the expected format.
+
+        Returns:
+                bool: True if the data is valid, False otherwise.
+        """
+        if not isinstance(info, list):
+            raise ValueError(f"Expected a list of dictionaries, got {type(info)} instead.")
+        if not all(isinstance(item, dict) for item in info):
+            raise ValueError("All items in the list must be dictionaries.")
+        return True
+
+    def get_info(self, offline: bool = False) -> list[dict]:
         """Fetch and save information from the remote JSON file, or read from local file if fetch fails.
 
         Args:
@@ -36,15 +54,18 @@ class RemoteConfigFetcher(ABC):
 
         Raises:
             FileNotFoundError: If the local file does not exist and the fetch fails.
+            ValueError: If the fetched data is not in the expected format.
 
         Returns:
-            dict: Parsed JSON data.
+            list[dict]: Parsed JSON data.
         """
         if not offline:
             try:
                 response = self.session.get(self.url, timeout=10)
                 if response.status_code == 200:
                     remote_info = response.json()
+                    if not self._validate_info(remote_info):
+                        raise ValueError(f"Invalid {self.info_name} information format.")
                     if os.getenv("RUN_ENV") != "TEST":
                         # Ensure directory exists
                         self.local_path.parent.mkdir(parents=True, exist_ok=True)
@@ -66,6 +87,8 @@ class RemoteConfigFetcher(ABC):
         try:
             with open(self.local_path) as file:
                 local_info = json.load(file)
+                if not self._validate_info(local_info):
+                    raise ValueError(f"Invalid {self.info_name} information format in local file.")
             print(f"Loaded {self.local_path.name} from local file.")
             return local_info
         except FileNotFoundError as e:
@@ -92,6 +115,25 @@ class PartitionInfoFetcher(RemoteConfigFetcher):
     def info_name(self) -> str:
         """Type of information being fetched."""
         return "partition"
+    
+    def _validate_info(self, info: list[dict]) -> bool:
+        """Validate the fetched partition information.
+
+        This function checks that each partition info dictionary contains 'name' and 'type' keys.
+        It also applies the base class validation.
+
+        Args:
+            info (list[dict]): The fetched partition information to validate.
+        
+        Raises:
+            ValueError: If the fetched data does not contain the expected keys.
+            
+        Returns:
+            bool: True if the data is valid, False otherwise."""
+
+        if not all("name" in p and "type" in p for p in info):
+            raise ValueError("Each partition info dictionary must contain 'name' and 'type' keys.")
+        return super()._validate_info(info)
 
 
 class NodeInfoFetcher(RemoteConfigFetcher):
