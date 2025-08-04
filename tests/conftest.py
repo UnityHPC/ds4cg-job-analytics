@@ -12,7 +12,7 @@ def mock_data_frame():
     try:
         temp_db_path = f"{temp_db_dir}/mock.db"
         convert_csv_to_db("tests/mock_data/mock.csv", temp_db_path)
-        mem_db = DatabaseConnection(temp_db_path)
+        mem_db = DatabaseConnection(temp_db_path, read_only=False)
         yield mem_db.fetch_all_jobs()
     except Exception as e:
         raise Exception("Exception at mock_data_frame") from e
