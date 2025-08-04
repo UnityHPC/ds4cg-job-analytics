@@ -260,9 +260,6 @@ def preprocess_data(
         include_failed_cancelled_jobs (bool, optional): Whether to include jobs with status FAILED or CANCELLED.
         include_cpu_only_jobs (bool, optional): Whether to include jobs that do not use GPUs (CPU-only jobs).
 
-    Raises:
-        ValueError: If the partition information does not contain the expected keys.
-
     Returns:
         pd.DataFrame: The preprocessed dataframe
     """
