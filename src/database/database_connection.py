@@ -26,7 +26,7 @@ class DatabaseConnection:
         Returns: 
             duckdb.DuckDBPyConnection: The connection object to the DuckDB database.
         """
-        self.connection = duckdb.connect(self.db_url, read_only=read_only)
+        self.connection = duckdb.connect(database=self.db_url, read_only=read_only)
         return self.connection
 
     def _disconnect(self) -> None:
