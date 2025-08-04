@@ -60,7 +60,7 @@ class DatabaseConnection:
         """
         if self.is_connected():
             query = f"SELECT * FROM {table_name} LIMIT 0"
-            return -self.connection.execute(query).df().columns.tolist()
+            return self.connection.execute(query).df().columns.tolist()
         else:
             raise ConnectionError("Database connection is not established.")
 

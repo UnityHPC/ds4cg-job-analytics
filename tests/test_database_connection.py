@@ -1,5 +1,5 @@
 import pytest
-from src.database.DatabaseConnection import DatabaseConnection
+from src.database.database_connection import DatabaseConnection
 import tempfile
 import shutil
 
