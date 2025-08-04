@@ -264,7 +264,12 @@ def _calculate_approx_vram_single_gpu_type(
     return total_vram
 
 
-def _adjust_vram_for_multivalent_gpus(multivalent: dict, allocated_vram: int, gpu_mem_usage: int | float) -> int:
+def _adjust_vram_for_multivalent_gpus(
+    multivalent: dict,
+    allocated_vram: int,
+    gpu_mem_usage: int | float,
+    gpus_with_exact_values: dict[str, int] | None = None,
+) -> int:
     """
     Adjust the allocated VRAM for multivalent GPUs to meet or exceed the GPU memory usage.
 
@@ -275,10 +280,16 @@ def _adjust_vram_for_multivalent_gpus(multivalent: dict, allocated_vram: int, gp
         multivalent (dict): Dictionary of GPU types (str) to counts (int) for multivalent GPUs.
         allocated_vram (int): Current total allocated VRAM in GiB.
         gpu_mem_usage (int | float): GPU memory usage in bytes.
+        gpus_with_exact_values (dict[str, int], optional): Dictionary of GPU types (str) to exact VRAM values (int).
 
     Returns:
         int: Adjusted total allocated VRAM in GiB.
     """
+    # Adjust VRAM for GPUs with exact values first if available
+    if gpus_with_exact_values:
+        for gpu, exact_vram in gpus_with_exact_values.items():
+            allocated_vram += exact_vram
+            multivalent[gpu] -= 1  # Reduce count for GPUs with exact values
 
     # Assume they wanted the bigger VRAM variant for each GPU until the condition is satisfied
     for gpu, gpu_count in multivalent.items():
@@ -399,7 +410,9 @@ def _calculate_alloc_vram_multiple_gpu_types_with_count(
 
         # if the estimate is less than the usage and not all GPU VRAMs were calculated exactly, update it
         if allocated_vram < gpu_mem_usage / 2**30 and len(gpus_with_exact_values) < len(multivalent):
-            allocated_vram = _adjust_vram_for_multivalent_gpus(multivalent, allocated_vram, gpu_mem_usage)
+            allocated_vram = _adjust_vram_for_multivalent_gpus(
+                multivalent, allocated_vram, gpu_mem_usage, gpus_with_exact_values
+            )
 
         return allocated_vram
 
