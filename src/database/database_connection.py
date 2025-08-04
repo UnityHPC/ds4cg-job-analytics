@@ -20,6 +20,9 @@ class DatabaseConnection:
     def _connect(self, read_only: bool) -> duckdb.DuckDBPyConnection:
         """Establish a connection to the DuckDB database.
 
+        Args:
+            read_only (bool): If True, the connection will be read-only. We want to set the default to read_only=True.
+
         Returns: 
             duckdb.DuckDBPyConnection: The connection object to the DuckDB database.
         """
