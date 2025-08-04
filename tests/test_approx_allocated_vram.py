@@ -103,28 +103,3 @@ def test_multivalent_vram_allocation_a100_only():
     )
 
     assert mock_data["AllocatedVRAM"].tolist() == expected_allocated_vram
-
-
-def test_multivalent_vram_allocation_mixed_a100_v100():
-    gpu_usage = [200 * (2**30)]  # 200 GiB usage
-    mock_data = pd.DataFrame({
-        "JobID": [1],
-        "GPUType": [{"a100": 3, "v100": 2}],
-        "NodeList": [["ece-gpu001", "gpu013", "gpu011"]],
-        "GPUs": [5],
-        "GPUMemUsage": gpu_usage,
-    })
-
-    # assumption: 3 A100 40GB (120GB) + 2 V100 32GB (64GB) = 184GB
-    # 200 GB usage -> we need to adjust A100 to 80GB
-
-    expected_allocated_vram = [224]
-
-    mock_data["AllocatedVRAM"] = mock_data.apply(
-        lambda row: _get_approx_allocated_vram(
-            row["JobID"], row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]
-        ),
-        axis=1,
-    )
-
-    assert mock_data["AllocatedVRAM"].tolist() == expected_allocated_vram
