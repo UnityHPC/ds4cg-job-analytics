@@ -29,6 +29,7 @@ def load_preprocessed_jobs_dataframe_from_duckdb(
         table_name (str, optional): Table name to query. Defaults to 'Jobs'.
         sample_size (int, optional): Number of rows to sample from the DataFrame. Defaults to None (no sampling).
         random_state (pd._typing.RandomState, optional): Random state for reproducibility. Defaults to None.
+        query (str, optional): Custom SQL query to fetch data. If provided, overrides the table_name.
 
     Returns:
         pd.DataFrame: DataFrame containing the table data.
@@ -799,8 +800,11 @@ class EfficiencyAnalysis:
             
         results = {gpu_type.upper(): [] for gpu_type in unique_gpu_types}
         for gpu_type in unique_gpu_types:
-            # Filter rows with this GPU type
-            gpu_jobs = job_efficiency_metrics[job_efficiency_metrics['GPUType'].apply(lambda x: isinstance(x, dict) and gpu_type in x)]
+            gpu_jobs = job_efficiency_metrics[
+        job_efficiency_metrics['GPUType'].apply(
+            lambda x, gpu_type=gpu_type: isinstance(x, dict) and gpu_type in x
+        )
+    ]
 
             if gpu_jobs.empty:
                 results[gpu_type.upper()] = [None] * len(metrics)
@@ -814,8 +818,10 @@ class EfficiencyAnalysis:
                 gpu_jobs["alloc_vram_efficiency"].median(),  # Median VRAM Efficiency
 
                 gpu_jobs["job_hours"].sum(),  # Total GPU Hours
-                (gpu_jobs["alloc_vram_efficiency"] * gpu_jobs["job_hours"]).sum() / gpu_jobs["job_hours"].sum(),  # Mean Weighted VRAM Efficiency
-                (gpu_jobs["alloc_vram_efficiency"] * gpu_jobs["job_hours"]).median() / gpu_jobs["job_hours"].median()  # Median Weighted VRAM Efficiency
+                 # Mean Weighted VRAM Efficiency
+                (gpu_jobs["alloc_vram_efficiency"] * gpu_jobs["job_hours"]).sum() / gpu_jobs["job_hours"].sum(), 
+                # Median Weighted VRAM Efficiency
+                (gpu_jobs["alloc_vram_efficiency"] * gpu_jobs["job_hours"]).median() / gpu_jobs["job_hours"].median()  
                 
             
             ]
@@ -824,7 +830,7 @@ class EfficiencyAnalysis:
         summary_df = pd.DataFrame(results, index=metrics)
         return summary_df
     
-    def compare_gpu_utilization_patterns(self):
+    def compare_gpu_utilization_patterns(self) -> pd.DataFrame:
         """
         Compare GPU utilization patterns across different GPU types.
 
