@@ -1,4 +1,3 @@
-from abc import ABC
 from typing import Any
 
 import matplotlib.pyplot as plt
@@ -11,7 +10,7 @@ from .models import TimeSeriesVisualizationKwargsModel
 from .visualization import DataVisualizer
 
 
-class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], ABC):
+class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
     """
     Visualizer for plotting VRAM efficiency and VRAM hours over time for users.
 
@@ -20,6 +19,9 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
 
     def __init__(self, df: pd.DataFrame) -> None:
         super().__init__(df)
+
+    def visualize(self, output_dir_path=None, **kwargs: Any) -> None:
+        return None
 
     def validate_visualize_kwargs(
         self,
@@ -56,23 +58,28 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
 
     def plot_vram_efficiency(
         self,
-        time_series_df: pd.DataFrame,
         annotation_style: str = "hover",  # "hover", "combined", "table", "none"
         show_secondary_y: bool = False,  # Show job counts on secondary y-axis
         exclude_fields: list[str] | None = None,  # List of fields to exclude from annotation text box
+        users: list[str] | None = None,  # Optional list of users to filter
     ) -> None:
         """
-        Plot VRAM efficiency over time using the prepared time series DataFrame.
+        Plot VRAM efficiency over time using the class-level DataFrame.
 
         Args:
-            time_series_df (pd.DataFrame): DataFrame containing time series data.
             annotation_style (str, optional): Style for annotations ("hover", "combined", "table", "none").
             show_secondary_y (bool, optional): Whether to show job counts on secondary y-axis.
             exclude_fields (list[str], optional): List of fields to exclude from annotation text box.
+            users (list[str], optional): List of users to filter. If None, plot all users.
 
         Returns:
             None: Displays the plot.
         """
+        # Filter users if provided
+        time_series_df = self.df
+        if users:
+            time_series_df = time_series_df[time_series_df["User"].isin(users)]
+
         # Create figure and axis
         fig, ax1 = plt.subplots(figsize=(12, 8))
 
@@ -81,6 +88,8 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
             ax2 = ax1.twinx()
             ax2.set_ylabel("Job Count", color="tab:gray")
             ax2.tick_params(axis="y", labelcolor="tab:gray")
+        else:
+            ax2 = None
 
         # Store annotation data for table display
         annotation_data = []
@@ -106,10 +115,11 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
                 markersize=6,
             )
 
-            if show_secondary_y:
+            # Ensure ax2 is only used if assigned
+            if show_secondary_y and ax2:
                 ax2.plot(
                     user_data["TimeGroup_Datetime"],
-                    user_data["Job_Count"],
+                    user_data["JobCount"],
                     marker="s",
                     label=f"{user} (Jobs)",
                     color=colors[idx],
@@ -125,7 +135,7 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
                     "Time": row["TimeGroup_Str"],
                     "Efficiency": f"{row['Efficiency']:.6f}",
                     "GPU_Hours": f"{row.get('GPU_Hours', 0):.1f}",
-                    "Job_Count": row["Job_Count"],
+                    "JobCount": row["JobCount"],
                 }
                 for field in exclude_fields:
                     annotation_fields.pop(field, None)
@@ -161,26 +171,33 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
 
     def plot_vram_hours(
         self,
-        time_series_df: pd.DataFrame,
         show_secondary_y: bool = False,
         exclude_fields: list[str] | None = None,
+        users: list[str] | None = None,  # Optional list of users to filter
     ) -> None:
         """
-        Plot VRAM Hours over time using the prepared time series DataFrame.
+        Plot VRAM Hours over time using the class-level DataFrame.
 
         Args:
-            time_series_df (pd.DataFrame): DataFrame containing time series data.
             show_secondary_y (bool, optional): Whether to show job counts on secondary y-axis.
             exclude_fields (list[str], optional): List of fields to exclude from annotation text box.
+            users (list[str], optional): List of users to filter. If None, plot all users.
 
         Returns:
             None: Displays the plot.
         """
+        # Filter users if provided
+        time_series_df = self.df
+        if users:
+            time_series_df = time_series_df[time_series_df["User"].isin(users)]
+
         fig, ax1 = plt.subplots(figsize=(12, 8))
         if show_secondary_y:
             ax2 = ax1.twinx()
             ax2.set_ylabel("Job Count", color="tab:gray")
             ax2.tick_params(axis="y", labelcolor="tab:gray")
+        else:
+            ax2 = None
 
         cmap = plt.get_cmap("tab10")
         colors = [cmap(i % 10) for i in range(len(time_series_df["User"].unique()))]
@@ -204,10 +221,11 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
                 markersize=6,
             )
 
-            if show_secondary_y:
+            # Ensure ax2 is only used if assigned
+            if show_secondary_y and ax2:
                 ax2.plot(
                     user_data["TimeGroup_Datetime"],
-                    user_data["Job_Count"],
+                    user_data["JobCount"],
                     marker="s",
                     label=f"{user} (Jobs)",
                     color=colors[idx],
@@ -268,7 +286,7 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
                 fig.add_trace(
                     go.Scatter(
                         x=user_df["TimeGroup_Datetime"],  # Use datetime for proper chronological ordering
-                        y=user_df["Job_Count"],
+                        y=user_df["JobCount"],
                         mode="lines+markers",
                         name=f"{user} (Job Count)",
                         line=dict(color=colors[idx % len(colors)], width=1, dash="dash"),
@@ -282,24 +300,29 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
 
     def plot_vram_efficiency_interactive(
         self,
-        time_series_df: pd.DataFrame,
         max_points: int = 100,
         exclude_fields: list[str] | None = None,
         job_count_trace: bool = False,
+        users: list[str] | None = None,  # Optional list of users to filter
     ) -> go.Figure:
         """
         Create an interactive plot with tooltips showing detailed metrics for VRAM efficiency.
 
         Args:
-            time_series_df (pd.DataFrame): DataFrame containing time series data.
             max_points (int, optional): Maximum number of points to plot to avoid memory issues.
             exclude_fields (list[str], optional): List of fields to exclude from annotation text box.
             job_count_trace (bool, optional): Whether to add a trace for job counts on secondary y-axis.
+            users (list[str], optional): List of users to filter. If None, plot all users.
 
         Returns:
              go.Figure: The interactive plot with detailed tooltips.
         """
         from plotly.subplots import make_subplots
+
+        # Filter users if provided
+        time_series_df = self.df
+        if users:
+            time_series_df = time_series_df[time_series_df["User"].isin(users)]
 
         if exclude_fields is None:
             exclude_fields = []
@@ -341,7 +364,7 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
                     "Time": row["TimeGroup_Str"],
                     "Efficiency": f"{row['Metric']:.6f}",
                     "GPU_Hours": f"{row['GPUHours']:.1f}",
-                    "Job_Count": row["JobCount"],
+                    "JobCount": row["JobCount"],
                 }
                 for field in exclude_fields:
                     fields.pop(field, None)
@@ -376,24 +399,29 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
 
     def plot_vram_hours_interactive(
         self,
-        time_series_df: pd.DataFrame,
         max_points: int = 100,
         exclude_fields: list[str] | None = None,
         job_count_trace: bool = False,
+        users: list[str] | None = None,  # Optional list of users to filter
     ) -> go.Figure:
         """
         Create an interactive plot of VRAM Hours over time for users.
 
         Args:
-            time_series_df (pd.DataFrame): DataFrame containing time series data.
             max_points (int, optional): Maximum number of points to plot to avoid memory issues.
             exclude_fields (list[str], optional): List of fields to exclude from annotation text box.
             job_count_trace (bool, optional): Whether to add a trace for job counts on secondary y-axis.
+            users (list[str], optional): List of users to filter. If None, plot all users.
 
         Returns:
              go.Figure: The interactive plot with detailed tooltips.
         """
         from plotly.subplots import make_subplots
+
+        # Filter users if provided
+        time_series_df = self.df
+        if users:
+            time_series_df = time_series_df[time_series_df["User"].isin(users)]
 
         if exclude_fields is None:
             exclude_fields = []
@@ -434,7 +462,7 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
                     "User": user,
                     "Time": row["TimeGroup_Str"],
                     "VRAM_Hours": f"{row['GPUHours']:.1f}",
-                    "Job_Count": row["JobCount"],
+                    "JobCount": row["JobCount"],
                 }
                 for field in exclude_fields:
                     fields.pop(field, None)
@@ -466,3 +494,120 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel], A
 
         fig.show()
         return fig
+
+    def plot_vram_efficiency_dot(
+            self,
+            exclude_fields: list[str] | None = None,
+    ) -> None:
+        """
+        Plot VRAM efficiency over time as a dot plot.
+
+        Each dot's:
+        - Position: x = time, y = efficiency
+        - Size: scaled by VRAM hours
+        - Color: represents user
+
+        Args:
+            time_series_df (pd.DataFrame): DataFrame containing time series data.
+            exclude_fields (list[str], optional): Fields to exclude from tooltip (unused in static plot).
+        """
+        time_series_df = self.df
+        if exclude_fields is None:
+            exclude_fields = []
+
+        fig, ax = plt.subplots(figsize=(12, 8))
+
+        users = time_series_df["User"].unique()
+        cmap = plt.get_cmap("tab10")
+        colors = [cmap(i % 10) for i in range(len(users))]
+
+        for idx, user in enumerate(users):
+            user_data = time_series_df[time_series_df["User"] == user]
+            if user_data.empty:
+                continue
+
+            # Normalize size: square root scaling to keep bubble area proportional to VRAM hours
+            vram_hours = user_data["GPUHours"]
+            sizes = np.sqrt(vram_hours + 1) * 10  # tweak multiplier for visual clarity
+
+            ax.scatter(
+                user_data["TimeGroup_Datetime"],
+                user_data["Efficiency"],
+                s=sizes,
+                color=colors[idx],
+                alpha=0.7,
+                label=user,
+                edgecolors="black",
+                linewidth=0.5,
+            )
+
+        ax.set_xlabel("Time Period")
+        ax.set_ylabel("VRAM Efficiency")
+        ax.set_title("VRAM Efficiency Dot Plot (Size = VRAM Hours)")
+        ax.legend(title="User", bbox_to_anchor=(1.05, 1), loc="upper left")
+        plt.tight_layout()
+        plt.show()
+
+    def plot_vram_efficiency_per_job_dot(
+            self,
+            users: list[str],
+            efficiency_metric: str,
+            vram_metric: str = "job_hours",
+            remove_zero_values: bool = True,
+    ) -> None:
+        """
+        Dot plot of VRAM efficiency for all individual jobs (not grouped).
+
+        Args:
+            users (list[str]): List of users to include.
+            efficiency_metric (str): Column name representing efficiency.
+            vram_metric (str): Column name representing VRAM hours (used for dot size).
+            remove_zero_values (bool): Whether to exclude jobs with zero or NaN efficiency.
+        """
+        df = self.df.copy()
+
+        # Filter by selected users
+        df = df[df["User"].isin(users)]
+
+        # Parse time from StartTime
+        # df["JobStart"] = pd.to_datetime(df["StartTime"])
+        df["JobStart"] = pd.to_datetime(df["StartTime"]).dt.to_period("M").dt.to_timestamp()
+
+        # Filter zero or invalid values if needed
+        if remove_zero_values:
+            df = df[df[efficiency_metric] > 0]
+            df = df[df[vram_metric] > 0]
+            df = df[df[efficiency_metric].notnull() & df[vram_metric].notnull()]
+
+        fig, ax = plt.subplots(figsize=(12, 8))
+
+        users = df["User"].unique()
+        cmap = plt.get_cmap("tab10")
+        colors = {user: cmap(i % 10) for i, user in enumerate(users)}
+
+        for user in users:
+            user_df = df[df["User"] == user]
+
+            sizes = np.sqrt(user_df[vram_metric] + 1) * 10  # tweak size factor
+
+            ax.scatter(
+                user_df["JobStart"],
+                user_df[efficiency_metric],
+                s=sizes,
+                color=colors[user],
+                alpha=0.7,
+                label=user,
+                edgecolors="black",
+                linewidth=0.5,
+            )
+
+        ax.set_xlabel("Job Start Time")
+        ax.set_ylabel("VRAM Efficiency")
+        ax.set_title("Per-Job VRAM Efficiency Dot Plot (Size = VRAM Hours)")
+        ax.legend(title="User", bbox_to_anchor=(1.05, 1), loc="upper left")
+        plt.tight_layout()
+        plt.show()
+
+        return fig
+
+

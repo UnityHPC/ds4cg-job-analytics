@@ -43,9 +43,9 @@ class FrequencyAnalysis(EfficiencyAnalysis):
         # Group jobs by the specified time unit
         data = self.group_jobs_by_time(data, time_unit)
 
-        data["all_time_groups"] = self.trim_zero_job_time_groups(
-            data["TimeGroup"].unique().tolist(), data["JobID"].value_counts().to_dict(), remove_zero_values
-        )
+        # data["all_time_groups"] = self.trim_zero_job_time_groups(
+        #     data["TimeGroup"].unique().tolist(), data["JobID"].value_counts().to_dict(), remove_zero_values
+        # )
 
         # Filter by users
         data = data[data["User"].isin(users)]
