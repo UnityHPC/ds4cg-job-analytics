@@ -167,7 +167,7 @@ class EfficiencyAnalysis:
                         raise ValueError(f"{filter_name} must be a numeric type.")
         return mask
 
-    def get_unique_gpu_types(self) -> pd.Series:
+    def get_unique_gpu_types(self) -> np.ndarray:
         """
         Get unique GPU types from the jobs DataFrame.
 
@@ -798,7 +798,7 @@ class EfficiencyAnalysis:
 
         job_efficiency_metrics = self.calculate_job_efficiency_metrics(self.jobs_df)
             
-        results = {gpu_type.upper(): [] for gpu_type in unique_gpu_types}
+        results: dict[str, list] = {gpu_type.upper(): [] for gpu_type in unique_gpu_types}
         for gpu_type in unique_gpu_types:
             gpu_jobs = job_efficiency_metrics[
         job_efficiency_metrics['GPUType'].apply(
