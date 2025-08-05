@@ -1,14 +1,10 @@
-import pytest
-from src.preprocess import preprocess_data
 import pandas as pd
-from src.config.enum_constants import (
-    InteractiveEnum,
-    QOSEnum,
-    StatusEnum,
-    ExitCodeEnum,
-    PartitionEnum,
-    AdminsAccountEnum,
-)
+import pytest
+from pandas.api.typing import NAType
+
+from src.config.enum_constants import (AdminsAccountEnum, ExitCodeEnum, InteractiveEnum, PartitionEnum, QOSEnum,
+                                       StatusEnum)
+from src.preprocess import preprocess_data
 from src.preprocess.preprocess import _get_partition_constraint, _get_requested_vram, _get_vram_constraint
 
 
@@ -454,20 +450,18 @@ def test_partition_constraint_and_requested_vram_on_mock_data(mock_data_frame: p
     assert "partition_constraint" in processed.columns
     assert "requested_vram" in processed.columns
 
-    # For each row, check that requested_vram is the max of partition_constraint and Constraints (if both are not NA)
-    exoected = pd.NA
+    # For each row, check that requested_vram is set to partition_constraint if both are not NA.
     for _idx, row in processed.iterrows():
         part_con = _get_partition_constraint(row["Partition"], row["GPUs"])
         constraint_val = _get_vram_constraint(row["Constraints"], row["GPUs"])
         # Compute expected requested_vram
+        expected: int | NAType
         if pd.isna(part_con) and pd.isna(constraint_val):
             expected = pd.NA
         elif pd.isna(part_con):
             expected = constraint_val
-        elif pd.isna(constraint_val):
-            expected = part_con
         else:
-            expected = max(part_con, constraint_val)
+            expected = part_con
         actual = row["requested_vram"]
         if pd.isna(expected):
             assert pd.isna(actual)

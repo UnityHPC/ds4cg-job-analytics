@@ -1,8 +1,10 @@
-import pytest
-from src.database.database_connection import DatabaseConnection
-import tempfile
 import shutil
+import tempfile
 from typing import Generator
+
+import pytest
+
+from src.database.database_connection import DatabaseConnection
 
 
 @pytest.fixture(scope="session")

@@ -1,6 +1,7 @@
+import ast
+
 import duckdb
 import pandas as pd
-import ast
 
 
 def convert_csv_to_db(path_to_csv: str, path_to_db: str, new_format: bool = False) -> None:

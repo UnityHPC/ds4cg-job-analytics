@@ -1,5 +1,6 @@
-import duckdb
 import os
+
+import duckdb
 import pandas as pd
 
 

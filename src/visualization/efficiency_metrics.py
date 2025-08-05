@@ -3,16 +3,17 @@ Module with utilities for visualizing efficiency metrics.
 """
 
 from abc import ABC
-
-import numpy as np
-from .visualization import DataVisualizer
-from pydantic import ValidationError
-import seaborn as sns
-import pandas as pd
-import matplotlib.pyplot as plt
-from typing import Any
 from pathlib import Path
+from typing import Any
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from pydantic import ValidationError
+
 from .models import EfficiencyMetricsKwargsModel, UsersWithMetricsKwargsModel
+from .visualization import DataVisualizer
 
 
 class EfficiencyMetricsVisualizer(DataVisualizer[EfficiencyMetricsKwargsModel], ABC):

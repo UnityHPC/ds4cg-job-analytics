@@ -1,12 +1,16 @@
-import pytest
-import tempfile
 import shutil
+import tempfile
+from typing import Generator
+
+import pandas as pd
+import pytest
+
 from src.database import DatabaseConnection
 from .mock_data.convert_csv_to_db import convert_csv_to_db
 
 
 @pytest.fixture(scope="module")
-def mock_data_frame(request: pytest.FixtureRequest) -> list[dict]:
+def mock_data_frame(request: pytest.FixtureRequest) -> Generator[pd.DataFrame, None, None]:
     temp_db_dir = tempfile.mkdtemp()
     mem_db = None
     try:
