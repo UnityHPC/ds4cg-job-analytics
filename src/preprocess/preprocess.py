@@ -62,7 +62,7 @@ def _get_multivalent_vram_based_on_node(gpu_type: str, node: str) -> int:
     return vram
 
 
-def _get_vram_constraint(constraints: list[str], gpu_count: int) -> int | NAType:
+def _get_vram_constraint(constraints: list[str], gpu_count: int) -> int:
     """
     Get the VRAM assigned to a job based on its constraints and GPU usage.
 
@@ -74,8 +74,8 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int) -> int | NAType
         gpu_count (int): Number of GPUs requested by the job.
 
     Returns:
-        int | NAType: Maximum VRAM amount in GiB obtained based on the provided constraints, multiplied by the
-                    number of GPUs. Returns NAType if no VRAM constraints are present.
+        int: Maximum VRAM amount in GiB obtained based on the provided constraints, multiplied by the
+                    number of GPUs. Returns 11 if no constraints are provided.
 
     """
     vram_constraints = []
@@ -104,7 +104,7 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int) -> int | NAType
                 vram_constraints.append(VRAM_VALUES[constr])
 
     if not (len(vram_constraints)) or gpu_count == 0:
-        return pd.NA  # if there are no constraints, return NAType
+        return 11  # if there are no constraints, return 11 GiB as a default requested value
 
     # TODO (Ayush): Check if we want to take max or min of the VRAM constraints
     return max(vram_constraints) * gpu_count
@@ -162,7 +162,7 @@ def _get_partition_constraint(partition: str, gpu_count: int) -> int | NAType:
     return VRAM_VALUES[gpu_type] * gpu_count
 
 
-def _get_requested_vram(vram_constraint: int | NAType, partition_constraint: int | NAType) -> int | NAType:
+def _get_requested_vram(vram_constraint: int, partition_constraint: int | NAType) -> int | NAType:
     """
     Get the requested VRAM for a job based on its constraints and partition.
 
@@ -172,7 +172,7 @@ def _get_requested_vram(vram_constraint: int | NAType, partition_constraint: int
     If neither is provided, it returns NAType.
 
     Args:
-        vram_constraint (int | NAType): The VRAM constraint from the job's constraints.
+        vram_constraint (int): The VRAM constraint from the job's constraints.
         partition_constraint (int | NAType): The VRAM size based on the partition name.
 
     Returns:
@@ -646,7 +646,7 @@ def preprocess_data(
     res.loc[:, "vram_constraint"] = res.apply(
         lambda row: _get_vram_constraint(row["Constraints"], row["GPUs"]), axis=1
     ).astype(pd.Int64Dtype())  # Use Int64Dtype to allow for nullable integers
-    res.loc[:, "partition_constraint"] = res.apply(
+    res.loc[:, ("partition_constraint")] = res.apply(
         lambda row: _get_partition_constraint(row["Partition"], row["GPUs"]), axis=1
     ).astype(pd.Int64Dtype())  # Use Int64Dtype to allow for nullable integers
     res.loc[:, "requested_vram"] = res.apply(
