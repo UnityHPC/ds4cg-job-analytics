@@ -184,7 +184,7 @@ contains tools to add a number of useful derived columns for plotting and analys
 | Partition |  VARCHAR | Job partition |
 | Nodes |  VARCHAR | Job nodes as compact string |
 | NodeList |  VARCHAR[] | List of job nodes |
-| CPUs |  SMALLINT | Number of CPUs |
+| CPUs |  SMALLINT | Number of CPU cores |
 | Memory |  INTEGER | Job allocated memory (bytes) |
 | GPUs |  SMALLINT | Number of GPUs requested |
 | GPUType |  VARCHAR[] | List of GPU types |
