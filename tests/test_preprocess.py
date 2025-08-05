@@ -2,8 +2,14 @@ import pandas as pd
 import pytest
 from pandas.api.typing import NAType
 
-from src.config.enum_constants import (AdminsAccountEnum, ExitCodeEnum, InteractiveEnum, PartitionEnum, QOSEnum,
-                                       StatusEnum)
+from src.config.enum_constants import (
+    AdminsAccountEnum,
+    ExitCodeEnum,
+    InteractiveEnum,
+    PartitionEnum,
+    QOSEnum,
+    StatusEnum,
+)
 from src.preprocess import preprocess_data
 from src.preprocess.preprocess import _get_partition_constraint, _get_requested_vram, _get_vram_constraint
 
