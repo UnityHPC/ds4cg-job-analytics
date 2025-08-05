@@ -62,7 +62,7 @@ def _get_multivalent_vram_based_on_node(gpu_type: str, node: str) -> int:
     return vram
 
 
-def _get_vram_constraint(constraints: list[str], gpu_count: int, gpu_mem_usage: int) -> int | NAType:
+def _get_vram_constraint(constraints: list[str], gpu_count: int) -> int | NAType:
     """
     Get the VRAM assigned to a job based on its constraints and GPU usage.
 
@@ -72,7 +72,6 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int, gpu_mem_usage: 
     Args:
         constraints (list[str]): List of constraints from the job, which may include VRAM requests.
         gpu_count (int): Number of GPUs requested by the job.
-        gpu_mem_usage (int): GPU memory usage in bytes.
 
     Returns:
         int | NAType: Maximum VRAM amount in GiB obtained based on the provided constraints, multiplied by the
@@ -477,6 +476,12 @@ def _get_approx_allocated_vram(
         - If the exact number of GPUs is not known, the function uses the minimum VRAM value among the available GPUs.
     """
 
+    if isinstance(gpu_types, (list, dict)):
+        if not gpu_types:
+            return 0
+    elif pd.isna(gpu_types):
+        return 0
+
     # Handle cases with one type of GPU
     if len(gpu_types) == 1:
         try:
@@ -560,7 +565,7 @@ def _fill_missing(res: pd.DataFrame) -> None:
         res["GPUType"]
         .fillna("")
         .apply(
-            lambda x: (["cpu"] if (isinstance(x, str) and x == "") else x.tolist() if isinstance(x, np.ndarray) else x)
+            lambda x: (pd.NA if (isinstance(x, str) and x == "") else x.tolist() if isinstance(x, np.ndarray) else x)
         )
     )
     res.loc[:, "GPUs"] = res["GPUs"].fillna(0)
@@ -639,7 +644,7 @@ def preprocess_data(
     # Added parameters for calculating VRAM metrics
     res.loc[:, "Queued"] = res["StartTime"] - res["SubmitTime"]
     res.loc[:, "vram_constraint"] = res.apply(
-        lambda row: _get_vram_constraint(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1
+        lambda row: _get_vram_constraint(row["Constraints"], row["GPUs"]), axis=1
     ).astype(pd.Int64Dtype())  # Use Int64Dtype to allow for nullable integers
     res.loc[:, "partition_constraint"] = res.apply(
         lambda row: _get_partition_constraint(row["Partition"], row["GPUs"]), axis=1

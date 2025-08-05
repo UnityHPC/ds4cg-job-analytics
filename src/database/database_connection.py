@@ -7,6 +7,7 @@ class DatabaseConnection:
 
     def __init__(self, db_url: str):
         self.db_url = db_url
+        self.connection = None
         self.connection = self._connect()
         print(f"Connected to {self.db_url}")
 
@@ -15,13 +16,14 @@ class DatabaseConnection:
         self.connection = duckdb.connect(self.db_url)
         return self.connection
 
-    def _disconnect(self):
+    def disconnect(self):
+        """Close the connection to the DuckDB database."""
         self.connection.close()
 
     def __del__(self):
         """Ensure the connection is closed when the object is deleted."""
-        if hasattr(self, "connection") and self.is_connected():
-            self._disconnect()
+        if self.is_connected():
+            self.disconnect()
             if not os.getenv("PYTEST_VERSION"):
                 print(f"Disconnected from {self.db_url}")
 
@@ -31,7 +33,7 @@ class DatabaseConnection:
 
     def fetch_all_column_names(self, table_name: str = "Jobs"):
         """Fetch all column names from the Jobs table."""
-        if self.is_connected():
+        if self.connection is not None:
             query = f"SELECT * FROM {table_name} LIMIT 0"
             return self.connection.execute(query).df().columns.tolist()
         else:
@@ -47,7 +49,7 @@ class DatabaseConnection:
         Returns:
             pd.DataFrame: A DataFrame containing the column information.
         """
-        if self.is_connected():
+        if self.connection is not None:
             query = f"DESCRIBE {table_name}"
             return self.connection.execute(query).fetchdf()
         else:
@@ -55,7 +57,7 @@ class DatabaseConnection:
 
     def fetch_all_jobs(self, table_name="Jobs"):
         """Fetch all data from the specified table. Table name is set to Jobs but can be changed accordingly."""
-        if self.is_connected():
+        if self.connection is not None:
             query = f"SELECT * FROM {table_name}"
             return self.connection.execute(query).fetchdf()
         else:
@@ -74,7 +76,7 @@ class DatabaseConnection:
         Returns:
             pd.DataFrame: The result of the query as a pandas DataFrame.
         """
-        if self.is_connected():
+        if self.connection is not None:
             try:
                 return self.connection.query(query).to_df()
             except duckdb.BinderException as e:
