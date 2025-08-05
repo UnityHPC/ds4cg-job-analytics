@@ -672,4 +672,15 @@ def preprocess_data(
         if len(filtered) > 0:
             message = f"Some entries in {col_name} having infinity values. This may be caused by an overflow."
             warnings.warn(message=message, stacklevel=2, category=UserWarning)
+
+    duplicate_rows = res[res["JobID"].duplicated(keep=False)]
+    if not duplicate_rows.empty:
+        duplicate_message = (
+            f"{len(duplicate_rows['JobID'].unique().tolist())} duplicate JobIDs detected. "
+            "Keeping only the latest entry for each JobID."
+        )
+        warnings.warn(message=duplicate_message, stacklevel=2, category=UserWarning)
+        res_sorted = res.sort_values(["SubmitTime"], ascending=False)  # Sort by SubmitTime to keep the latest entry
+        res = res_sorted.drop_duplicates(subset="JobID", keep="first") # Keep the latest entry for each JobID
+
     return res
