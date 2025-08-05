@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 class RemoteConfigFetcher(ABC):
-    """Class to fetch and parse partition information from a remote JSON file."""
+    """Abstract class to fetch and parse partition information from a remote JSON file."""
 
     session = CachedSession('fetch_cache', expire_after=60)  # Cache for 60 seconds
 

@@ -29,7 +29,7 @@ def _helper_filter_irrelevant_records(
     Args:
         input_df (pd.DataFrame): Input dataframe to filter. Note that the Elapsed field should be in unit seconds.
         min_elapsed_seconds (int): Minimum elapsed time in seconds.
-        include_cpu_only_jobs (bool, optional): Whether to include jobs that do not use GPUs (CPU-only jobs).
+        include_cpu_only_jobs (bool): Whether to include jobs that do not use GPUs (CPU-only jobs). Default is False.
 
     Returns:
         pd.DataFrame: Filtered dataframe.
