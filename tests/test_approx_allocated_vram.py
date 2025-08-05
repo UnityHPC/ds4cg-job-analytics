@@ -3,7 +3,7 @@ from src.preprocess.preprocess import _get_approx_allocated_vram
 
 
 # Test for single node VRAM allocation
-def test_approx_allocated_vram_single_node():
+def test_approx_allocated_vram_single_node() -> None:
     gpu_usage = [20, 10, 50, 200, 5, 80]  # in GB
     gpu_usage_bytes = [usage * (2**30) for usage in gpu_usage]  # convert to bytes
     mock_data = pd.DataFrame({
@@ -34,7 +34,7 @@ def test_approx_allocated_vram_single_node():
 
 
 # Test for jobs with mixed nodes and VRAM usage below minimum
-def test_approx_allocated_vram_mixed_nodes_below_minimum():
+def test_approx_allocated_vram_mixed_nodes_below_minimum() -> None:
     gpu_usage = [100]
     gpu_usage_bytes = [usage * (2**30) for usage in gpu_usage]  # convert to bytes
     mock_data = pd.DataFrame({
@@ -58,7 +58,7 @@ def test_approx_allocated_vram_mixed_nodes_below_minimum():
 
 
 # Test for jobs with mixed nodes and VRAM usage exceeding minimum
-def test_approx_allocated_vram_mixed_nodes_exceeding_minimum():
+def test_approx_allocated_vram_mixed_nodes_exceeding_minimum() -> None:
     gpu_usage = [150]  # in GB
     gpu_usage_bytes = [usage * (2**30) for usage in gpu_usage]  # convert to bytes
     mock_data = pd.DataFrame({
@@ -81,7 +81,7 @@ def test_approx_allocated_vram_mixed_nodes_exceeding_minimum():
     assert mock_data["AllocatedVRAM"].tolist() == expected_allocated_vram
 
 
-def test_multivalent_vram_allocation_a100_only():
+def test_multivalent_vram_allocation_a100_only() -> None:
     gpu_usage = [100 * (2**30)]  # 100 GiB usage
     mock_data = pd.DataFrame({
         "JobID": [1],

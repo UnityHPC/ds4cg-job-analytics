@@ -6,7 +6,7 @@ from .mock_data.convert_csv_to_db import convert_csv_to_db
 
 
 @pytest.fixture(scope="module")
-def mock_data_frame(request):
+def mock_data_frame(request: pytest.FixtureRequest) -> list[dict]:
     temp_db_dir = tempfile.mkdtemp()
     mem_db = None
     try:

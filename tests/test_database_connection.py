@@ -5,7 +5,7 @@ import shutil
 
 
 @pytest.fixture(scope="session")
-def temp_file_db():
+def temp_file_db() -> DatabaseConnection:
     """
     Create a temporary file-based database for testing.
 
@@ -92,11 +92,11 @@ def temp_file_db():
         shutil.rmtree(temp_db_dir)
 
 
-def test_connection_established(temp_file_db):
+def test_connection_established(temp_file_db: DatabaseConnection) -> None:
     assert temp_file_db.is_connected() is True
 
 
-def test_fetch_all_returns_correct_data(temp_file_db):
+def test_fetch_all_returns_correct_data(temp_file_db: DatabaseConnection) -> None:
     mock_jobs_df = temp_file_db.fetch_all_jobs()
 
     assert len(mock_jobs_df) == 3
@@ -117,7 +117,7 @@ def test_fetch_all_returns_correct_data(temp_file_db):
     assert mock_jobs_df.iloc[2]["Status"] == "OUT_OF_MEMORY"
 
 
-def test_fetch_selected_columns_with_filter(temp_file_db):
+def test_fetch_selected_columns_with_filter(temp_file_db: DatabaseConnection) -> None:
     query = """
         SELECT JobID, User
         FROM Jobs
@@ -131,7 +131,7 @@ def test_fetch_selected_columns_with_filter(temp_file_db):
     assert mock_jobs_df.iloc[0]["User"] == "alice"
 
 
-def test_fetch_with_filtering_multiple_conditions(temp_file_db):
+def test_fetch_with_filtering_multiple_conditions(temp_file_db: DatabaseConnection) -> None:
     query = """
         SELECT JobID, User
         FROM Jobs
@@ -145,7 +145,7 @@ def test_fetch_with_filtering_multiple_conditions(temp_file_db):
     assert mock_jobs_df.iloc[0]["User"] == "alice"
 
 
-def test_fetch_all_column_names(temp_file_db):
+def test_fetch_all_column_names(temp_file_db: DatabaseConnection) -> None:
     column_names = temp_file_db.fetch_all_column_names()
 
     assert len(column_names) == 29
@@ -156,7 +156,7 @@ def test_fetch_all_column_names(temp_file_db):
     assert "GPUs" in column_names
 
 
-def test_fetch_query_with_invalid_column(temp_file_db):
+def test_fetch_query_with_invalid_column(temp_file_db: DatabaseConnection) -> None:
     query = """
         SELECT GPUMetrics
         FROM Jobs

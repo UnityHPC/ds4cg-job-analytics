@@ -31,7 +31,7 @@ def convert_csv_to_db(path_to_csv: str, path_to_db: str, new_format: bool = Fals
             df_mock[col] = pd.to_numeric(df_mock[col], errors="coerce")
             df_mock[col] = df_mock[col].astype("float64")
 
-        def parse_gpu_type(x):
+        def parse_gpu_type(x: str) -> dict | None:
             if pd.isna(x) or x.strip() == "":
                 return None
             try:

@@ -77,9 +77,6 @@ ignore = [
 "mvp_scripts/*" = ["N", "NPY", "PD", "D100", "TD", "ANN"]
 "notebooks/SlurmGPU.ipynb" = ["N", "NPY", "PD", "D100", "TD", "ANN"]
 
-# TODO (Arda): Remove these ignores once the code is fixed
-"tests/*" = ["ANN"]
-
 [tool.ruff.lint.isort]
 # Combine multiple 'as' imports on a single line (e.g., import foo as bar, baz as qux)
 combine-as-imports = true
