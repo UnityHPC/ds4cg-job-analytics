@@ -2,10 +2,11 @@ import pytest
 from src.database.database_connection import DatabaseConnection
 import tempfile
 import shutil
+from typing import Generator
 
 
 @pytest.fixture(scope="session")
-def temp_file_db() -> DatabaseConnection:
+def temp_file_db() -> Generator[DatabaseConnection, None, None]:
     """
     Create a temporary file-based database for testing.
 
@@ -50,39 +51,40 @@ def temp_file_db() -> DatabaseConnection:
             CPUComputeUsage FLOAT
         );
         """
-        mem_db.connection.execute(schema_sql)
-        insert_sql = """
-        INSERT INTO Jobs VALUES (
-            'abc-123', 101, NULL, 'train_model', FALSE, 'yes', FALSE,
-            'projectX', 'alice', ['A100'], 'normal', 'COMPLETED', '0:0',
-            CURRENT_TIMESTAMP - INTERVAL 3 HOUR,
-            CURRENT_TIMESTAMP - INTERVAL 2 HOUR,
-            CURRENT_TIMESTAMP - INTERVAL 1 HOUR,
-            3600, 7200, 'gpu', 'node001', ['node001'],
-            16, 640, 1, ['A100'], 120, 0.85, 320, 0.75
-        );
-        INSERT INTO Jobs VALUES (
-            'xyz-215', 102, NULL, 'train_model', FALSE, 'yes', FALSE,
-            'projectX', 'bob', ['A100'], 'normal', 'FAILED', '0:0',
-            CURRENT_TIMESTAMP - INTERVAL 3 HOUR,
-            CURRENT_TIMESTAMP - INTERVAL 2 HOUR,
-            CURRENT_TIMESTAMP - INTERVAL 1 HOUR,
-            3600, 7200, 'gpu', 'node001', ['node001'],
-            16, 640, 1, ['M40'], 120, 0.85, 320, 0.75
-        );
-        INSERT INTO Jobs VALUES (
-            'xyz-217', 103, NULL, 'train_model', FALSE, 'yes', FALSE,
-            'projectX', 'chris', ['A100'], 'normal', 'OUT_OF_MEMORY', '0:0',
-            CURRENT_TIMESTAMP - INTERVAL 3 HOUR,
-            CURRENT_TIMESTAMP - INTERVAL 2 HOUR,
-            CURRENT_TIMESTAMP - INTERVAL 1 HOUR,
-            3600, 7200, 'gpu', 'node001', ['node001'],
-            16, 640, 1, ['M40'], 120, 0.85, 320, 0.75
-        );
-        """
-        mem_db.connection.execute(insert_sql)
+        if mem_db.connection is not None:
+            mem_db.connection.execute(schema_sql)
+            insert_sql = """
+            INSERT INTO Jobs VALUES (
+                'abc-123', 101, NULL, 'train_model', FALSE, 'yes', FALSE,
+                'projectX', 'alice', ['A100'], 'normal', 'COMPLETED', '0:0',
+                CURRENT_TIMESTAMP - INTERVAL 3 HOUR,
+                CURRENT_TIMESTAMP - INTERVAL 2 HOUR,
+                CURRENT_TIMESTAMP - INTERVAL 1 HOUR,
+                3600, 7200, 'gpu', 'node001', ['node001'],
+                16, 640, 1, ['A100'], 120, 0.85, 320, 0.75
+            );
+            INSERT INTO Jobs VALUES (
+                'xyz-215', 102, NULL, 'train_model', FALSE, 'yes', FALSE,
+                'projectX', 'bob', ['A100'], 'normal', 'FAILED', '0:0',
+                CURRENT_TIMESTAMP - INTERVAL 3 HOUR,
+                CURRENT_TIMESTAMP - INTERVAL 2 HOUR,
+                CURRENT_TIMESTAMP - INTERVAL 1 HOUR,
+                3600, 7200, 'gpu', 'node001', ['node001'],
+                16, 640, 1, ['M40'], 120, 0.85, 320, 0.75
+            );
+            INSERT INTO Jobs VALUES (
+                'xyz-217', 103, NULL, 'train_model', FALSE, 'yes', FALSE,
+                'projectX', 'chris', ['A100'], 'normal', 'OUT_OF_MEMORY', '0:0',
+                CURRENT_TIMESTAMP - INTERVAL 3 HOUR,
+                CURRENT_TIMESTAMP - INTERVAL 2 HOUR,
+                CURRENT_TIMESTAMP - INTERVAL 1 HOUR,
+                3600, 7200, 'gpu', 'node001', ['node001'],
+                16, 640, 1, ['M40'], 120, 0.85, 320, 0.75
+            );
+            """
+            mem_db.connection.execute(insert_sql)
 
-        yield mem_db
+            yield mem_db
     except Exception as e:
         raise e
     finally:
@@ -123,7 +125,7 @@ def test_fetch_selected_columns_with_filter(temp_file_db: DatabaseConnection) ->
         FROM Jobs
         WHERE Status = 'COMPLETED'
     """
-    mock_jobs_df = temp_file_db.connection.execute(query).fetchdf()
+    mock_jobs_df = temp_file_db.fetch_query(query)
 
     assert len(mock_jobs_df) == 1
     assert list(mock_jobs_df.columns) == ["JobID", "User"]
@@ -137,7 +139,7 @@ def test_fetch_with_filtering_multiple_conditions(temp_file_db: DatabaseConnecti
         FROM Jobs
         WHERE Status = 'COMPLETED' AND GPUs = 1
     """
-    mock_jobs_df = temp_file_db.connection.execute(query).fetchdf()
+    mock_jobs_df = temp_file_db.fetch_query(query)
 
     assert len(mock_jobs_df) == 1
     assert list(mock_jobs_df.columns) == ["JobID", "User"]

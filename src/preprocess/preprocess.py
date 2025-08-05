@@ -162,7 +162,7 @@ def _get_partition_constraint(partition: str, gpu_count: int) -> int | NAType:
     return VRAM_VALUES[gpu_type] * gpu_count
 
 
-def _get_requested_vram(vram_constraint: int, partition_constraint: int | NAType) -> int | NAType:
+def _get_requested_vram(vram_constraint: int | NAType, partition_constraint: int | NAType) -> int | NAType:
     """
     Get the requested VRAM for a job based on its constraints and partition.
 
@@ -172,7 +172,7 @@ def _get_requested_vram(vram_constraint: int, partition_constraint: int | NAType
     If neither is provided, it returns NAType.
 
     Args:
-        vram_constraint (int): The VRAM constraint from the job's constraints.
+        vram_constraint (int | NAType): The VRAM constraint from the job's constraints.
         partition_constraint (int | NAType): The VRAM size based on the partition name.
 
     Returns:

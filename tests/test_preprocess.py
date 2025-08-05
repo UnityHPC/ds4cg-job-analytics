@@ -455,6 +455,7 @@ def test_partition_constraint_and_requested_vram_on_mock_data(mock_data_frame: p
     assert "requested_vram" in processed.columns
 
     # For each row, check that requested_vram is the max of partition_constraint and Constraints (if both are not NA)
+    exoected = pd.NA
     for _idx, row in processed.iterrows():
         part_con = _get_partition_constraint(row["Partition"], row["GPUs"])
         constraint_val = _get_vram_constraint(row["Constraints"], row["GPUs"])
