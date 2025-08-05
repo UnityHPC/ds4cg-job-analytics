@@ -62,7 +62,7 @@ def _get_multivalent_vram_based_on_node(gpu_type: str, node: str) -> int:
     return vram
 
 
-def _get_vram_constraint(constraints: list[str], gpu_count: int) -> int:
+def _get_vram_constraint(constraints: list[str], gpu_count: int) -> int | NAType:
     """
     Get the VRAM assigned to a job based on its constraints and GPU usage.
 
@@ -74,8 +74,8 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int) -> int:
         gpu_count (int): Number of GPUs requested by the job.
 
     Returns:
-        int: Maximum VRAM amount in GiB obtained based on the provided constraints, multiplied by the
-                    number of GPUs. Returns 11 if no constraints are provided.
+        int | NAType: Maximum VRAM amount in GiB obtained based on the provided constraints, multiplied by the
+                    number of GPUs. Returns pd.NA if no VRAM constraints are provided or if no GPUs are requested.
 
     """
     vram_constraints = []
@@ -104,7 +104,7 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int) -> int:
                 vram_constraints.append(VRAM_VALUES[constr])
 
     if not (len(vram_constraints)) or gpu_count == 0:
-        return 11  # if there are no constraints, return 11 GiB as a default requested value
+        return pd.NA # if no VRAM constraints are provided or no GPUs are requested return pd.NA
 
     # TODO (Ayush): Check if we want to take max or min of the VRAM constraints
     return max(vram_constraints) * gpu_count
