@@ -153,11 +153,11 @@ def _get_partition_constraint(partition: str, gpu_count: int) -> int | NAType:
         gpu_count (int): The number of GPUs requested by the job.
 
     Returns:
-        int | NAType: The VRAM size in GiB or NAType if the partition is not recognized.
+        int | NAType: The VRAM size in GiB or NAType if the partition is not recognized or no GPUs are requested.
     """
     gpu_type = _get_partition_gpu(partition).lower()
-    if gpu_type not in VRAM_VALUES:
-        # if the GPU type is not in VRAM_VALUES, return pd.NA
+    if gpu_type not in VRAM_VALUES or gpu_count == 0:
+        # if the GPU type is not in VRAM_VALUES or there are no GPUs requested, return pd.NA
         return pd.NA
     return VRAM_VALUES[gpu_type] * gpu_count
 
