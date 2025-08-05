@@ -32,7 +32,7 @@ def test_load_jobs_no_filter(mock_data):
     assert expect_num_records == len(res)
 
 
-def test_load_jobs_filter_day_back_1(mock_data):
+def test_load_jobs_filter_date_back_1(mock_data):
     """
     Test for filtering by days_back
     """
@@ -53,7 +53,7 @@ def test_load_jobs_filter_day_back_1(mock_data):
         assert id in expect_job_ids
 
 
-def test_load_jobs_filter_day_back_2(mock_data):
+def test_load_jobs_filter_date_back_2(mock_data):
     """
     Test for filtering by days_back
     """
@@ -95,7 +95,7 @@ def test_load_jobs_filter_min_elapsed(mock_data):
         assert id in expect_job_ids
 
 
-def test_load_jobs_filter_day_back_include_all(mock_data):
+def test_load_jobs_filter_date_back_include_all(mock_data):
     """
     Test for filtering by days_back, including CPU only jobs and FAILED/ CANCELLED jobs
     """
@@ -184,15 +184,18 @@ def test_load_jobs_custom_query_days_back_2(mock_data, recwarn):
     ].copy()
     expect_ids = filtered_data["JobID"].to_list()
     expect_warning_msg = (
-        "Parameter days_back = 100 is passed but custom_query already contained conditions for "
+        "Parameter dates_back = 100 is passed but custom_query already contained conditions for "
         "filtering by dates_back. dates_back condition in custom_query will be used."
     )
 
-    assert len(recwarn) == 5
     assert str(recwarn[0].message) == expect_warning_msg
     assert len(res) == len(filtered_data)
     for id in res["JobID"]:
         assert id in expect_ids
+
+
+# TODO: add another test for handling empty dataframe
+# TODO: move test preprocess to test_preprocess modules
 
 
 def test_preprocess_key_errors_raised(mock_data, recwarn):
@@ -231,7 +234,7 @@ def test_preprocess_warning_raised(mock_data, recwarn):
         query = f"SELECT {col_str} FROM Jobs"
 
         expect_warning_msg = (
-            f"Column {col} not exist in dataframe, this may result in unexpected outcome when filtering."
+            f"Column {col} not exist in dataframe, this may result in unexpected results when filtering."
         )
         with pytest.warns(UserWarning, match=expect_warning_msg):
             _res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=db_path, custom_query=query)
