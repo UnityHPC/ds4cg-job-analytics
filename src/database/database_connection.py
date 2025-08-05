@@ -4,14 +4,14 @@ import pandas as pd
 
 
 class DatabaseConnection:
-    
     """
     A class to manage database connections using DuckDB.
 
-    This class provides methods to establish a connection to a DuckDB database using a given URL. 
+    This class provides methods to establish a connection to a DuckDB database using a given URL.
     It can be used to interact with the database and perform operations.
 
     """
+
     def __init__(self, db_url: str, read_only: bool = True) -> None:
         self.db_url = db_url
         self.connection = None
@@ -24,14 +24,17 @@ class DatabaseConnection:
         Args:
             read_only (bool): If True, the connection will be read-only. We want to set the default to read_only=True.
 
-        Returns: 
+        Returns:
             duckdb.DuckDBPyConnection: The connection object to the DuckDB database.
         """
         self.connection = duckdb.connect(database=self.db_url, read_only=read_only)
         return self.connection
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         """Close the connection to the DuckDB database."""
+        if self.connection is not None:
+            self.connection.close()
+            self.connection = None
 
     def __del__(self) -> None:
         """Ensure the connection is closed when the object is deleted."""
@@ -44,22 +47,22 @@ class DatabaseConnection:
         """
         Check if the database connection is active.
 
-        Returns: 
+        Returns:
             bool: True if the connection is active, False otherwise
         """
         return self.connection is not None
 
     def fetch_all_column_names(self, table_name: str = "Jobs") -> list[str]:
         """Fetch all column names from any table. By default, it fetches from a table named 'Jobs'.
-        
-        Args: 
-            table_name (str): The name of the table to fetch all the column names from. Defaults to "Jobs"  
+
+        Args:
+            table_name (str): The name of the table to fetch all the column names from. Defaults to "Jobs"
 
         Raises:
             ConnectionError: If the connection is not established.
 
         Returns:
-            list: A list of column names from the specified table.    
+            list: A list of column names from the specified table.
         """
         if self.connection is not None:
             query = f"SELECT * FROM {table_name} LIMIT 0"
@@ -94,7 +97,7 @@ class DatabaseConnection:
 
         Raises:
             ConnectionError: If the connection is not active.
-            
+
         Returns:
             pd.DataFrame: A pandas DataFrame containing all rows from the specified table.
         """
