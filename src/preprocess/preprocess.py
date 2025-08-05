@@ -681,6 +681,6 @@ def preprocess_data(
         )
         warnings.warn(message=duplicate_message, stacklevel=2, category=UserWarning)
         res_sorted = res.sort_values(["SubmitTime"], ascending=False)  # Sort by SubmitTime to keep the latest entry
-        res = res_sorted.drop_duplicates(subset="JobID", keep="first") # Keep the latest entry for each JobID
+        res = res_sorted.drop_duplicates(subset="JobID", keep="first")  # Keep the latest entry for each JobID
 
     return res
