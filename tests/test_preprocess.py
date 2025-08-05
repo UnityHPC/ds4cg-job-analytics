@@ -377,9 +377,6 @@ def test_preprocess_gpu_type(mock_data_frame):
         include_cpu_only_jobs=True,
     )
 
-    # Check that GPUType is filled with 'cpu' for CPU-only 
-    temp = data.loc[data["GPUs"].isna(), "GPUType"]
-    print(temp)
     assert all(row == ["cpu"] for row in data.loc[data["GPUType"].isna(), "GPUType"])
 
     # Check that numpy arrays in GPUType are converted to lists

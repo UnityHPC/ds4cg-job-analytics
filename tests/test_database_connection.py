@@ -16,7 +16,7 @@ def temp_file_db():
         mem_db = None
         temp_db_dir = tempfile.mkdtemp()
         temp_db_path = f"{temp_db_dir}/mock_database.db"
-        mem_db = DatabaseConnection(db_url=temp_db_path)
+        mem_db = DatabaseConnection(db_url=temp_db_path, read_only=False)
         schema_sql = """
         CREATE TABLE Jobs (
             UUID VARCHAR,
@@ -87,7 +87,6 @@ def temp_file_db():
         raise e
     finally:
         if mem_db is not None:
-            mem_db._disconnect()
             del mem_db
         shutil.rmtree(temp_db_dir)
 
