@@ -13,7 +13,7 @@ def load_preprocessed_jobs_dataframe_from_duckdb(
     table_name: str = "Jobs",
     sample_size: int | None = None,
     random_state: pd._typing.RandomState | None = None,
-    days_back: int | None = None,
+    dates_back: int | None = None,
     custom_query: str = "",
     include_failed_cancelled_jobs: bool = False,
     include_cpu_only_jobs: bool = False,
@@ -27,8 +27,8 @@ def load_preprocessed_jobs_dataframe_from_duckdb(
         table_name (str, optional): Table name to query. Defaults to 'Jobs'.
         sample_size (int, optional): Number of rows to sample from the DataFrame. Defaults to None (no sampling).
         random_state (pd._typing.RandomState, optional): Random state for reproducibility. Defaults to None.
-        days_back (int, optional): Number of days back to filter jobs based on StartTime.
-            Deafults to None. If None, will not filter by startTime.
+        dates_back (int, optional): Number of days back to filter jobs based on StartTime.
+            Defaults to None. If None, will not filter by startTime.
         custom_query(str, optional): Custom SQL query to execute. Defaults to an empty string.
             If empty, will select all jobs.
         include_failed_cancelled_jobs (bool, optional): If True, include jobs with FAILED or CANCELLED status.
@@ -45,8 +45,9 @@ def load_preprocessed_jobs_dataframe_from_duckdb(
         RuntimeError: If the jobs DataFrame cannot be loaded from the database.
     """
 
+    # check if the query contains condition of date_back in the form "StartTime > date"
     def _contain_dates_back_condition(query: str) -> bool:
-        pattern = r"(?i:WHERE)\s+[^;]*StartTime\s*>=\s*[^;]+"
+        pattern = r"(?:WHERE)\s+[^;]*StartTime\s*>=?\s*[^;]+"
         return bool(re.search(pattern, query, re.IGNORECASE))
 
     if isinstance(db_path, Path):
@@ -56,15 +57,15 @@ def load_preprocessed_jobs_dataframe_from_duckdb(
 
         if not custom_query:
             custom_query = f"SELECT * FROM {table_name}"
-        if days_back is not None and not _contain_dates_back_condition(custom_query):
-            cutoff = datetime.now() - timedelta(days=days_back)
+        if dates_back is not None and not _contain_dates_back_condition(custom_query):
+            cutoff = datetime.now() - timedelta(days=dates_back)
             if "where" not in custom_query.lower():
                 custom_query += f" WHERE StartTime >= '{cutoff}'"
             else:
                 custom_query += f" AND StartTime >= '{cutoff}'"
-        elif days_back is not None and _contain_dates_back_condition(custom_query):
+        elif dates_back is not None and _contain_dates_back_condition(custom_query):
             warnings.warn(
-                f"Parameter days_back = {days_back} is passed but custom_query already contained conditions for "
+                f"Parameter dates_back = {dates_back} is passed but custom_query already contained conditions for "
                 "filtering by dates_back. dates_back condition in custom_query will be used.",
                 UserWarning,
                 stacklevel=2,

@@ -253,7 +253,8 @@ def preprocess_data(
     """
     Preprocess dataframe, filtering out unwanted rows and columns, filling missing values and converting types.
 
-    Handling missing columns logic:
+    Notes:
+        # Handling missing columns logic
         - columns in ENFORCE_COLUMNS are columns that are must-have for basic metrics calculation.
         - columns in ESSENTIAL_COLUMNS are columns that are involved in preprocessing logics.
         - For any columns in ENFORCE_COLUMNS that do not exist, a KeyError will be raised.
@@ -281,12 +282,12 @@ def preprocess_data(
 
     # filtering records
     col_set = set(data.columns.to_list())
-    for col in ESSENTIAL_COLUMNS:
-        if col not in col_set and col in ENFORCE_COLUMNS:
-            raise KeyError(f"Column {col} does not exist in dataframe.")
-        elif col not in col_set:
+    for col_name in ESSENTIAL_COLUMNS:
+        if col_name not in col_set and col_name in ENFORCE_COLUMNS:
+            raise KeyError(f"Column {col_name} does not exist in dataframe.")
+        elif col_name not in col_set:
             warnings.warn(
-                f"Column {col} not exist in dataframe, this may result in unexpected outcome when filtering.",
+                f"Column {col_name} not exist in dataframe, this may result in unexpected results when filtering.",
                 UserWarning,
                 stacklevel=2,
             )
@@ -310,23 +311,27 @@ def preprocess_data(
         ("Partition", lambda df: df["Partition"] != PartitionEnum.BUILDING.value),
     ]
 
-    for col, cond in filter_conditions:
-        if col in data:
+    for col_name, cond in filter_conditions:
+        if col_name in data:
             mask &= cond(data)
     res = data[mask].copy()
+
+    if res.empty:
+        warnings.warn(
+            message="Dataframe results from database and filtering is empty.", category=UserWarning, stacklevel=2
+        )
 
     _fill_missing(res)
     # Type casting for columns involving time
     time_columns = ["StartTime", "SubmitTime"]
-    for col in time_columns:
-        res[col] = pd.to_datetime(res[col], errors="coerce")
+    for col_name in time_columns:
+        res[col_name] = pd.to_datetime(res[col_name], errors="coerce")
 
     timedelta_columns = ["TimeLimit", "Elapsed"]
-    for col in timedelta_columns:
-        try:
-            res[col] = pd.to_timedelta(res[col], unit="s", errors="coerce")
-        except KeyError:
+    for col_name in timedelta_columns:
+        if col_name not in res.columns:
             continue
+        res[col_name] = pd.to_timedelta(res[col_name], unit="s", errors="coerce")
     # Added parameters for calculating VRAM metrics
     res.loc[:, "Queued"] = res["StartTime"] - res["SubmitTime"]
 
@@ -334,7 +339,7 @@ def preprocess_data(
     vram_constraints_series = res.apply(
         lambda row: _get_vram_constraint(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1
     )
-    # when dataframe is empty, vram_constraints_series is the whole epty dataframe
+    # when dataframe is empty, vram_constraints_series is the whole empty dataframe
     if len(vram_constraints_series):
         res.loc[:, "vram_constraint"] = vram_constraints_series.astype(pd.Int64Dtype())
     else:
@@ -352,14 +357,13 @@ def preprocess_data(
 
     # Convert columns to categorical
 
-    for col, enum_obj in ATTRIBUTE_CATEGORIES.items():
-        try:
-            enum_values = [e.value for e in enum_obj]
-            unique_values = res[col].unique().tolist()
-            all_categories = list(set(enum_values) | set(unique_values))
-            res[col] = pd.Categorical(res[col], categories=all_categories, ordered=False)
-        except KeyError:
+    for col_name, enum_obj in ATTRIBUTE_CATEGORIES.items():
+        if col_name not in res.columns:
             continue
+        enum_values = [e.value for e in enum_obj]
+        unique_values = res[col_name].unique().tolist()
+        all_categories = list(set(enum_values) | set(unique_values))
+        res[col_name] = pd.Categorical(res[col_name], categories=all_categories, ordered=False)
 
     # Raise warning if GPUMemUsage or CPUMemUsage having infinity values
     mem_usage_columns = ["CPUMemUsage", "GPUMemUsage"]
