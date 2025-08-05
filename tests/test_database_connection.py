@@ -16,7 +16,7 @@ def temp_file_db():
     mem_db = None
     try:
         temp_db_path = f"{temp_db_dir}/mock_database.db"
-        mem_db = DatabaseConnection(db_url=temp_db_path)
+        mem_db = DatabaseConnection(db_url=temp_db_path, read_only=False)
         schema_sql = """
         CREATE TABLE Jobs (
             UUID VARCHAR,
