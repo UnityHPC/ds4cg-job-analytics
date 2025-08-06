@@ -32,7 +32,7 @@ def test_load_jobs_no_filter(mock_data):
     assert expect_num_records == len(res)
 
 
-def test_load_jobs_filter_date_back_1(mock_data):
+def test_load_jobs_filter_date_back_1(mock_data, recwarn):
     """
     Test for filtering by days_back
     """
@@ -53,7 +53,7 @@ def test_load_jobs_filter_date_back_1(mock_data):
         assert id in expect_job_ids
 
 
-def test_load_jobs_filter_date_back_2(mock_data):
+def test_load_jobs_filter_date_back_2(mock_data, recwarn):
     """
     Test for filtering by days_back
     """
@@ -74,7 +74,7 @@ def test_load_jobs_filter_date_back_2(mock_data):
         assert id in expect_job_ids
 
 
-def test_load_jobs_filter_min_elapsed(mock_data):
+def test_load_jobs_filter_min_elapsed(mock_data, recwarn):
     """
     Test for filtering by days back and minimum elapsed time.
     """
@@ -95,7 +95,7 @@ def test_load_jobs_filter_min_elapsed(mock_data):
         assert id in expect_job_ids
 
 
-def test_load_jobs_filter_date_back_include_all(mock_data):
+def test_load_jobs_filter_date_back_include_all(mock_data, recwarn):
     """
     Test for filtering by days_back, including CPU only jobs and FAILED/ CANCELLED jobs
     """
@@ -114,7 +114,9 @@ def test_load_jobs_filter_date_back_include_all(mock_data):
 
 def test_load_jobs_custom_query(mock_data, recwarn):
     """
-    Test if function fetches expected records when using custom sql query
+    Test if function fetches expected records when using custom sql query.
+
+    Warnings are expected to be raised since this select a subset of columns.
     """
     mock_csv, db_path = mock_data
     query = (
@@ -133,7 +135,7 @@ def test_load_jobs_custom_query(mock_data, recwarn):
 
 def test_load_jobs_custom_query_days_back_1(mock_data, recwarn):
     """
-    Test in case custom query does not contain dates_back and dates_back parameter is given
+    Test in case custom query does not contain dates_back and dates_back parameter is given.
 
     Expect result will be filtered correctly by dates_back.
     """
@@ -194,8 +196,20 @@ def test_load_jobs_custom_query_days_back_2(mock_data, recwarn):
         assert id in expect_ids
 
 
-# TODO: add another test for handling empty dataframe
-# TODO: move test preprocess to test_preprocess modules
+def test_preprocess_empty_dataframe_warning(mock_data, recwarn):
+    """
+    Test handling the dataframe loads from database when the result is empty.
+
+    Expect a UserWarning to be raised with the appropriate message.
+    """
+    _mock_csv, db_path = mock_data
+    # Query that returns no rows
+    query = "SELECT * FROM Jobs WHERE 1=0"
+    res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=db_path, custom_query=query)
+    assert res.empty
+    # Check that the warning is about empty dataframe
+    assert len(recwarn) == 1
+    assert str(recwarn[0].message) == "Dataframe results from database and filtering is empty."
 
 
 def test_preprocess_key_errors_raised(mock_data, recwarn):

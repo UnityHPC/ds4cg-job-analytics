@@ -13,7 +13,7 @@ from .conftest import helper_filter_irrelevant_records
 import pytest
 
 
-def test_preprocess_data_filtred_columns(mock_data):
+def test_preprocess_data_filtred_columns(mock_data, recwarn):
     """
     Test that the preprocessed data does not contain irrelevant columns.
     """
@@ -25,7 +25,7 @@ def test_preprocess_data_filtred_columns(mock_data):
     assert "Preempted" not in data.columns
 
 
-def test_preprocess_data_filtered_gpu(mock_data):
+def test_preprocess_data_filtered_gpu(mock_data, recwarn):
     """
     Test that the preprocessed data does not contain null GPUType and GPUs.
     """
@@ -37,7 +37,7 @@ def test_preprocess_data_filtered_gpu(mock_data):
     assert not any(is_gpu_null)
 
 
-def test_preprocess_data_filtered_status(mock_data):
+def test_preprocess_data_filtered_status(mock_data, recwarn):
     """
     Test that the preprocessed data does not contain FAILED or CANCELLED jobs.
     """
@@ -49,7 +49,7 @@ def test_preprocess_data_filtered_status(mock_data):
     assert not any(status_cancelled)
 
 
-def test_preprocess_data_filtered_min_elapses_1(mock_data):
+def test_preprocess_data_filtered_min_elapses_1(mock_data, recwarn):
     """
     Test that the preprocessed data does not contain jobs with elapsed time below the threshold (300 seconds).
     """
@@ -61,7 +61,7 @@ def test_preprocess_data_filtered_min_elapses_1(mock_data):
     assert not any(elapsed_below_threshold)
 
 
-def test_preprocess_data_filter_min_esplapes_2(mock_data):
+def test_preprocess_data_filter_min_esplapes_2(mock_data, recwarn):
     """
     Test that the preprocessed data contains only jobs with elapsed time below the threshold (700 seconds).
     """
@@ -77,7 +77,7 @@ def test_preprocess_data_filter_min_esplapes_2(mock_data):
     assert len(data) == len(ground_truth)
 
 
-def test_preprocess_data_filtered_root_account(mock_data):
+def test_preprocess_data_filtered_root_account(mock_data, recwarn):
     """
     Test that the preprocessed data does not contain jobs with root account, partition building, or qos updates.
     """
@@ -91,7 +91,7 @@ def test_preprocess_data_filtered_root_account(mock_data):
     assert not any(partition_building)
 
 
-def test_preprocess_data_include_cpu_job(mock_data):
+def test_preprocess_data_include_cpu_job(mock_data, recwarn):
     """
     Test that the preprocessed data includes CPU-only jobs when specified.
     """
@@ -116,7 +116,7 @@ def test_preprocess_data_include_cpu_job(mock_data):
     assert data["GPUs"].value_counts()[0] == expected_gpus_count_0
 
 
-def test_preprocess_data_include_failed_cancelled_job(mock_data):
+def test_preprocess_data_include_failed_cancelled_job(mock_data, recwarn):
     """
     Test that the preprocessed data includes FAILED and CANCELLED jobs when specified.
     """
@@ -141,7 +141,7 @@ def test_preprocess_data_include_failed_cancelled_job(mock_data):
     assert data["Status"].value_counts()[StatusEnum.CANCELLED.value] == expect_cancelled_status
 
 
-def test_preprocess_data_include_custom_qos(mock_data):
+def test_preprocess_data_include_custom_qos(mock_data, recwarn):
     mock_data_frame = mock_data[0]
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_custom_qos=True)
     ground_truth = helper_filter_irrelevant_records(mock_data_frame, 600, include_custom_qos=True)
@@ -157,7 +157,7 @@ def test_preprocess_data_include_custom_qos(mock_data):
         assert id in expect_ids
 
 
-def test_preprocess_data_include_all(mock_data):
+def test_preprocess_data_include_all(mock_data, recwarn):
     """
     Test that the preprocessed data includes all jobs when CPU-only, FAILED/CANCELLED, custom QOS jobs are specified.
     """
@@ -185,7 +185,7 @@ def test_preprocess_data_include_all(mock_data):
     assert data["Status"].value_counts()[StatusEnum.COMPLETED.value] == expect_completed_status
 
 
-def test_preprocess_data_fill_missing_interactive(mock_data):
+def test_preprocess_data_fill_missing_interactive(mock_data, recwarn):
     """
     Test that the preprocessed data fills missing interactive job types with 'non-interactive' correctly.
     """
@@ -204,7 +204,7 @@ def test_preprocess_data_fill_missing_interactive(mock_data):
     assert interactive_stat[InteractiveEnum.NON_INTERACTIVE.value] == expect_non_interactive
 
 
-def test_preprocess_data_fill_missing_array_id(mock_data):
+def test_preprocess_data_fill_missing_array_id(mock_data, recwarn):
     """
     Test that the preprocessed data fills missing ArrayID with -1 correctly.
     """
@@ -221,7 +221,7 @@ def test_preprocess_data_fill_missing_array_id(mock_data):
     assert array_id_stat[-1] == expect_array_id_null
 
 
-def test_preprocess_data_fill_missing_gpu_type(mock_data):
+def test_preprocess_data_fill_missing_gpu_type(mock_data, recwarn):
     """
     Test that the preprocessed data fills missing GPUType with 'cpu' correctly.
     """
@@ -242,7 +242,7 @@ def test_preprocess_data_fill_missing_gpu_type(mock_data):
     assert gpus_stat[0] == expect_gpus_null
 
 
-def test_preprocess_data_fill_missing_constraints(mock_data):
+def test_preprocess_data_fill_missing_constraints(mock_data, recwarn):
     """
     Test that the preprocessed data fills missing Constraints with empty numpy array correctly.
     """
@@ -259,7 +259,7 @@ def test_preprocess_data_fill_missing_constraints(mock_data):
     assert sum(len(x) == 0 for x in data["Constraints"]) == expect_constraints_null
 
 
-def test_category_interactive(mock_data):
+def test_category_interactive(mock_data, recwarn):
     """
     Test that the preprocessed data has 'Interactive' as a categorical variable and check values contained within it.
     """
@@ -279,7 +279,7 @@ def test_category_interactive(mock_data):
     assert expected.issubset(set(data["Interactive"].cat.categories))
 
 
-def test_category_qos(mock_data):
+def test_category_qos(mock_data, recwarn):
     """
     Test that the preprocessed data has 'QOS' as a categorical variable and check values contained within it.
     """
@@ -298,7 +298,7 @@ def test_category_qos(mock_data):
     assert expected.issubset(set(data["QOS"].cat.categories))
 
 
-def test_category_exit_code(mock_data):
+def test_category_exit_code(mock_data, recwarn):
     """
     Test that the preprocessed data has 'ExitCode' as a categorical variable and check values contained within it.
     """
@@ -318,7 +318,7 @@ def test_category_exit_code(mock_data):
     assert expected.issubset(set(data["ExitCode"].cat.categories))
 
 
-def test_category_partition(mock_data):
+def test_category_partition(mock_data, recwarn):
     """
     Test that the preprocessed data has 'Partition' as a categorical variable and check values contained within it.
     """
@@ -338,7 +338,7 @@ def test_category_partition(mock_data):
     assert expected.issubset(set(data["Partition"].cat.categories))
 
 
-def test_category_account(mock_data):
+def test_category_account(mock_data, recwarn):
     """
     Test that the preprocessed data has 'Account' as a categorical variable and check values contained within it.
     """
@@ -358,7 +358,7 @@ def test_category_account(mock_data):
     assert expected.issubset(set(data["Account"].cat.categories))
 
 
-def test_preprocess_timedelta_conversion(mock_data):
+def test_preprocess_timedelta_conversion(mock_data, recwarn):
     """
     Test that the preprocessed data converts elapsed time to timedelta.
     """
@@ -378,7 +378,7 @@ def test_preprocess_timedelta_conversion(mock_data):
     assert time_limit[max_len - 1].total_seconds() == ground_truth["TimeLimit"][max_len - 1]
 
 
-def test_preprocess_gpu_type(mock_data):
+def test_preprocess_gpu_type(mock_data, recwarn):
     """
     Test that the GPUType column is correctly filled and transformed during preprocessing.
     """
