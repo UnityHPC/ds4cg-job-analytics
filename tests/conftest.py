@@ -42,17 +42,26 @@ def helper_filter_irrelevant_records(
     return res
 
 
+# fixture for returning path to temporary db
 @pytest.fixture(scope="module")
-def mock_data():
-    temp_db_dir = tempfile.mkdtemp()
-    mem_db = None
+def mock_data_path():
     try:
+        temp_db_dir = tempfile.mkdtemp()
         temp_db_path = f"{temp_db_dir}/mock.db"
         convert_csv_to_db("tests/mock_data/mock.csv", temp_db_path)
-        mem_db = DatabaseConnection(temp_db_path)
-        yield mem_db.fetch_all_jobs(), temp_db_path
+        yield temp_db_path
+    finally:
+        shutil.rmtree(temp_db_dir)
+
+
+# fixture for returning mock_data_frame
+@pytest.fixture(scope="module")
+def mock_data(mock_data_path):
+    mem_db = None
+    try:
+        mem_db = DatabaseConnection(mock_data_path)
+        yield mem_db.fetch_all_jobs()
     except Exception as e:
         raise Exception("Exception at mock_data_frame") from e
     finally:
         del mem_db
-        shutil.rmtree(temp_db_dir)
