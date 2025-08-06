@@ -1,4 +1,4 @@
-from .enum_constants import InteractiveEnum, QOSEnum, StatusEnum, ExitCodeEnum, PartitionEnum, AdminsAccountEnum
+from .enum_constants import InteractiveEnum, QOSEnum, StatusEnum, ExitCodeEnum, AdminPartitionEnum, AdminsAccountEnum
 
 # VRAM values for different GPU types in GB. Add new GPU types in lowercase as needed.
 VRAM_VALUES = {
@@ -36,7 +36,7 @@ ATTRIBUTE_CATEGORIES = {
     "Status": StatusEnum,
     "ExitCode": ExitCodeEnum,
     "Account": AdminsAccountEnum,
-    "Partition": PartitionEnum,
+    "Partition": AdminPartitionEnum,
 }
 
 # Storing GPU names that have multiple vram options

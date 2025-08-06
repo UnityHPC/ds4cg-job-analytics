@@ -342,9 +342,9 @@ class EfficiencyAnalysis:
                 "Calculated it using the input jobs DataFrame."
             )
 
-        # Compute user_job_hours_per_job once and reuse for both metrics
-        user_job_hours_per_job = self.jobs_with_efficiency_metrics.groupby("User", observed=True)[
-            "job_hours"
+        # Compute user_vram_hours_per_job once and reuse for both metrics
+        user_vram_hours_per_job = self.jobs_with_efficiency_metrics.groupby("User", observed=True)[
+            "vram_hours"
         ].transform("sum")
 
         def avg_non_inf(x: pd.Series) -> float | pd.api.typing.NAType:
@@ -375,7 +375,7 @@ class EfficiencyAnalysis:
         self.jobs_with_efficiency_metrics.loc[:, "weighted_alloc_vram_efficiency"] = (
             self.jobs_with_efficiency_metrics["alloc_vram_efficiency"]
             * self.jobs_with_efficiency_metrics["vram_hours"]
-            / user_job_hours_per_job
+            / user_vram_hours_per_job
         )
 
         users_w_efficiency_metrics.loc[:, "expected_value_alloc_vram_efficiency"] = (
@@ -387,7 +387,7 @@ class EfficiencyAnalysis:
         self.jobs_with_efficiency_metrics.loc[:, "weighted_vram_constraint_efficiency"] = (
             self.jobs_with_efficiency_metrics["vram_constraint_efficiency"]
             * self.jobs_with_efficiency_metrics["vram_hours"]
-            / user_job_hours_per_job
+            / user_vram_hours_per_job
         ).astype(pd.Float64Dtype())
 
         users_w_efficiency_metrics.loc[:, "expected_value_vram_constraint_efficiency"] = (
@@ -399,7 +399,7 @@ class EfficiencyAnalysis:
         self.jobs_with_efficiency_metrics.loc[:, "weighted_gpu_count"] = (
             self.jobs_with_efficiency_metrics["gpu_count"]
             * self.jobs_with_efficiency_metrics["vram_hours"]
-            / user_job_hours_per_job
+            / user_vram_hours_per_job
         )
         users_w_efficiency_metrics.loc[:, "expected_value_gpu_count"] = (
             self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_gpu_count"]
