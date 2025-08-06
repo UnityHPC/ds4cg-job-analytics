@@ -99,7 +99,7 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int) -> int | NAType
             if constr in VRAM_VALUES:
                 vram_constraints.append(VRAM_VALUES[constr])
 
-    if not (len(vram_constraints)) or gpu_count == 0:
+    if not (len(vram_constraints)):
         return pd.NA  # if no VRAM constraints are provided or no GPUs are requested return pd.NA
 
     # TODO (Ayush): Check if we want to take max or min of the VRAM constraints
