@@ -8,7 +8,9 @@ from src.config.enum_constants import (
     PartitionEnum,
     AdminsAccountEnum,
 )
+from src.config.constants import ENFORCE_COLUMNS, ESSENTIAL_COLUMNS
 from .conftest import helper_filter_irrelevant_records
+import pytest
 
 
 def test_preprocess_data_filtred_columns(mock_data):
@@ -391,3 +393,35 @@ def test_preprocess_gpu_type(mock_data):
 
     # Check that numpy arrays in GPUType are converted to lists
     assert all(isinstance(row, list) for row in data["GPUType"] if not pd.isna(row))
+
+
+def test_preprocess_key_errors_raised(mock_data, recwarn):
+    """
+    Test handling the dataframe when missing one of the ENFORCE_COLUMNS in constants.py
+
+    Expect to raise KeyError for any of these columns if they are missing in the dataframe.
+    """
+    mock_csv, db_path = mock_data
+    for col in ENFORCE_COLUMNS:
+        cur_df = mock_csv.drop(col, axis=1, inplace=False)
+        with pytest.raises(KeyError, match=f"Column {col} does not exist in dataframe."):
+            _res = preprocess_data(cur_df)
+
+
+def test_preprocess_warning_raised(mock_data, recwarn):
+    """
+    Test handling the dataframe when missing one of the columns
+
+    These columns are not in ENFORCE_COLUMNS so only warnings are expected to be raised.
+    """
+    mock_csv, db_path = mock_data
+    for col in ESSENTIAL_COLUMNS:
+        if col in ENFORCE_COLUMNS:
+            continue
+        cur_df = mock_csv.drop(col, axis=1, inplace=False)
+
+        expect_warning_msg = (
+            f"Column {col} not exist in dataframe, this may result in unexpected results when filtering."
+        )
+        with pytest.warns(UserWarning, match=expect_warning_msg):
+            _res = preprocess_data(cur_df)

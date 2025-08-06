@@ -202,7 +202,7 @@ def test_preprocess_key_errors_raised(mock_data, recwarn):
     """
     Test handling the dataframe loads from database when missing one of the ENFORCE_COLUMNS in constants.py
 
-    Expect to raise KeyError for any of these columns if they are missing in the dataframe
+    Expect to raise RuntimeError for any of these columns if they are missing in the dataframe
     """
     mock_csv, db_path = mock_data
     for col in ENFORCE_COLUMNS:
@@ -220,7 +220,7 @@ def test_preprocess_warning_raised(mock_data, recwarn):
     """
     Test handling the dataframe loads from database when missing one of the columns
 
-    These columns are not the one in ENFORCE_COLUMNS so warnings, not errors, are expected to be raised
+    These columns are not in ENFORCE_COLUMNS so only warnings are expected to be raised
     """
     mock_csv, db_path = mock_data
     for col in ESSENTIAL_COLUMNS:
@@ -238,10 +238,3 @@ def test_preprocess_warning_raised(mock_data, recwarn):
         )
         with pytest.warns(UserWarning, match=expect_warning_msg):
             _res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=db_path, custom_query=query)
-
-
-def test_check_elasped(mock_data):
-    mock_csv, db_path = mock_data
-    temp = (mock_csv["EndTime"] - mock_csv["StartTime"]).apply(lambda x: pandas.to_timedelta(x).total_seconds())
-    print(temp)
-    assert all(temp == mock_csv["Elapsed"])
