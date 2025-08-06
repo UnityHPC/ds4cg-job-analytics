@@ -290,9 +290,9 @@ def preprocess_data(
     for col in time_columns:
         data[col] = pd.to_datetime(data[col], errors="coerce")
 
-    time_limit_in_seconds = res["TimeLimit"] * 60
-    res["TimeLimit"] = pd.to_timedelta(time_limit_in_seconds, unit="s", errors="coerce")
-    res["Elapsed"] = pd.to_timedelta(res["Elapsed"], unit="s", errors="coerce")
+    time_limit_in_seconds = data["TimeLimit"] * 60
+    data["TimeLimit"] = pd.to_timedelta(time_limit_in_seconds, unit="s", errors="coerce")
+    data["Elapsed"] = pd.to_timedelta(data["Elapsed"], unit="s", errors="coerce")
 
     # Added parameters for calculating VRAM metrics
     data.loc[:, "Queued"] = data["StartTime"] - data["SubmitTime"]
