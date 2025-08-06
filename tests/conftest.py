@@ -17,7 +17,8 @@ def mock_data_frame():
     except Exception as e:
         raise Exception("Exception at mock_data_frame") from e
     finally:
-        mem_db._disconnect()
-        del mem_db
+        if mem_db is not None:
+            mem_db._disconnect()
+            del mem_db
         shutil.rmtree(temp_db_dir)
         
