@@ -10,6 +10,7 @@ from ..config.constants import (
     DEFAULT_MIN_ELAPSED_SECONDS,
     ATTRIBUTE_CATEGORIES,
     MULTIVALENT_GPUS,
+    PARTITION_TO_GPU_MAP,
 )
 from ..config.enum_constants import StatusEnum, AdminsAccountEnum, AdminPartitionEnum, QOSEnum, PartitionTypeEnum
 from ..config.remote_config import PartitionInfoFetcher
@@ -112,7 +113,7 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int) -> int | NAType
     return max(vram_constraints) * gpu_count
 
 
-def _get_partition_gpu(partition: str) -> str:
+def _get_partition_gpu(partition: str) -> str | None:
     """
     Get the GPU type based on the partition name.
 
@@ -122,25 +123,9 @@ def _get_partition_gpu(partition: str) -> str:
         partition (str): The name of the partition (e.g., "superpod-a100", "umd-cscdr-gpu").
 
     Returns:
-        str: The GPU type associated with the partition or the partition if no specific mapping exists.
-
+        str | None: The GPU type associated with the partition or None if no specific mapping exists.
     """
-    temp = partition.replace("gypsum-", "")
-    if partition in ["superpod-a100", "umd-cscdr-gpu", "uri-gpu", "cbio-gpu"]:
-        return "a100-80g"
-    if partition in ["power9-gpu", "power9-gpu-preempt"]:
-        return "v100"
-    if partition in ["ials-gpu"]:
-        return "2080_ti"
-    if partition in ["ece-gpu"]:
-        return "a100-40g"
-    if partition in ["lan"]:
-        return "a40"
-    if partition in ["astroth-gpu"]:
-        return "2080"
-    if partition in ["gpupod-l40s"]:
-        return "l40s"
-    return temp
+    return PARTITION_TO_GPU_MAP.get(partition.lower(), None)
 
 
 def _get_partition_constraint(partition: str, gpu_count: int) -> int | NAType:
@@ -155,11 +140,11 @@ def _get_partition_constraint(partition: str, gpu_count: int) -> int | NAType:
         gpu_count (int): The number of GPUs requested by the job.
 
     Returns:
-        int | NAType: The VRAM size in GiB or NAType if the partition is not recognized or no GPUs are requested.
+        int | NAType: The requested VRAM in GiB or NAType if the partition is not recognized.
     """
-    gpu_type = _get_partition_gpu(partition).lower()
-    if gpu_type not in VRAM_VALUES or gpu_count == 0:
-        # if the GPU type is not in VRAM_VALUES or there are no GPUs requested, return pd.NA
+    gpu_type = _get_partition_gpu(partition)
+    if gpu_type is None:
+        # if the GPU Type is not inferrable from the partition, return NAType
         return pd.NA
     return VRAM_VALUES[gpu_type] * gpu_count
 
