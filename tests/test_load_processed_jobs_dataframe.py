@@ -238,3 +238,10 @@ def test_preprocess_warning_raised(mock_data, recwarn):
         )
         with pytest.warns(UserWarning, match=expect_warning_msg):
             _res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=db_path, custom_query=query)
+
+
+def test_check_elasped(mock_data):
+    mock_csv, db_path = mock_data
+    temp = (mock_csv["EndTime"] - mock_csv["StartTime"]).apply(lambda x: pandas.to_timedelta(x).total_seconds())
+    print(temp)
+    assert all(temp == mock_csv["Elapsed"])
