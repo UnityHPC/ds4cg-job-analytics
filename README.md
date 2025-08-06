@@ -185,8 +185,8 @@ contains tools to add a number of useful derived columns for plotting and analys
 | Partition |  VARCHAR | Job partition |
 | Nodes |  VARCHAR | Job nodes as compact string |
 | NodeList |  VARCHAR[] | List of job nodes |
-| CPUs |  SMALLINT | Number of CPUs |
-| Memory |  INT | Job allocated memory (MiB) |
+| CPUs |  SMALLINT | Number of CPU cores |
+| Memory |  INTEGER | Job allocated memory (bytes) |
 | GPUs |  SMALLINT | Number of GPUs requested |
 | GPUType |  DICT | Dictionary with keys as type of GPU (str) and the values as number of GPUs corresponding to that type (int) |
 | GPUMemUsage |  FLOAT | GPU memory usage (bytes) |
