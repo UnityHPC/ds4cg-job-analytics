@@ -8,20 +8,17 @@ from src.config.enum_constants import (
     AdminsAccountEnum,
     ExitCodeEnum,
     InteractiveEnum,
-    PartitionEnum,
     QOSEnum,
     StatusEnum,
     AdminPartitionEnum,
-    PartitionTypeEnum
+    PartitionTypeEnum,
 )
 from src.preprocess import preprocess_data
 from src.preprocess.preprocess import _get_partition_constraint, _get_requested_vram, _get_vram_constraint
 
 
 def _helper_filter_irrelevant_records(
-    input_df: pd.DataFrame,
-    min_elapsed_seconds: int,
-    include_cpu_only_jobs: bool = False
+    input_df: pd.DataFrame, min_elapsed_seconds: int, include_cpu_only_jobs: bool = False
 ) -> pd.DataFrame:
     """
     Private function to help generate expected ground truth dataframe for test.
@@ -41,7 +38,7 @@ def _helper_filter_irrelevant_records(
         pd.DataFrame: Filtered dataframe.
     """
 
-    # TODO(Tan): Update implementation to use the same logic as preprocess_data 
+    # TODO(Tan): Update implementation to use the same logic as preprocess_data
     mask = pd.Series([True] * len(input_df), index=input_df.index)
 
     mask &= input_df["Elapsed"] >= min_elapsed_seconds
@@ -50,7 +47,7 @@ def _helper_filter_irrelevant_records(
     mask &= input_df["QOS"] != QOSEnum.UPDATES.value
     # Filter out jobs whose partition type is not 'gpu', unless include_cpu_only_jobs is True.
     partition_info = PartitionInfoFetcher().get_info()
-    gpu_partitions = [p['name'] for p in partition_info if p['type'] == PartitionTypeEnum.GPU.value]
+    gpu_partitions = [p["name"] for p in partition_info if p["type"] == PartitionTypeEnum.GPU.value]
     mask &= input_df["Partition"].isin(gpu_partitions) | include_cpu_only_jobs
 
     return input_df[mask].copy()
@@ -94,7 +91,6 @@ def test_preprocess_data_filtered_status(mock_data_frame: pd.DataFrame) -> None:
     assert not any(status_cancelled)
 
 
-
 @pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)
 def test_preprocess_data_filtered_min_elapsed_1(mock_data_frame: pd.DataFrame) -> None:
     """
@@ -121,9 +117,8 @@ def test_preprocess_data_filter_min_elapsed_2(mock_data_frame: pd.DataFrame) -> 
     # TODO (Tan): Update the mock data to include jobs with elapsed time below 700 seconds
     ground_truth = _helper_filter_irrelevant_records(mock_data_frame, 700, include_cpu_only_jobs=True)
     assert len(data) == len(ground_truth), (
-    f"JobIDs in data: {data['JobID'].tolist()}, "
-    f"JobIDs in ground_truth: {ground_truth['JobID'].tolist()}"
-)
+        f"JobIDs in data: {data['JobID'].tolist()}, JobIDs in ground_truth: {ground_truth['JobID'].tolist()}"
+    )
 
 
 @pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)

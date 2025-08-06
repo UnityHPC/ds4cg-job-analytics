@@ -97,7 +97,7 @@ class AdminsAccountEnum(Enum):
 @unique
 class AdminPartitionEnum(Enum):
     """An enumeration representing partitions used by admin in maintenance that need to be omitted from analysis.
-    
+
     Attributes:
         BUILDING: Represents the building partition.
     """

@@ -610,7 +610,7 @@ def preprocess_data(
         print("[Preprocessing] Running with new database format: GPU types as dictionary.")
     elif isinstance(first_non_null, list):
         print("[Preprocessing] Running with old database format: GPU types as list.")
-        
+
     mask = pd.Series([True] * len(data), index=data.index)
 
     mask &= data["Elapsed"] >= min_elapsed_seconds
@@ -619,12 +619,11 @@ def preprocess_data(
     mask &= data["QOS"] != QOSEnum.UPDATES.value
     # Filter out failed or cancelled jobs, except when include_failed_cancel_jobs is True
     mask &= (
-        (data["Status"] != StatusEnum.FAILED.value)
-        & (data["Status"] != StatusEnum.CANCELLED.value)
+        (data["Status"] != StatusEnum.FAILED.value) & (data["Status"] != StatusEnum.CANCELLED.value)
     ) | include_failed_cancelled_jobs
     # Filter out jobs whose partition type is not 'gpu', unless include_cpu_only_jobs is True.
     partition_info = PartitionInfoFetcher().get_info()
-    gpu_partitions = [p['name'] for p in partition_info if p['type'] == PartitionTypeEnum.GPU.value]
+    gpu_partitions = [p["name"] for p in partition_info if p["type"] == PartitionTypeEnum.GPU.value]
     mask &= data["Partition"].isin(gpu_partitions) | include_cpu_only_jobs
 
     data = data[mask].copy()
