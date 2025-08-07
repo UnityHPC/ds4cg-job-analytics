@@ -15,11 +15,11 @@ def test_load_jobs_correct_types(mock_data_path):
     assert isinstance(res, pandas.DataFrame)
 
 
-def test_load_jobs_no_filter(mock_data, mock_data_path):
+def test_load_jobs_no_filter(mock_data_frame, mock_data_path):
     """
     Test in case there is no filtering, function should return every valid records from database.
     """
-    temp = helper_filter_irrelevant_records(mock_data, 0)
+    temp = helper_filter_irrelevant_records(mock_data_frame, 0)
     ground_truth_csv = temp[
         (temp["Status"] != StatusEnum.CANCELLED.value)
         & (temp["Status"] != StatusEnum.FAILED.value)
@@ -31,11 +31,11 @@ def test_load_jobs_no_filter(mock_data, mock_data_path):
     assert expect_num_records == len(res)
 
 
-def test_load_jobs_filter_date_back_1(mock_data, mock_data_path, recwarn):
+def test_load_jobs_filter_date_back_1(mock_data_frame, mock_data_path, recwarn):
     """
     Test for filtering by days_back
     """
-    temp = helper_filter_irrelevant_records(mock_data, 0)
+    temp = helper_filter_irrelevant_records(mock_data_frame, 0)
     res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=mock_data_path, dates_back=90)
     cutoff = datetime.now() - timedelta(days=90)
     ground_truth_csv = temp[
@@ -51,11 +51,11 @@ def test_load_jobs_filter_date_back_1(mock_data, mock_data_path, recwarn):
         assert id in expect_job_ids
 
 
-def test_load_jobs_filter_date_back_2(mock_data, mock_data_path, recwarn):
+def test_load_jobs_filter_date_back_2(mock_data_frame, mock_data_path, recwarn):
     """
     Test for filtering by days_back
     """
-    temp = helper_filter_irrelevant_records(mock_data, 0)
+    temp = helper_filter_irrelevant_records(mock_data_frame, 0)
     res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=mock_data_path, dates_back=150)
     cutoff = datetime.now() - timedelta(days=150)
     ground_truth_csv = temp[
@@ -71,11 +71,11 @@ def test_load_jobs_filter_date_back_2(mock_data, mock_data_path, recwarn):
         assert id in expect_job_ids
 
 
-def test_load_jobs_filter_min_elapsed(mock_data, mock_data_path, recwarn):
+def test_load_jobs_filter_min_elapsed(mock_data_frame, mock_data_path, recwarn):
     """
     Test for filtering by days back and minimum elapsed time.
     """
-    temp = helper_filter_irrelevant_records(mock_data, 13000)
+    temp = helper_filter_irrelevant_records(mock_data_frame, 13000)
     res = load_preprocessed_jobs_dataframe_from_duckdb(
         db_path=mock_data_path, min_elapsed_seconds=13000, dates_back=90
     )
@@ -93,11 +93,11 @@ def test_load_jobs_filter_min_elapsed(mock_data, mock_data_path, recwarn):
         assert id in expect_job_ids
 
 
-def test_load_jobs_filter_date_back_include_all(mock_data, mock_data_path, recwarn):
+def test_load_jobs_filter_date_back_include_all(mock_data_frame, mock_data_path, recwarn):
     """
     Test for filtering by days_back, including CPU only jobs and FAILED/ CANCELLED jobs
     """
-    temp = helper_filter_irrelevant_records(mock_data, 0)
+    temp = helper_filter_irrelevant_records(mock_data_frame, 0)
     res = load_preprocessed_jobs_dataframe_from_duckdb(
         db_path=mock_data_path, dates_back=90, include_cpu_only_jobs=True, include_failed_cancelled_jobs=True
     )
@@ -109,7 +109,7 @@ def test_load_jobs_filter_date_back_include_all(mock_data, mock_data_path, recwa
         assert id in expect_job_ids
 
 
-def test_load_jobs_custom_query(mock_data, mock_data_path, recwarn):
+def test_load_jobs_custom_query(mock_data_frame, mock_data_path, recwarn):
     """
     Test if function fetches expected records when using custom sql query.
 
@@ -122,8 +122,10 @@ def test_load_jobs_custom_query(mock_data, mock_data_path, recwarn):
     res = load_preprocessed_jobs_dataframe_from_duckdb(
         db_path=mock_data_path, custom_query=query, include_cpu_only_jobs=True
     )
-    filtered_data = mock_data[
-        (mock_data["Status"] != "CANCELLED") & (mock_data["Status"] != "FAILED") & (mock_data["ArrayID"].notna())
+    filtered_data = mock_data_frame[
+        (mock_data_frame["Status"] != "CANCELLED")
+        & (mock_data_frame["Status"] != "FAILED")
+        & (mock_data_frame["ArrayID"].notna())
     ].copy()
     assert len(res) == len(filtered_data)
     expect_ids = filtered_data["JobID"].to_list()
@@ -131,7 +133,7 @@ def test_load_jobs_custom_query(mock_data, mock_data_path, recwarn):
         assert id in expect_ids
 
 
-def test_load_jobs_custom_query_days_back_1(mock_data, mock_data_path, recwarn):
+def test_load_jobs_custom_query_days_back_1(mock_data_frame, mock_data_path, recwarn):
     """
     Test in case custom query does not contain dates_back and dates_back parameter is given.
 
@@ -145,11 +147,11 @@ def test_load_jobs_custom_query_days_back_1(mock_data, mock_data_path, recwarn):
         db_path=mock_data_path, custom_query=query, include_cpu_only_jobs=True, dates_back=150
     )
     cutoff = datetime.now() - timedelta(days=150)
-    filtered_data = mock_data[
-        (mock_data["Status"] != "CANCELLED")
-        & (mock_data["Status"] != "FAILED")
-        & (mock_data["ArrayID"].notna())
-        & (mock_data["StartTime"] >= cutoff)
+    filtered_data = mock_data_frame[
+        (mock_data_frame["Status"] != "CANCELLED")
+        & (mock_data_frame["Status"] != "FAILED")
+        & (mock_data_frame["ArrayID"].notna())
+        & (mock_data_frame["StartTime"] >= cutoff)
     ].copy()
     assert len(res) == len(filtered_data)
     expect_ids = filtered_data["JobID"].to_list()
@@ -157,7 +159,7 @@ def test_load_jobs_custom_query_days_back_1(mock_data, mock_data_path, recwarn):
         assert id in expect_ids
 
 
-def test_load_jobs_custom_query_days_back_2(mock_data, mock_data_path, recwarn):
+def test_load_jobs_custom_query_days_back_2(mock_data_frame, mock_data_path, recwarn):
     """
     Test in case custom_query already contains dates_back condtion and date_back parameter is given
 
@@ -174,11 +176,11 @@ def test_load_jobs_custom_query_days_back_2(mock_data, mock_data_path, recwarn):
         db_path=mock_data_path, custom_query=query, include_cpu_only_jobs=True, dates_back=100
     )
 
-    filtered_data = mock_data[
-        (mock_data["Status"] != "CANCELLED")
-        & (mock_data["Status"] != "FAILED")
-        & (mock_data["ArrayID"].notna())
-        & (mock_data["StartTime"] >= cutoff)
+    filtered_data = mock_data_frame[
+        (mock_data_frame["Status"] != "CANCELLED")
+        & (mock_data_frame["Status"] != "FAILED")
+        & (mock_data_frame["ArrayID"].notna())
+        & (mock_data_frame["StartTime"] >= cutoff)
     ].copy()
     expect_ids = filtered_data["JobID"].to_list()
     expect_warning_msg = (

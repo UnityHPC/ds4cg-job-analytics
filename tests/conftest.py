@@ -56,7 +56,7 @@ def mock_data_path():
 
 # fixture for returning mock_data_frame
 @pytest.fixture(scope="module")
-def mock_data(mock_data_path):
+def mock_data_frame(mock_data_path):
     mem_db = None
     try:
         mem_db = DatabaseConnection(mock_data_path)
