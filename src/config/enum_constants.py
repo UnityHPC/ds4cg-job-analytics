@@ -142,6 +142,25 @@ class PartitionTypeEnum(Enum):
 
 
 @unique
+class NodeInfoKeyEnum(Enum):
+    """
+    An enumeration representing important keys in node information configuration.
+
+    Attributes:
+        NAME: Represents the name of the node.
+        TYPE: Represents the type of the node (e.g., CPU, GPU).
+        RAM: Represents the total RAM available on the node.
+        COUNT: Represents the number of nodes of this type.
+        GPU_COUNT: Represents the number of GPUs available on the node.
+    """
+
+    NODES = "nodes"
+    RAM = "ram"
+    COUNT = "count"
+    GPU_COUNT = "gpu_count"
+
+
+@unique
 class MetricsDataFrameNameEnum(Enum):
     """
     An enumeration representing the names of DataFrames containing efficiency metrics.

@@ -3,6 +3,7 @@ import json
 import os
 from requests_cache import CachedSession
 from pathlib import Path
+from .enum_constants import NodeInfoKeyEnum
 
 
 class RemoteConfigFetcher(ABC):
@@ -153,3 +154,54 @@ class NodeInfoFetcher(RemoteConfigFetcher):
     def info_name(self) -> str:
         """Type of information being fetched."""
         return "node"
+    
+    def _validate_info(self, info: list[dict]) -> bool:
+        """Validate the fetched node information.
+
+        This function checks that each node info dictionary contains the keys listed in NodeInfoKeyEnum.
+        It also applies the base class validation.
+
+        Args:
+            info (list[dict]): The fetched node information to validate.
+
+        Raises:
+            ValueError: If the fetched data does not contain the expected keys.
+            
+        Returns:
+            bool: True if the data is valid, False otherwise."""
+
+        for p in info:
+            missing_keys = [key.value for key in NodeInfoKeyEnum.__members__.values() if key.value not in p]
+            if missing_keys:
+                raise ValueError(
+                    "Each node info dictionary must contain the keys listed in NodeInfoKeyEnum."
+                    f" Missing keys: {missing_keys}"
+                    f"{' in ' + p['nodes_folded'] if 'nodes_folded' in p else ''}"
+                )
+        return super()._validate_info(info)
+    
+    def get_node_memory(self, node_name: str, offline: bool = False) -> int:
+        """Get the total CPU memory of a node in GiB.
+
+        Args:
+            node_name (str): The name of the node.
+            offline (bool): If True, skip fetching from remote and only read from local file.
+
+        Raises:
+            ValueError: If the node is not found in the node configuration file.
+            ValueError: If there is an error calculating the node memory.
+
+        Returns:
+            int: Total memory of the node in GiB, or None if not found.
+        """
+        nodes_info = self.get_info(offline)
+        try:
+            # see if that name exists in the nodes info file
+            for node_batch in nodes_info:
+                for name in node_batch['nodes']:
+                    if name == node_name:
+                        return node_batch["ram"]
+            # If the node is not found, raise an exception
+            raise ValueError(f"Node '{node_name}' not found in node configuration file {self.local_path}.")
+        except Exception as e:
+            raise ValueError(f"Error calculating node memory from {self.local_path}: {e}") from e
