@@ -122,7 +122,8 @@ class EfficiencyAnalysis:
 
         Args:
             col (pd.Series): The column to filter.
-            filter (str | datetime | int | float | list | set | tuple | dict | pd.api.typing.NAType): The filter value(s).
+            filter (str | datetime | int | float | list | set | tuple | dict | pd.api.typing.NAType):
+              The filter value(s).
             permissible_filter_types (set[FilterTypeEnum]): Set of permissible filter types.
             filter_name (str): Name of the filter.
 

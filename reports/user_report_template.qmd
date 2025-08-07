@@ -1,0 +1,705 @@
+---
+title: !expr paste("USER", params$user_id, "Unity GPU Jobs Analytics")
+format: 
+  html:
+    theme: cosmo
+    css: styles.css
+    toc: true
+    toc-depth: 3
+    page-layout: article
+    self-contained: true
+params:
+  data_file: "user_data.json"
+---
+
+```{python}
+#| tags: [parameters]
+#| echo: false
+
+data_file = "user_data.json"
+```
+
+```{python}
+#| echo: false
+
+# Import required libraries
+import pandas as pd
+import numpy as np
+import json
+import sys
+import os
+from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
+import seaborn as sns
+from pathlib import Path
+
+# Add the project root to Python path so we can import from src
+project_root = Path.cwd().parent  # Go up from reports directory to project root
+sys.path.insert(0, str(project_root))
+
+# Set up plotting style
+plt.style.use('default')
+sns.set_palette("husl")
+
+# Load data from JSON file
+try:
+    with open(f"user_reports/temp/{data_file}", 'r') as f:
+        data = json.load(f)
+    
+    # Extract all variables from the JSON data
+    user_id = data['user_id']
+    start_date = data['start_date']
+    end_date = data['end_date']
+    analysis_period = data['analysis_period']
+    
+    # Convert data back to DataFrames
+    summary_stats_df = pd.DataFrame(data['summary_stats'])
+    comparison_stats_df = pd.DataFrame(data['comparison_stats'])
+    time_series_data_df = pd.DataFrame(data['time_series_data'])
+    gpu_type_data_df = pd.DataFrame(data['gpu_type_data'])
+    recommendations = data['recommendations']
+    user_jobs = pd.DataFrame(data['user_jobs'])
+    
+    print(f"Report generated for user: {user_id}")
+    print(f"Analysis period: {analysis_period}")
+    print(f"Total jobs analyzed: {len(user_jobs)}")
+    
+except Exception as e:
+    print(f"Error loading data: {e}")
+    # Initialize fallback values
+    user_id = "UNKNOWN"
+    analysis_period = "Unknown"
+    summary_stats_df = pd.DataFrame()
+    comparison_stats_df = pd.DataFrame()
+    time_series_data_df = pd.DataFrame()
+    gpu_type_data_df = pd.DataFrame()
+    recommendations = []
+    user_jobs = pd.DataFrame()
+```
+
+## {analysis_period} GPU Jobs Analytics
+
+**Analysis Period:** `{python} print(analysis_period)`
+
+---
+
+## Summary Statistics
+
+```{python}
+#| echo: false
+
+# Display the summary statistics table
+if len(summary_stats_df) > 0:
+    # Style the table with HTML formatting
+    from IPython.display import display, HTML
+    
+    # Create a styled HTML table
+    table_html = summary_stats_df.to_html(
+        index=False,
+        escape=False,
+        classes='table table-striped table-hover',
+        table_id='summary-stats-table',
+        border=0
+    )
+    
+    # Add custom CSS styling to make it look better
+    styled_table = f"""
+    <style>
+    #summary-stats-table {{
+        width: 100%;
+        margin: 20px 0;
+        border-collapse: collapse;
+        font-family: Arial, sans-serif;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border-radius: 8px;
+        overflow: hidden;
+    }}
+    #summary-stats-table th {{
+        background-color: #4CAF50;
+        color: white;
+        font-weight: bold;
+        padding: 12px 15px;
+        text-align: left;
+        border: none;
+    }}
+    #summary-stats-table td {{
+        padding: 12px 15px;
+        border-bottom: 1px solid #ddd;
+        background-color: #f9f9f9;
+    }}
+    #summary-stats-table tr:nth-child(even) td {{
+        background-color: #f2f2f2;
+    }}
+    #summary-stats-table tr:hover td {{
+        background-color: #e8f5e8;
+    }}
+    </style>
+    {table_html}
+    """
+    
+    display(HTML(styled_table))
+    
+else:
+    # Fallback minimal table if no data passed
+    fallback_html = """
+    <style>
+    .fallback-table {
+        width: 100%;
+        margin: 20px 0;
+        border-collapse: collapse;
+        font-family: Arial, sans-serif;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .fallback-table th {
+        background-color: #f44336;
+        color: white;
+        font-weight: bold;
+        padding: 12px 15px;
+        text-align: left;
+    }
+    .fallback-table td {
+        padding: 12px 15px;
+        background-color: #fff3e0;
+        border-bottom: 1px solid #ddd;
+    }
+    </style>
+    <table class="fallback-table">
+        <thead>
+            <tr>
+                <th>Metric</th>
+                <th>Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Data Status</td>
+                <td>No summary statistics provided</td>
+            </tr>
+        </tbody>
+    </table>
+    """
+    display(HTML(fallback_html))
+```
+
+### Performance Summary
+
+```{python}
+#| echo: false
+#| output: asis
+
+if len(summary_stats_df) > 0:
+    # Extract key metrics from summary_stats_df for narrative
+    try:
+        # Get efficiency category and metrics from the table
+        efficiency_row = summary_stats_df[summary_stats_df['Metric'].str.contains('efficiency category', case=False, na=False)]
+        vram_usage_row = summary_stats_df[summary_stats_df['Metric'].str.contains('Average VRAM efficiency', case=False, na=False)]
+        zero_usage_row = summary_stats_df[summary_stats_df['Metric'].str.contains('Zero usage jobs', case=False, na=False)]
+        time_estimate_row = summary_stats_df[summary_stats_df['Metric'].str.contains('Time estimation', case=False, na=False)]
+        cpu_gpu_ratio_row = summary_stats_df[summary_stats_df['Metric'].str.contains('CPU/GPU memory ratio', case=False, na=False)]
+        
+        # Generate narrative based on available data
+        if not efficiency_row.empty:
+            efficiency_category = efficiency_row.iloc[0]['Value']
+            print(f"Your overall job's efficiency in this period lies in the **{efficiency_category}** category.")
+        
+        if not vram_usage_row.empty:
+            vram_efficiency = vram_usage_row.iloc[0]['Value']
+            print(f" Your GPU jobs use **{vram_efficiency}** of the requested GPU memory on average.")
+        
+        if not zero_usage_row.empty:
+            zero_usage = zero_usage_row.iloc[0]['Value']
+            if "0" not in str(zero_usage):
+                print(f"\n⚠️ **{zero_usage}** of your jobs did not use any significant amount of GPU memory.")
+            else:
+                print("\n✓ All of your jobs are using GPU memory effectively.")
+        
+        if not time_estimate_row.empty:
+            time_estimate = time_estimate_row.iloc[0]['Value']
+            print(f"\nYou appear to have **{time_estimate}** the time limits for your jobs.")
+        
+        if not cpu_gpu_ratio_row.empty:
+            cpu_gpu_ratio = cpu_gpu_ratio_row.iloc[0]['Value']
+            try:
+                ratio_value = float(str(cpu_gpu_ratio).split()[0])
+                if ratio_value > 2.0:
+                    print(f"\n⚠️ Your CPU to GPU memory usage ratio is high ({cpu_gpu_ratio}). This might indicate that your jobs are more CPU-intensive than GPU-intensive.")
+            except:
+                pass
+                
+    except Exception as e:
+        print("Performance analysis data not available in expected format.")
+else:
+    print("No performance summary data provided.")
+```
+
+---
+
+## Single-Column Visualizations
+
+### GPU Memory Usage Distribution
+
+```{python}
+#| echo: false
+#| fig-cap: "GPU Memory Usage Distribution"
+#| fig-width: 10
+#| fig-height: 6
+
+if len(user_jobs) > 0 and 'used_vram_gib' in user_jobs.columns:
+    # Create histogram of GPU memory usage
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    if len(user_jobs) > 0:
+        sns.histplot(data=user_jobs, x="used_vram_gib", bins=20, kde=True, color='blue', alpha=0.7, ax=ax)
+        
+        # Add average and median lines
+        avg_usage = user_jobs["used_vram_gib"].mean()
+        median_usage = user_jobs["used_vram_gib"].median()
+        
+        ax.axvline(x=avg_usage, color='red', linestyle='--', label=f'Average: {avg_usage:.2f} GiB')
+        ax.axvline(x=median_usage, color='green', linestyle='--', label=f'Median: {median_usage:.2f} GiB')
+        
+        ax.set_xlabel('GPU Memory Used (GiB)')
+        ax.set_ylabel('Number of Jobs')
+        ax.set_title('Distribution of Your GPU Memory Usage')
+        ax.legend()
+        plt.tight_layout()
+        plt.show()
+    else:
+        print("No job data available for this user.")
+else:
+    print("GPU memory usage data not available.")
+```
+
+### Job Status Distribution
+
+```{python}
+#| echo: false
+#| fig-cap: "Job Status Distribution"
+#| fig-width: 8
+#| fig-height: 6
+
+if len(user_jobs) > 0 and 'Status' in user_jobs.columns:
+    
+    if len(user_jobs) > 0:
+        # Create pie chart of job statuses
+        status_counts = user_jobs['Status'].value_counts()
+        
+        fig, ax = plt.subplots(figsize=(8, 6))
+        colors = plt.cm.Set3(np.linspace(0, 1, len(status_counts)))
+        
+        wedges, texts, autotexts = ax.pie(status_counts.values, labels=status_counts.index, 
+                                         autopct='%1.1f%%', colors=colors, startangle=90)
+        
+        ax.set_title('Distribution of Job Statuses')
+        plt.tight_layout()
+        plt.show()
+    else:
+        print("No job data available for this user.")
+else:
+    print("Job status data not available.")
+```
+
+### GPU Type Usage
+
+```{python}
+#| echo: false
+#| fig-cap: "GPU Type Usage"
+#| fig-width: 10
+#| fig-height: 6
+
+if len(gpu_type_data_df) > 0:
+    # Create GPU type visualization using pre-calculated data
+    plt.figure(figsize=(10, 6))
+    plt.pie(gpu_type_data_df['job_count'], labels=gpu_type_data_df['gpu_type'], autopct='%1.1f%%')
+    plt.title('GPU Type Usage Distribution')
+    plt.axis('equal')
+    plt.show()
+else:
+    print("No GPU type data available.")
+```
+
+---
+
+## Comparison with All Users
+
+### VRAM Efficiency Comparison
+
+```{python}
+#| echo: false
+#| fig-cap: "VRAM Efficiency Comparison"
+#| fig-width: 10
+#| fig-height: 6
+
+if len(comparison_stats_df) > 0:
+    # Create comparison visualization
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    categories = comparison_stats_df['Category']
+    your_values = comparison_stats_df['Your_Value']
+    avg_values = comparison_stats_df['Average_Value']
+    
+    x = np.arange(len(categories))
+    width = 0.35
+    
+    bars1 = ax.bar(x - width/2, your_values, width, label='Your Performance', alpha=0.8)
+    bars2 = ax.bar(x + width/2, avg_values, width, label='Average Performance', alpha=0.8)
+    
+    ax.set_xlabel('Performance Category')
+    ax.set_ylabel('Value')
+    ax.set_title('Your Performance vs. Average Users')
+    ax.set_xticks(x)
+    ax.set_xticklabels(categories, rotation=45, ha='right')
+    ax.legend()
+    
+    # Add value labels on bars
+    def autolabel(rects, values):
+        for rect, value in zip(rects, values):
+            height = rect.get_height()
+            ax.annotate(f'{value:.1f}',
+                       xy=(rect.get_x() + rect.get_width() / 2, height),
+                       xytext=(0, 3),
+                       textcoords="offset points",
+                       ha='center', va='bottom')
+    
+    autolabel(bars1, your_values)
+    autolabel(bars2, avg_values)
+    
+    plt.tight_layout()
+    plt.show()
+else:
+    print("No comparison data available.")
+```
+
+### Time Usage Efficiency Comparison
+
+```{python}
+#| echo: false
+#| fig-cap: "Time Usage Efficiency Comparison"
+#| fig-width: 12
+#| fig-height: 7
+
+if len(comparison_stats_df) > 0:
+    # Find time efficiency comparison
+    time_comparison = comparison_stats_df[comparison_stats_df['Category'].str.contains('Time Usage', case=False, na=False)]
+    
+    if not time_comparison.empty:
+        fig, ax = plt.subplots(figsize=(12, 7))
+        
+        categories = ['Your Time Usage', 'Average User Time Usage']
+        values = [time_comparison.iloc[0]['Your_Value'], time_comparison.iloc[0]['Average_Value']]
+        colors = ['#1f77b4', '#ff7f0e']
+        
+        # Create bars using matplotlib instead of seaborn
+        bars = ax.bar(categories, values, color=colors, alpha=0.8, width=0.6)
+        
+        # Add value labels on bars
+        for bar, value in zip(bars, values):
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + max(values) * 0.01,
+                   f'{value:.2f}%',
+                   ha='center', va='bottom', fontsize=12, fontweight='bold')
+        
+        ax.set_ylabel('Time Usage (%)', fontsize=12)
+        ax.set_title('Your Time Usage Efficiency vs. Average User', fontsize=14, fontweight='bold')
+        ax.grid(True, alpha=0.3, axis='y')
+        
+        # Improve layout
+        plt.subplots_adjust(bottom=0.15)
+        ax.set_ylim(0, max(values) * 1.15)
+        
+        plt.tight_layout()
+        plt.show()
+        
+        # Print values for debugging
+        print(f"Your time usage efficiency: {values[0]:.2f}%")
+        print(f"Average user time usage efficiency: {values[1]:.2f}%")
+        
+    else:
+        print("Time usage comparison data not available.")
+        print("Available comparison categories:")
+        if len(comparison_stats_df) > 0:
+            for cat in comparison_stats_df['Category'].tolist():
+                print(f"  - {cat}")
+else:
+    print("No comparison statistics provided.")
+```
+
+### Total GPU Memory Usage Comparison
+
+```{python}
+#| echo: false
+#| fig-cap: "Total GPU Memory Usage Comparison"
+#| fig-width: 12
+#| fig-height: 7
+
+if len(comparison_stats_df) > 0:
+    # Find total GPU memory comparison
+    memory_comparison = comparison_stats_df[comparison_stats_df['Category'].str.contains('Total GPU Memory', case=False, na=False)]
+    
+    if not memory_comparison.empty:
+        fig, ax = plt.subplots(figsize=(12, 7))
+        
+        categories = ['Your Total GPU Memory', 'Average User Total GPU Memory']
+        values = [memory_comparison.iloc[0]['Your_Value'], memory_comparison.iloc[0]['Average_Value']]
+        colors = ['#2ca02c', '#d62728']
+        
+        # Create bars using matplotlib instead of seaborn to avoid warnings
+        bars = ax.bar(categories, values, color=colors, alpha=0.8, width=0.6)
+        
+        # Add value labels on bars
+        for bar, value in zip(bars, values):
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + max(values) * 0.01,
+                   f'{value:.0f} GiB',
+                   ha='center', va='bottom', fontsize=12, fontweight='bold')
+        
+        ax.set_ylabel('Total GPU Memory Used (GiB)', fontsize=12)
+        ax.set_title('Your Total GPU Memory Usage vs. Average User', fontsize=14, fontweight='bold')
+        ax.grid(True, alpha=0.3, axis='y')
+        
+        # Improve layout and spacing
+        plt.subplots_adjust(bottom=0.15)
+        ax.set_ylim(0, max(values) * 1.15)
+        
+        # Wrap long labels if needed
+        ax.set_xticklabels(['Your Total\nGPU Memory', 'Average User\nTotal GPU Memory'])
+        
+        plt.tight_layout()
+        plt.show()
+        
+        # Also print the values for debugging
+        print(f"Your total GPU memory usage: {values[0]:.1f} GiB")
+        print(f"Average user total GPU memory usage: {values[1]:.1f} GiB")
+        
+    else:
+        print("Total GPU memory comparison data not available.")
+        print("Available comparison categories:")
+        if len(comparison_stats_df) > 0:
+            for cat in comparison_stats_df['Category'].tolist():
+                print(f"  - {cat}")
+else:
+    print("No comparison statistics provided.")
+```
+
+---
+
+## Time Series Analysis
+
+### VRAM Efficiency Over Time
+
+```{python}
+#| echo: false
+#| fig-cap: "VRAM Efficiency Over Time"
+#| fig-width: 12
+#| fig-height: 8
+
+if len(time_series_data_df) > 0:
+    try:
+        # Import the TimeSeriesVisualizer
+        from src.visualization.time_series import TimeSeriesVisualizer
+        
+        # First, let's check what columns we have and map them to what TimeSeriesVisualizer expects
+        print("Available time series columns:", list(time_series_data_df.columns))
+        
+        # Create a copy and map columns to what TimeSeriesVisualizer expects
+        ts_data = time_series_data_df.copy()
+        
+        # Map our columns to expected column names
+        if 'Metric' in ts_data.columns:
+            ts_data['Efficiency'] = ts_data['Metric']
+        elif 'alloc_vram_efficiency' in ts_data.columns:
+            ts_data['Efficiency'] = ts_data['alloc_vram_efficiency']
+        
+        if 'GPUHours' in ts_data.columns:
+            ts_data['GPU_Hours'] = ts_data['GPUHours']
+        elif 'job_hours' in ts_data.columns:
+            ts_data['GPU_Hours'] = ts_data['job_hours']
+        
+        # Ensure we have a User column
+        if 'User' not in ts_data.columns:
+            ts_data['User'] = user_id
+        
+        # Create visualizer instance with the mapped time series DataFrame
+        ts_visualizer = TimeSeriesVisualizer(ts_data)
+        
+        # Use the appropriate method for VRAM efficiency plotting
+        ts_visualizer.plot_vram_efficiency(
+            annotation_style="none",  # No annotations for cleaner report
+            show_secondary_y=False,   # No secondary axis for simplicity
+            users=[user_id]          # Filter to current user only
+        )
+        
+    except Exception as e:
+        print(f"Error using TimeSeriesVisualizer: {e}")
+        print("Available columns:", list(time_series_data_df.columns) if len(time_series_data_df) > 0 else "No data")
+        print("Falling back to basic plotting...")
+        
+        # Fallback to basic plotting if TimeSeriesVisualizer fails
+        x_col = 'TimeGroup_Datetime' if 'TimeGroup_Datetime' in time_series_data_df.columns else 'TimeGroup_Str'
+        y_col = 'Metric' if 'Metric' in time_series_data_df.columns else 'alloc_vram_efficiency'
+        
+        if x_col in time_series_data_df.columns and y_col in time_series_data_df.columns:
+            # Convert datetime column if needed
+            if 'Datetime' in x_col and time_series_data_df[x_col].dtype == 'object':
+                time_series_data_df[x_col] = pd.to_datetime(time_series_data_df[x_col])
+            
+            plt.figure(figsize=(12, 6))
+            plt.plot(time_series_data_df[x_col], time_series_data_df[y_col], 
+                    marker='o', linewidth=2, markersize=6)
+            plt.xlabel('Time Period')
+            plt.ylabel('VRAM Efficiency')
+            plt.title('VRAM Efficiency Over Time')
+            plt.xticks(rotation=45)
+            plt.grid(True, alpha=0.3)
+            plt.tight_layout()
+            plt.show()
+        else:
+            print(f"Required columns not found. Available columns: {list(time_series_data_df.columns)}")
+            
+elif len(user_jobs) > 0:
+    # Create simple time series from user_jobs using TimeSeriesVisualizer
+    try:
+        from src.visualization.time_series import TimeSeriesVisualizer
+        
+        if 'StartTime' in user_jobs.columns:
+            # Use the per-job dot plot method for individual job analysis
+            # This works directly with job_metrics data like in the notebook
+            ts_visualizer = TimeSeriesVisualizer(user_jobs)
+            
+            # Extract user names as a list (like in the notebook example)
+            user_names = [user_id]
+            print(f"Plotting for user: {user_names}")
+            
+            ts_visualizer.plot_vram_efficiency_per_job_dot(
+                users=user_names,  # Pass list of user strings
+                efficiency_metric='alloc_vram_efficiency' if 'alloc_vram_efficiency' in user_jobs.columns else 'used_vram_gib',
+                vram_metric='vram_hours' if 'vram_hours' in user_jobs.columns else 'job_hours',
+                remove_zero_values=True
+            )
+        else:
+            print("No StartTime column available for time series analysis.")
+    except Exception as e:
+        print(f"Error using TimeSeriesVisualizer: {e}")
+        print("Available columns in user_jobs:", list(user_jobs.columns) if len(user_jobs) > 0 else "No data")
+        print("Falling back to basic time series plot...")
+        
+        # Basic fallback plot
+        if 'StartTime' in user_jobs.columns:
+            user_jobs_sorted = user_jobs.sort_values('StartTime')
+            
+            if 'alloc_vram_efficiency' in user_jobs_sorted.columns:
+                efficiency_col = 'alloc_vram_efficiency'
+                multiplier = 1
+            elif 'used_vram_gib' in user_jobs_sorted.columns and 'allocated_vram' in user_jobs_sorted.columns:
+                user_jobs_sorted['vram_efficiency'] = user_jobs_sorted['used_vram_gib'] / user_jobs_sorted['allocated_vram']
+                efficiency_col = 'vram_efficiency'
+                multiplier = 1
+            else:
+                print("No efficiency data available for fallback plot.")
+                efficiency_col = None
+            
+            if efficiency_col:
+                fig, ax = plt.subplots(figsize=(12, 6))
+                ax.plot(user_jobs_sorted['StartTime'], user_jobs_sorted[efficiency_col] * multiplier, 
+                       marker='o', linewidth=2, markersize=4, alpha=0.7)
+                ax.set_xlabel('Date')
+                ax.set_ylabel('VRAM Efficiency')
+                ax.set_title('VRAM Efficiency Over Time')
+                plt.xticks(rotation=45)
+                plt.tight_layout()
+                plt.show()
+        else:
+            print("No job data available for time series analysis.")
+else:
+    print("No time series data provided.")
+```
+
+### Job Count Over Time
+
+```{python}
+#| echo: false
+#| fig-cap: "Job Count Over Time"
+#| fig-width: 12
+#| fig-height: 6
+
+if len(time_series_data_df) > 0:
+    # Use the time series data for job count visualization
+    if 'JobCount' in time_series_data_df.columns:
+        fig, ax = plt.subplots(figsize=(12, 6))
+        
+        # Get the appropriate time column
+        x_col = 'TimeGroup_Datetime' if 'TimeGroup_Datetime' in time_series_data_df.columns else 'TimeGroup_Str'
+        
+        # Convert to datetime if needed
+        if x_col == 'TimeGroup_Datetime' and time_series_data_df[x_col].dtype == 'object':
+            time_series_data_df[x_col] = pd.to_datetime(time_series_data_df[x_col])
+        
+        # Create a clean line plot with markers
+        ax.plot(time_series_data_df[x_col], time_series_data_df['JobCount'], 
+               marker='o', linewidth=2.5, markersize=8, color='#2E8B57', 
+               markerfacecolor='#90EE90', markeredgecolor='#2E8B57', markeredgewidth=2)
+        
+        # Fill area under the curve for better visual appeal
+        ax.fill_between(time_series_data_df[x_col], time_series_data_df['JobCount'], 
+                       alpha=0.3, color='#90EE90')
+        
+        # Add horizontal line for average
+        avg_jobs = time_series_data_df['JobCount'].mean()
+        ax.axhline(y=avg_jobs, color='red', linestyle='--', alpha=0.7, 
+                  label=f'Average: {avg_jobs:.1f} jobs')
+        
+        ax.set_xlabel('Time Period', fontsize=12)
+        ax.set_ylabel('Number of Jobs', fontsize=12)
+        ax.set_title('Job Submission Activity Over Time', fontsize=14, fontweight='bold')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        
+        # Improve x-axis formatting
+        if x_col == 'TimeGroup_Datetime':
+            plt.xticks(rotation=45)
+        else:
+            # For string dates, show fewer labels to avoid crowding
+            n_ticks = min(8, len(time_series_data_df))
+            tick_indices = np.linspace(0, len(time_series_data_df)-1, n_ticks, dtype=int)
+            ax.set_xticks([time_series_data_df[x_col].iloc[i] for i in tick_indices])
+            plt.xticks(rotation=45)
+        
+        plt.tight_layout()
+        plt.show()
+    else:
+        print("Job count data not available in time series.")
+else:
+    print("No time series data available for job count visualization.")
+```
+
+---
+
+## Recommendations for Improvement
+
+```{python}
+#| echo: false
+#| output: asis
+
+if recommendations and len(recommendations) > 0:
+    print("Based on your GPU usage patterns, here are some recommendations to improve efficiency:\n")
+    for i, rec in enumerate(recommendations, 1):
+        print(f"{i}. {rec}\n")
+else:
+    print("No specific recommendations provided. Generally, focus on optimizing GPU memory usage and time allocation for better efficiency.")
+```
+
+---
+
+## Additional Resources
+
+For more information on optimizing your GPU usage, please refer to these resources:
+
+1. [Unity HPC Documentation](https://docs.unity.rc.umass.edu/)
+2. [GPU Programming Best Practices](https://docs.unity.rc.umass.edu/documentation/tools/gpus/)
+3. [Contact Unity on Slack](https://docs.unity.rc.umass.edu/contact/community/)
+
+---
+
+*Report generated on `{python} print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))`*

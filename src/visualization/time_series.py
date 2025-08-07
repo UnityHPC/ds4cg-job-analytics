@@ -20,7 +20,14 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
     def __init__(self, df: pd.DataFrame) -> None:
         super().__init__(df)
 
-    def visualize(self, output_dir_path=None, **kwargs: Any) -> None:
+    def visualize(self, output_dir_path: str | None = None, **kwargs: dict) -> None:
+        """
+        Base visualize method - should be overridden by subclasses.
+        
+        Args:
+            output_dir_path: Optional output directory path.
+            **kwargs: Additional keyword arguments.
+        """
         return None
 
     def validate_visualize_kwargs(
@@ -577,7 +584,7 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
         if remove_zero_values:
             df = df[df[efficiency_metric] > 0]
             df = df[df[vram_metric] > 0]
-            df = df[df[efficiency_metric].notnull() & df[vram_metric].notnull()]
+            df = df[df[efficiency_metric].notna() & df[vram_metric].notna()]
 
         fig, ax = plt.subplots(figsize=(12, 8))
 

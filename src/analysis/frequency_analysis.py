@@ -23,7 +23,7 @@ class FrequencyAnalysis(EfficiencyAnalysis):
         self,
         users: list[str],
         metric: str,
-        time_unit: TimeUnitEnum,
+        time_unit: TimeUnitEnum | str,
         remove_zero_values: bool = True,
     ) -> pd.DataFrame:
         """
@@ -32,7 +32,7 @@ class FrequencyAnalysis(EfficiencyAnalysis):
         Args:
             users (list[str]): List of usernames.
             metric (str): The metric used to calculate efficiency (e.g., alloc_vram_efficiency or vram_hours).
-            time_unit (TimeUnitEnum): Time unit for grouping (e.g., 'Months', 'Weeks', 'Days').
+            time_unit (TimeUnitEnum | str): Time unit for grouping. Can be either the enum or its string value.
             remove_zero_values (bool): Whether to remove zero values.
 
         Returns:
@@ -71,13 +71,13 @@ class FrequencyAnalysis(EfficiencyAnalysis):
 
         return grouped_data
 
-    def group_jobs_by_time(self, data: pd.DataFrame, time_unit: TimeUnitEnum) -> pd.DataFrame:
+    def group_jobs_by_time(self, data: pd.DataFrame, time_unit: TimeUnitEnum | str) -> pd.DataFrame:
         """
         Group jobs by a specified time unit (Months, Weeks, Days).
 
         Args:
             data (pd.DataFrame): Jobs DataFrame.
-            time_unit (TimeUnitEnum): Time unit to group by ('Months', 'Weeks', 'Days').
+            time_unit (TimeUnitEnum | str): Time unit to group by. Can be either the enum or its string value.
 
         Returns:
             pd.DataFrame: Grouped jobs DataFrame.
@@ -85,14 +85,20 @@ class FrequencyAnalysis(EfficiencyAnalysis):
         Raises:
             ValueError: If an invalid time unit is provided.
         """
-        if time_unit == TimeUnitEnum.MONTHS.value:
+        # Handle both enum and string inputs
+        if isinstance(time_unit, TimeUnitEnum):
+            time_unit_value = time_unit.value
+        else:
+            time_unit_value = time_unit
+            
+        if time_unit_value == TimeUnitEnum.MONTHS.value:
             data["TimeGroup"] = pd.to_datetime(data["StartTime"]).dt.to_period("M")
-        elif time_unit == TimeUnitEnum.WEEKS.value:
+        elif time_unit_value == TimeUnitEnum.WEEKS.value:
             data["TimeGroup"] = pd.to_datetime(data["StartTime"]).dt.to_period("W")
-        elif time_unit == TimeUnitEnum.DAYS.value:
+        elif time_unit_value == TimeUnitEnum.DAYS.value:
             data["TimeGroup"] = pd.to_datetime(data["StartTime"]).dt.date
         else:
-            raise ValueError(f"Invalid time unit {time_unit}. Choose 'Months', 'Weeks', or 'Days'.")
+            raise ValueError(f"Invalid time unit {time_unit_value}. Choose 'Months', 'Weeks', or 'Days'.")
 
         return data
 

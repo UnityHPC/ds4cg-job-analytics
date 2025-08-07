@@ -42,3 +42,8 @@ data/
 *.diff
 /docs/build
 /site
+
+# quarto specific files
+.quarto/
+*.html
+reports/user_reports/*
