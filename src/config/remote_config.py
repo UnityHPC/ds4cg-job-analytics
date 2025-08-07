@@ -198,9 +198,9 @@ class NodeInfoFetcher(RemoteConfigFetcher):
         try:
             # see if that name exists in the nodes info file
             for node_batch in nodes_info:
-                for name in node_batch['nodes']:
+                for name in node_batch[NodeInfoKeyEnum.NODES.value]:
                     if name == node_name:
-                        return node_batch["ram"]
+                        return node_batch[NodeInfoKeyEnum.RAM.value]
             # If the node is not found, raise an exception
             raise ValueError(f"Node '{node_name}' not found in node configuration file {self.local_path}.")
         except Exception as e:
