@@ -27,3 +27,4 @@ def mock_data_frame(request: pytest.FixtureRequest) -> Generator[pd.DataFrame, N
             mem_db.disconnect()
             del mem_db
         shutil.rmtree(temp_db_dir)
+        

@@ -72,11 +72,6 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             None
         """
         col_data = jobs_df[col]
-        # Determine unit for conversion
-        if col == "Elapsed" and not pd.api.types.is_timedelta64_dtype(col_data):
-            col_data = pd.to_timedelta(col_data, unit="seconds", errors="coerce")
-        elif col == "TimeLimit" and not pd.api.types.is_timedelta64_dtype(col_data):
-            col_data = pd.to_timedelta(col_data, unit="minutes", errors="coerce")
 
         # Convert to minutes for plotting
         timelimit_minutes = col_data.dropna().dt.total_seconds() / 60
