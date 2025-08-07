@@ -7,11 +7,15 @@ from src.config.enum_constants import (
     ExitCodeEnum,
     AdminPartitionEnum,
     AdminsAccountEnum,
+    PartitionTypeEnum,
 )
 from src.config.constants import ENFORCE_COLUMNS, ESSENTIAL_COLUMNS
-
-from .conftest import helper_filter_irrelevant_records
+from src.config.remote_config import PartitionInfoFetcher
+from .conftest import helper_filter_irrelevant_records, update_helper_filter_irrelevant_records
 import pytest
+
+partition_info = PartitionInfoFetcher().get_info()
+gpu_partitions = [p["name"] for p in partition_info if p["type"] == PartitionTypeEnum.GPU.value]
 
 
 def test_preprocess_data_filtred_columns(mock_data_frame, recwarn):
@@ -58,7 +62,7 @@ def test_preprocess_data_filtered_min_elapsed(mock_data_frame):
     assert not any(elapsed_below_threshold)
 
 
-def test_preprocess_data_filter_min_esplaped_2(mock_data_frame, recwarn):
+def test_preprocess_data_filter_min_esplaped_2(mock_data_frame, mock_data_path, recwarn):
     """
     Test that the preprocessed data contains only jobs with elapsed time below the threshold (700 seconds).
     """
@@ -68,7 +72,13 @@ def test_preprocess_data_filter_min_esplaped_2(mock_data_frame, recwarn):
         include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
-    ground_truth = helper_filter_irrelevant_records(mock_data_frame, 700, include_cpu_only_jobs=True)
+    ground_truth = update_helper_filter_irrelevant_records(
+        mock_data_path,
+        min_elapsed_seconds=700,
+        include_cpu_only_jobs=True,
+        include_cancelled_jobs=True,
+        include_failed_jobs=True,
+    )
     assert len(data) == len(ground_truth), (
         f"JobIDs in data: {data['JobID'].tolist()}, JobIDs in ground_truth: {ground_truth['JobID'].tolist()}"
     )
@@ -87,36 +97,26 @@ def test_preprocess_data_filtered_root_account(mock_data_frame, recwarn):
     assert not any(partition_building)
 
 
-def test_preprocess_data_include_cpu_job(mock_data_frame, recwarn):
+def test_preprocess_data_include_cpu_job(mock_data_frame, mock_data_path, recwarn):
     """
     Test that the preprocessed data includes CPU-only jobs when specified.
     """
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_cpu_only_jobs=True)
-    ground_truth = helper_filter_irrelevant_records(mock_data_frame, 600, include_cpu_only_jobs=True)
-    expected_cpu_type = len(
-        ground_truth[
-            ground_truth["GPUType"].isna()
-            & (ground_truth["Status"] != StatusEnum.FAILED.value)
-            & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
-        ]
+    ground_truth = update_helper_filter_irrelevant_records(
+        mock_data_path, min_elapsed_seconds=600, include_cpu_only_jobs=True
     )
-    expected_gpus_count_0 = len(
-        ground_truth[
-            ground_truth["GPUs"].isna()
-            & (ground_truth["Status"] != StatusEnum.FAILED.value)
-            & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
-        ]
-    )
-    assert sum(x == ["cpu"] for x in data["GPUType"]) == expected_cpu_type
-    assert sum(x == 0 for x in data["GPUs"]) == expected_gpus_count_0
+    expect_cpus_jobs = len(ground_truth[~ground_truth["Partition"].isin(gpu_partitions)])
+    assert sum(~(data["Partition"].isin(gpu_partitions))) == expect_cpus_jobs
 
 
-def test_preprocess_data_include_failed_cancelled_job(mock_data_frame, recwarn):
+def test_preprocess_data_include_failed_cancelled_job(mock_data_frame, mock_data_path, recwarn):
     """
     Test that the preprocessed data includes FAILED and CANCELLED jobs when specified.
     """
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_failed_cancelled_jobs=True)
-    ground_truth = helper_filter_irrelevant_records(mock_data_frame, 600)
+    ground_truth = update_helper_filter_irrelevant_records(
+        mock_data_path, min_elapsed_seconds=600, include_cancelled_jobs=True, include_failed_jobs=True
+    )
     expect_failed_status = len(ground_truth[(ground_truth["Status"] == StatusEnum.FAILED.value)])
     expect_cancelled_status = len(ground_truth[(ground_truth["Status"] == StatusEnum.CANCELLED.value)])
     assert sum(x == StatusEnum.FAILED.value for x in data["Status"]) == expect_failed_status
