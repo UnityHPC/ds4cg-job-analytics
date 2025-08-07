@@ -9,10 +9,11 @@ from ..config.constants import (
     DEFAULT_MIN_ELAPSED_SECONDS,
     ATTRIBUTE_CATEGORIES,
     MULTIVALENT_GPUS,
-    ESSENTIAL_COLUMNS,
     ENFORCE_COLUMNS,
+    ESSENTIAL_COLUMNS,
 )
-from ..config.enum_constants import StatusEnum, AdminsAccountEnum, PartitionEnum, QOSEnum
+from ..config.enum_constants import StatusEnum, AdminsAccountEnum, AdminPartitionEnum, QOSEnum, PartitionTypeEnum
+from ..config import PartitionInfoFetcher
 
 
 def _get_vram_from_node(gpu_type: str, node: str) -> int:
@@ -94,6 +95,7 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int, gpu_mem_usage: 
                 vram_constraints.append(max(MULTIVALENT_GPUS[gpu_type]))
             else:
                 vram_constraints.append(VRAM_VALUES[gpu_type])
+
     if not (len(vram_constraints)):
         return pd.NA  # if nothing is requested, return NAType
 
@@ -231,9 +233,9 @@ def _fill_missing(res: pd.DataFrame) -> None:
     fill_map = {
         "ArrayID": lambda col: col.fillna(-1),
         "Interactive": lambda col: col.fillna("non-interactive"),
-        "Constraints": lambda col: col.fillna("").apply(lambda x: [] if isinstance(x, str) and x == "" else x),
+        "Constraints": lambda col: col.fillna("").apply(lambda x: [] if isinstance(x, str) and x == "" else list(x)),
         "GPUType": lambda col: col.fillna("").apply(
-            lambda x: ["cpu"] if isinstance(x, str) and x == "" else x.tolist() if isinstance(x, np.ndarray) else x
+            lambda x: (["cpu"] if (isinstance(x, str) and x == "") else x.tolist() if isinstance(x, np.ndarray) else x)
         ),
         "GPUs": lambda col: col.fillna(0),
     }
@@ -253,125 +255,101 @@ def preprocess_data(
     """
     Preprocess dataframe, filtering out unwanted rows and columns, filling missing values and converting types.
 
-    Notes:
-        # Handling missing columns logic
-        - columns in ENFORCE_COLUMNS are columns that are must-have for basic metrics calculation.
-        - columns in ESSENTIAL_COLUMNS are columns that are involved in preprocessing logics.
-        - For any columns in ENFORCE_COLUMNS that do not exist, a KeyError will be raised.
-        - For any columns in ESSENTIAL_COLUMNS but not in ENFORCE_COLUMNS, a warning will be raised.
-        - _fill_missing, records filtering, and type conversion logic will happen only if columns involved exist
+    This function will take in a dataframe to create a new dataframe satisfying given criteria.
 
     Args:
         input_df (pd.DataFrame): The input dataframe containing job data.
         min_elapsed_seconds (int, optional): Minimum elapsed time in seconds to keep a job record. Defaults to 600.
         include_failed_cancelled_jobs (bool, optional): Whether to include jobs with status FAILED or CANCELLED.
-            Default to False.
         include_cpu_only_jobs (bool, optional): Whether to include jobs that do not use GPUs (CPU-only jobs).
-            Default to False.
         include_custom_qos (bool, optional): Whether to include entries with custom qos values or not. Default to False
-
-    Returns:
-        pd.DataFrame: The new preprocessed dataframe
 
     Raises:
         KeyError: If any columns in ENFORCE_COLUMNS do not exist in the dataframe.
 
+    Returns:
+        pd.DataFrame: The preprocessed dataframe
     """
-    # drop columns and avoid errors in case any of them is not in the dataframe
-    data = input_df.drop(columns=["UUID", "EndTime", "Nodes", "Preempted"], axis=1, inplace=False, errors="ignore")
 
-    # filtering records
-    col_set = set(data.columns.to_list())
+    data = input_df.drop(columns=["UUID", "EndTime", "Nodes", "Preempted"], axis=1, inplace=False)
+    qos_values = set(QOSEnum.__members__.values())
+    exist_column_set = set(data.columns.to_list())
+
+    # missing columns handling
     for col_name in ESSENTIAL_COLUMNS:
-        if col_name not in col_set and col_name in ENFORCE_COLUMNS:
+        if col_name not in exist_column_set and col_name in ENFORCE_COLUMNS:
             raise KeyError(f"Column {col_name} does not exist in dataframe.")
-        elif col_name not in col_set:
+        elif col_name not in exist_column_set:
             warnings.warn(
                 f"Column {col_name} not exist in dataframe, this may result in unexpected results when filtering.",
                 UserWarning,
                 stacklevel=2,
             )
-    mask = pd.Series([True] * len(data))
 
-    # for filtering columns that must exist in the dataset
-    mask &= data["GPUType"].notna() | include_cpu_only_jobs
-    mask &= data["GPUs"].notna() | include_cpu_only_jobs
+    # filtering records
+    mask = pd.Series([True] * len(data), index=data.index)
 
-    # for filtering columns which may or may not appear in the dataset
-    qos_values = {e.value for e in QOSEnum}
-    filter_conditions = [
-        (
-            "Status",
-            lambda df: ((df["Status"] != StatusEnum.FAILED.value) & (df["Status"] != StatusEnum.CANCELLED.value))
-            | include_failed_cancelled_jobs,
-        ),
-        ("QOS", lambda df: (df["QOS"] != QOSEnum.UPDATES.value) & ((df["QOS"].isin(qos_values)) | include_custom_qos)),
-        ("Elapsed", lambda df: df["Elapsed"] >= min_elapsed_seconds),
-        ("Account", lambda df: df["Account"] != AdminsAccountEnum.ROOT.value),
-        ("Partition", lambda df: df["Partition"] != PartitionEnum.BUILDING.value),
-    ]
+    mask &= data["Elapsed"] >= min_elapsed_seconds
+    mask &= data["Account"] != AdminsAccountEnum.ROOT.value
+    mask &= data["Partition"] != AdminPartitionEnum.BUILDING.value
+    mask &= (data["QOS"] != QOSEnum.UPDATES.value) & (include_custom_qos | data["QOS"].isin(qos_values))
+    # Filter out failed or cancelled jobs, except when include_failed_cancel_jobs is True
+    mask &= (
+        (data["Status"] != StatusEnum.FAILED.value) & (data["Status"] != StatusEnum.CANCELLED.value)
+    ) | include_failed_cancelled_jobs
+    # Filter out jobs whose partition type is not 'gpu', unless include_cpu_only_jobs is True.
+    partition_info = PartitionInfoFetcher().get_info()
+    gpu_partitions = [p["name"] for p in partition_info if p["type"] == PartitionTypeEnum.GPU.value]
+    mask &= data["Partition"].isin(gpu_partitions) | include_cpu_only_jobs
 
-    for col_name, cond in filter_conditions:
-        if col_name in data:
-            mask &= cond(data)
-    res = data[mask].copy()
-
-    if res.empty:
+    data = data[mask].copy()
+    if data.empty:
         warnings.warn(
             message="Dataframe results from database and filtering is empty.", category=UserWarning, stacklevel=2
         )
 
-    _fill_missing(res)
+    _fill_missing(data)
     # Type casting for columns involving time
     time_columns = ["StartTime", "SubmitTime"]
-    for col_name in time_columns:
-        res[col_name] = pd.to_datetime(res[col_name], errors="coerce")
-
-    timedelta_columns = ["TimeLimit", "Elapsed"]
-    for col_name in timedelta_columns:
-        if col_name not in res.columns:
+    for col in time_columns:
+        if col not in exist_column_set:
             continue
-        res[col_name] = pd.to_timedelta(res[col_name], unit="s", errors="coerce")
+        data[col] = pd.to_datetime(data[col], errors="coerce")
+
+    duration_columns = ["TimeLimit", "Elapsed"]
+    for col in duration_columns:
+        if col not in exist_column_set:
+            continue
+        target_col = data[col] * 60 if col == "TimeLimit" else data[col]
+        data[col] = pd.to_timedelta(target_col, unit="s", errors="coerce")
+
     # Added parameters for calculating VRAM metrics
-    res.loc[:, "Queued"] = res["StartTime"] - res["SubmitTime"]
-
-    # vram_constraint_calculation
-    vram_constraints_series = res.apply(
+    data.loc[:, "Queued"] = data["StartTime"] - data["SubmitTime"]
+    data.loc[:, "vram_constraint"] = data.apply(
         lambda row: _get_vram_constraint(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1
-    )
-    # when dataframe is empty, vram_constraints_series is the whole empty dataframe
-    if len(vram_constraints_series):
-        res.loc[:, "vram_constraint"] = vram_constraints_series.astype(pd.Int64Dtype())
-    else:
-        res.loc[:, "vram_constraint"] = pd.Series(dtype=pd.Int64Dtype())
-
-    # allocated_vram calculation
-    vram_allocated_series = res.apply(
+    ).astype(pd.Int64Dtype())  # Use Int64Dtype to allow for nullable integers
+    data.loc[:, "allocated_vram"] = data.apply(
         lambda row: _get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
         axis=1,
     )
-    if len(vram_allocated_series):
-        res.loc[:, "allocated_vram"] = vram_allocated_series.astype("int64")
-    else:
-        res.loc[:, "allocated_vram"] = pd.Series(dtype="int64")
 
     # Convert columns to categorical
 
-    for col_name, enum_obj in ATTRIBUTE_CATEGORIES.items():
-        if col_name not in res.columns:
+    for col, enum_obj in ATTRIBUTE_CATEGORIES.items():
+        if col not in exist_column_set:
             continue
-        enum_values = [e.value for e in enum_obj]
-        unique_values = res[col_name].unique().tolist()
+        enum_values = enum_obj.__members__.values()
+        unique_values = data[col].unique().tolist()
         all_categories = list(set(enum_values) | set(unique_values))
-        res[col_name] = pd.Categorical(res[col_name], categories=all_categories, ordered=False)
+        data[col] = pd.Categorical(data[col], categories=all_categories, ordered=False)
 
     # Raise warning if GPUMemUsage or CPUMemUsage having infinity values
     mem_usage_columns = ["CPUMemUsage", "GPUMemUsage"]
     for col_name in mem_usage_columns:
-        if col_name not in res.columns:
+        if col_name not in exist_column_set:
             continue
-        filtered = res[res[col_name] == np.inf].copy()
+        filtered = data[data[col_name] == np.inf].copy()
         if len(filtered) > 0:
             message = f"Some entries in {col_name} having infinity values. This may be caused by an overflow."
             warnings.warn(message=message, stacklevel=2, category=UserWarning)
-    return res
+    return data
