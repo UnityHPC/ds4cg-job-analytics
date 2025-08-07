@@ -673,12 +673,19 @@ def preprocess_data(
 
     # Save error records to a summary file
     if len(error_records) > 0:
-        print(f"Found {len(error_records)} records with errors.")
+        print(f"Found {len(error_records)} records with errors. Reporting them to a summary file.")
         summary_file_path = Path("data/preprocessing/error_summary.txt")
+        summary_file_path.parent.mkdir(parents=True, exist_ok=True)  # Ensure directory exists
+
+        if summary_file_path.exists():
+            print("Error summary file already exists. Overwriting it.")
+
         summary_lines = ["Error Summary\n", "=" * 30 + "\n"]
         for record in error_records:
             summary_lines.append(
-                f"Job ID: {record['job_id']}, Error Type: {ErrorTypeEnum(record['error_type']).value}, Info: {record['info']}\n"
+                f"Job ID: {record['job_id']}\n"
+                f"Error Type: {ErrorTypeEnum(record['error_type']).value}, "
+                f"Info: {record['info']}\n"
             )
         with open(summary_file_path, "w", encoding="utf-8") as f:
             f.writelines(summary_lines)
