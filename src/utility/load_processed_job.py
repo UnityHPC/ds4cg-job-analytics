@@ -17,6 +17,7 @@ def load_preprocessed_jobs_dataframe_from_duckdb(
     custom_query: str = "",
     include_failed_cancelled_jobs: bool = False,
     include_cpu_only_jobs: bool = False,
+    include_custom_qos: bool = False,
     min_elapsed_seconds: int = DEFAULT_MIN_ELAPSED_SECONDS,
 ) -> pd.DataFrame:
     """
@@ -35,6 +36,7 @@ def load_preprocessed_jobs_dataframe_from_duckdb(
             Defaults to False.
         include_cpu_only_jobs (bool, optional): If True, include jobs that do not use GPUs (CPU-only jobs).
             Defaults to False.
+        include_custom_qos (bool, optional): If True, include jobs with custom qos values. Defaults to False.
         min_elapsed_seconds (int, optional): Minimum elapsed time in seconds to filter jobs by elapsed time.
             Defaults to 0.
 
@@ -73,10 +75,7 @@ def load_preprocessed_jobs_dataframe_from_duckdb(
 
         jobs_df = db.fetch_query(custom_query)
         processed_data = preprocess_data(
-            jobs_df,
-            min_elapsed_seconds,
-            include_failed_cancelled_jobs,
-            include_cpu_only_jobs,
+            jobs_df, min_elapsed_seconds, include_failed_cancelled_jobs, include_cpu_only_jobs, include_custom_qos
         )
         if sample_size is not None:
             processed_data = processed_data.sample(n=sample_size, random_state=random_state)

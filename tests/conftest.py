@@ -67,7 +67,9 @@ def mock_data_path():
 def mock_data_frame(mock_data_path):
     mem_db = None
     try:
-        mem_db = DatabaseConnection(mock_data_path, read_only=False)
+        mem_db = DatabaseConnection(
+            mock_data_path
+        )  # with read_only = True as we don't expect to write into database directly from tests
         yield mem_db.fetch_all_jobs()
     except Exception as e:
         raise Exception("Exception at mock_data_frame") from e

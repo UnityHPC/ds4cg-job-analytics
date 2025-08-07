@@ -271,7 +271,7 @@ def preprocess_data(
         pd.DataFrame: The preprocessed dataframe
     """
 
-    data = input_df.drop(columns=["UUID", "EndTime", "Nodes", "Preempted"], axis=1, inplace=False)
+    data = input_df.drop(columns=["UUID", "EndTime", "Nodes", "Preempted"], axis=1, inplace=False, errors="ignore")
     qos_values = set([member.value for member in QOSEnum])
     exist_column_set = set(data.columns.to_list())
 
