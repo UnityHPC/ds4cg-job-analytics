@@ -13,7 +13,7 @@ from ..config.constants import (
     ESSENTIAL_COLUMNS,
 )
 from ..config.enum_constants import StatusEnum, AdminsAccountEnum, AdminPartitionEnum, QOSEnum, PartitionTypeEnum
-from ..config import PartitionInfoFetcher
+from ..config.remote_config import PartitionInfoFetcher
 
 
 def _get_vram_from_node(gpu_type: str, node: str) -> int:
@@ -272,7 +272,7 @@ def preprocess_data(
     """
 
     data = input_df.drop(columns=["UUID", "EndTime", "Nodes", "Preempted"], axis=1, inplace=False)
-    qos_values = set(QOSEnum.__members__.values())
+    qos_values = set([member.value for member in QOSEnum])
     exist_column_set = set(data.columns.to_list())
 
     # missing columns handling
@@ -289,18 +289,24 @@ def preprocess_data(
     # filtering records
     mask = pd.Series([True] * len(data), index=data.index)
 
-    mask &= data["Elapsed"] >= min_elapsed_seconds
-    mask &= data["Account"] != AdminsAccountEnum.ROOT.value
-    mask &= data["Partition"] != AdminPartitionEnum.BUILDING.value
-    mask &= (data["QOS"] != QOSEnum.UPDATES.value) & (include_custom_qos | data["QOS"].isin(qos_values))
-    # Filter out failed or cancelled jobs, except when include_failed_cancel_jobs is True
-    mask &= (
-        (data["Status"] != StatusEnum.FAILED.value) & (data["Status"] != StatusEnum.CANCELLED.value)
-    ) | include_failed_cancelled_jobs
-    # Filter out jobs whose partition type is not 'gpu', unless include_cpu_only_jobs is True.
+    # Get partition info for GPU filtering
     partition_info = PartitionInfoFetcher().get_info()
     gpu_partitions = [p["name"] for p in partition_info if p["type"] == PartitionTypeEnum.GPU.value]
-    mask &= data["Partition"].isin(gpu_partitions) | include_cpu_only_jobs
+
+    filter_conditions = {
+        "Elapsed": lambda df: df["Elapsed"] >= min_elapsed_seconds,
+        "Account": lambda df: df["Account"] != AdminsAccountEnum.ROOT.value,
+        "Partition": lambda df: (df["Partition"] != AdminPartitionEnum.BUILDING.value)
+        & (include_cpu_only_jobs | df["Partition"].isin(gpu_partitions)),
+        "QOS": lambda df: (df["QOS"] != QOSEnum.UPDATES.value) & (include_custom_qos | df["QOS"].isin(qos_values)),
+        "Status": lambda df: include_failed_cancelled_jobs
+        | ((df["Status"] != StatusEnum.FAILED.value) & (df["Status"] != StatusEnum.CANCELLED.value)),
+    }
+
+    for col, func in filter_conditions.items():
+        if col not in exist_column_set:
+            continue
+        mask &= func(data)
 
     data = data[mask].copy()
     if data.empty:
@@ -338,7 +344,7 @@ def preprocess_data(
     for col, enum_obj in ATTRIBUTE_CATEGORIES.items():
         if col not in exist_column_set:
             continue
-        enum_values = enum_obj.__members__.values()
+        enum_values = [e.value for e in enum_obj]
         unique_values = data[col].unique().tolist()
         all_categories = list(set(enum_values) | set(unique_values))
         data[col] = pd.Categorical(data[col], categories=all_categories, ordered=False)

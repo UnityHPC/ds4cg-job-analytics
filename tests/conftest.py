@@ -5,7 +5,7 @@ import tempfile
 import shutil
 from src.config.enum_constants import (
     QOSEnum,
-    PartitionEnum,
+    AdminPartitionEnum,
     AdminsAccountEnum,
 )
 import pandas as pd
@@ -35,7 +35,7 @@ def helper_filter_irrelevant_records(
     res = input_df[
         (input_df["Elapsed"] >= min_elapsed_seconds)
         & (input_df["Account"] != AdminsAccountEnum.ROOT.value)
-        & (input_df["Partition"] != PartitionEnum.BUILDING.value)
+        & (input_df["Partition"] != AdminPartitionEnum.BUILDING.value)
         & (input_df["QOS"] != QOSEnum.UPDATES.value)
         & ((input_df["QOS"].isin(qos_values)) | include_custom_qos)
     ]
@@ -59,9 +59,11 @@ def mock_data_path():
 def mock_data_frame(mock_data_path):
     mem_db = None
     try:
-        mem_db = DatabaseConnection(mock_data_path)
+        mem_db = DatabaseConnection(mock_data_path, read_only=False)
         yield mem_db.fetch_all_jobs()
     except Exception as e:
         raise Exception("Exception at mock_data_frame") from e
     finally:
-        del mem_db
+        if mem_db is not None:
+            mem_db._disconnect()
+            del mem_db
