@@ -68,7 +68,6 @@ def test_preprocess_data_filter_min_esplaped_2(mock_data_frame, recwarn):
         include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
-    # TODO (Tan): Update the mock data to include jobs with elapsed time below 700 seconds
     ground_truth = helper_filter_irrelevant_records(mock_data_frame, 700, include_cpu_only_jobs=True)
     assert len(data) == len(ground_truth), (
         f"JobIDs in data: {data['JobID'].tolist()}, JobIDs in ground_truth: {ground_truth['JobID'].tolist()}"
@@ -109,7 +108,7 @@ def test_preprocess_data_include_cpu_job(mock_data_frame, recwarn):
         ]
     )
     assert sum(x == ["cpu"] for x in data["GPUType"]) == expected_cpu_type
-    assert data["GPUs"].value_counts()[0] == expected_gpus_count_0
+    assert sum(x == 0 for x in data["GPUs"]) == expected_gpus_count_0
 
 
 def test_preprocess_data_include_failed_cancelled_job(mock_data_frame, recwarn):
@@ -118,32 +117,17 @@ def test_preprocess_data_include_failed_cancelled_job(mock_data_frame, recwarn):
     """
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_failed_cancelled_jobs=True)
     ground_truth = helper_filter_irrelevant_records(mock_data_frame, 600)
-    expect_failed_status = len(
-        ground_truth[
-            (ground_truth["Status"] == StatusEnum.FAILED.value)
-            & (ground_truth["GPUType"].notna())
-            & (ground_truth["GPUs"].notna())
-        ]
-    )
-    expect_cancelled_status = len(
-        ground_truth[
-            (ground_truth["Status"] == StatusEnum.CANCELLED.value)
-            & (ground_truth["GPUType"].notna())
-            & (ground_truth["GPUs"].notna())
-        ]
-    )
-    assert data["Status"].value_counts()[StatusEnum.FAILED.value] == expect_failed_status
-    assert data["Status"].value_counts()[StatusEnum.CANCELLED.value] == expect_cancelled_status
+    expect_failed_status = len(ground_truth[(ground_truth["Status"] == StatusEnum.FAILED.value)])
+    expect_cancelled_status = len(ground_truth[(ground_truth["Status"] == StatusEnum.CANCELLED.value)])
+    assert sum(x == StatusEnum.FAILED.value for x in data["Status"]) == expect_failed_status
+    assert sum(x == StatusEnum.CANCELLED.value for x in data["Status"]) == expect_cancelled_status
 
 
 def test_preprocess_data_include_custom_qos(mock_data_frame, recwarn):
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_custom_qos=True)
     ground_truth = helper_filter_irrelevant_records(mock_data_frame, 600, include_custom_qos=True)
     filtered_ground_truth = ground_truth[
-        (ground_truth["Status"] != "CANCELLED")
-        & (ground_truth["Status"] != "FAILED")
-        & (ground_truth["GPUs"].notna())
-        & (ground_truth["GPUType"].notna())
+        (ground_truth["Status"] != "CANCELLED") & (ground_truth["Status"] != "FAILED")
     ].copy()
     assert len(data) == len(filtered_ground_truth), (
         f"JobIDs in data: {data['JobID'].tolist()}, JobIDs in ground_truth: {filtered_ground_truth['JobID'].tolist()}"
@@ -177,10 +161,10 @@ def test_preprocess_data_include_all(mock_data_frame, recwarn):
         f"JobIDs in data: {data['JobID'].tolist()}, JobIDs in ground_truth: {ground_truth['JobID'].tolist()}"
     )
     assert sum(x == ["cpu"] for x in data["GPUType"]) == expect_gpu_type_null
-    assert data["GPUs"].value_counts()[0] == expect_gpus_null
-    assert data["Status"].value_counts()[StatusEnum.FAILED.value] == expect_failed_status
-    assert data["Status"].value_counts()[StatusEnum.CANCELLED.value] == expect_cancelled_status
-    assert data["Status"].value_counts()[StatusEnum.COMPLETED.value] == expect_completed_status
+    assert sum(x == 0 for x in data["GPUs"]) == expect_gpus_null
+    assert sum(x == StatusEnum.FAILED.value for x in data["Status"]) == expect_failed_status
+    assert sum(x == StatusEnum.CANCELLED.value for x in data["Status"]) == expect_cancelled_status
+    assert sum(x == StatusEnum.COMPLETED.value for x in data["Status"]) == expect_completed_status
 
 
 def test_preprocess_data_fill_missing_interactive(mock_data_frame, recwarn):
@@ -197,8 +181,7 @@ def test_preprocess_data_fill_missing_interactive(mock_data_frame, recwarn):
 
     expect_non_interactive = len(ground_truth[(ground_truth["Interactive"].isna())])
 
-    interactive_stat = data["Interactive"].value_counts()
-    assert interactive_stat[InteractiveEnum.NON_INTERACTIVE.value] == expect_non_interactive
+    assert sum(x == InteractiveEnum.NON_INTERACTIVE.value for x in data["Interactive"]) == expect_non_interactive
 
 
 def test_preprocess_data_fill_missing_array_id(mock_data_frame, recwarn):
@@ -213,8 +196,7 @@ def test_preprocess_data_fill_missing_array_id(mock_data_frame, recwarn):
     )
     ground_truth = helper_filter_irrelevant_records(mock_data_frame, 100, include_cpu_only_jobs=True)
     expect_array_id_null = len(ground_truth[(ground_truth["ArrayID"].isna())])
-    array_id_stat = data["ArrayID"].value_counts()
-    assert array_id_stat[-1] == expect_array_id_null
+    assert sum(x == -1 for x in data["ArrayID"]) == expect_array_id_null
 
 
 def test_preprocess_data_fill_missing_gpu_type(mock_data_frame, recwarn):
@@ -231,11 +213,10 @@ def test_preprocess_data_fill_missing_gpu_type(mock_data_frame, recwarn):
     ground_truth = helper_filter_irrelevant_records(mock_data_frame, 100, include_cpu_only_jobs=True)
     expect_gpu_type_null = len(ground_truth[(ground_truth["GPUType"].isna())])
     expect_gpus_null = len(ground_truth[(ground_truth["GPUs"].isna())])
-    gpus_stat = data["GPUs"].value_counts()
 
     assert sum(x == ["cpu"] for x in data["GPUType"]) == expect_gpu_type_null
-    assert gpus_stat[0] == expect_gpus_null, (
-        f"Expected {expect_gpus_null} null GPUs, but found {gpus_stat[0]} null GPUs."
+    assert sum(x == 0 for x in data["GPUs"]) == expect_gpus_null, (
+        f"Expected {expect_gpus_null} null GPUs, but found {sum(x == 0 for x in data['GPUs'])} null GPUs."
     )
 
 
@@ -277,10 +258,7 @@ def test_category_qos(mock_data_frame, recwarn):
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
     ground_truth = helper_filter_irrelevant_records(mock_data_frame, 600)
     ground_truth_filtered = ground_truth[
-        (ground_truth["GPUType"].notna())
-        & (ground_truth["GPUs"].notna())
-        & (ground_truth["Status"] != StatusEnum.FAILED.value)
-        & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
+        (ground_truth["Status"] != StatusEnum.FAILED.value) & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
     ]
     expected = set(ground_truth_filtered["QOS"].dropna().to_numpy()) | set([e.value for e in QOSEnum])
 
@@ -296,10 +274,7 @@ def test_category_exit_code(mock_data_frame, recwarn):
 
     ground_truth = helper_filter_irrelevant_records(mock_data_frame, 600)
     ground_truth_filtered = ground_truth[
-        (ground_truth["GPUType"].notna())
-        & (ground_truth["GPUs"].notna())
-        & (ground_truth["Status"] != StatusEnum.FAILED.value)
-        & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
+        (ground_truth["Status"] != StatusEnum.FAILED.value) & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
     ]
     expected = set(ground_truth_filtered["ExitCode"].dropna().to_numpy()) | set([e.value for e in ExitCodeEnum])
 
@@ -315,10 +290,7 @@ def test_category_partition(mock_data_frame, recwarn):
 
     ground_truth = helper_filter_irrelevant_records(mock_data_frame, 600)
     ground_truth_filtered = ground_truth[
-        (ground_truth["GPUType"].notna())
-        & (ground_truth["GPUs"].notna())
-        & (ground_truth["Status"] != StatusEnum.FAILED.value)
-        & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
+        (ground_truth["Status"] != StatusEnum.FAILED.value) & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
     ]
     expected = set(ground_truth_filtered["Partition"].dropna().to_numpy()) | set([e.value for e in AdminPartitionEnum])
 
@@ -334,10 +306,7 @@ def test_category_account(mock_data_frame, recwarn):
 
     ground_truth = helper_filter_irrelevant_records(mock_data_frame, 600)
     ground_truth_filtered = ground_truth[
-        (ground_truth["GPUType"].notna())
-        & (ground_truth["GPUs"].notna())
-        & (ground_truth["Status"] != StatusEnum.FAILED.value)
-        & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
+        (ground_truth["Status"] != StatusEnum.FAILED.value) & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
     ]
     expected = set(ground_truth_filtered["Account"].dropna().to_numpy()) | set([e.value for e in AdminsAccountEnum])
 

@@ -38,8 +38,6 @@ def test_load_jobs_filter_date_back_1(mock_data_frame, mock_data_path, recwarn):
     ground_truth_csv = temp[
         (temp["Status"] != StatusEnum.CANCELLED.value)
         & (temp["Status"] != StatusEnum.FAILED.value)
-        & (temp["GPUType"].notna())
-        & (temp["GPUs"].notna())
         & (temp["StartTime"] >= cutoff)
     ]
     expect_job_ids = ground_truth_csv["JobID"].to_numpy()
@@ -58,8 +56,6 @@ def test_load_jobs_filter_date_back_2(mock_data_frame, mock_data_path, recwarn):
     ground_truth_csv = temp[
         (temp["Status"] != StatusEnum.CANCELLED.value)
         & (temp["Status"] != StatusEnum.FAILED.value)
-        & (temp["GPUType"].notna())
-        & (temp["GPUs"].notna())
         & (temp["StartTime"] >= cutoff)
     ]
     expect_job_ids = ground_truth_csv["JobID"].to_numpy()
@@ -80,8 +76,6 @@ def test_load_jobs_filter_min_elapsed(mock_data_frame, mock_data_path, recwarn):
     ground_truth_csv = temp[
         (temp["Status"] != StatusEnum.CANCELLED.value)
         & (temp["Status"] != StatusEnum.FAILED.value)
-        & (temp["GPUType"].notna())
-        & (temp["GPUs"].notna())
         & (temp["StartTime"] >= cutoff)
     ]
     expect_job_ids = ground_truth_csv["JobID"].to_numpy()
