@@ -155,3 +155,16 @@ class MetricsDataFrameNameEnum(Enum):
     JOBS = "jobs_with_efficiency_metrics"
     USERS = "users_with_efficiency_metrics"
     PI_GROUPS = "pi_accounts_with_efficiency_metrics"
+
+
+@unique
+class ErrorTypeEnum(Enum):
+    """An enumeration representing different error types.
+
+    Attributes:
+        MALFORMED_CONSTRAINT: Represents errors due to malformed constraints.
+        UNKNOWN_GPU_TYPE: Represents errors related to unknown GPU types specified in constraints.
+    """
+
+    MALFORMED_CONSTRAINT = "malformed_constraint"
+    UNKNOWN_GPU_TYPE = "unknown_gpu_type"

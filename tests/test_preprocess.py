@@ -475,7 +475,7 @@ def test_partition_constraint_and_requested_vram_on_mock_data(mock_data_frame: p
     # For each row, check that requested_vram is set to partition_constraint if both are not NA.
     for _idx, row in processed.iterrows():
         part_con = _get_partition_constraint(row["Partition"], row["GPUs"])
-        constraint_val = _get_vram_constraint(row["Constraints"], row["GPUs"])
+        constraint_val = _get_vram_constraint(row["JobID"], row["Constraints"], row["GPUs"])
         # Compute expected requested_vram
         expected: int | NAType
         if pd.isna(part_con) and pd.isna(constraint_val):
