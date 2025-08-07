@@ -53,7 +53,7 @@ def _helper_filter_irrelevant_records(
     return input_df[mask].copy()
 
 
-@pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_preprocess_data_filtered_columns(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data does not contain irrelevant columns.
@@ -67,7 +67,7 @@ def test_preprocess_data_filtered_columns(mock_data_frame: pd.DataFrame) -> None
     assert "requested_vram" in data.columns
 
 
-@pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_preprocess_data_filtered_gpu(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data does not contain null GPUType and GPUs.
@@ -79,7 +79,7 @@ def test_preprocess_data_filtered_gpu(mock_data_frame: pd.DataFrame) -> None:
     assert not any(is_gpu_null)
 
 
-@pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_preprocess_data_filtered_status(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data does not contain FAILED or CANCELLED jobs.
@@ -91,7 +91,7 @@ def test_preprocess_data_filtered_status(mock_data_frame: pd.DataFrame) -> None:
     assert not any(status_cancelled)
 
 
-@pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_preprocess_data_filtered_min_elapsed_1(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data does not contain jobs with elapsed time below the threshold (300 seconds).
@@ -103,7 +103,7 @@ def test_preprocess_data_filtered_min_elapsed_1(mock_data_frame: pd.DataFrame) -
     assert not any(elapsed_below_threshold)
 
 
-@pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_preprocess_data_filter_min_elapsed_2(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data contains only jobs with elapsed time below the threshold (700 seconds).
@@ -121,7 +121,7 @@ def test_preprocess_data_filter_min_elapsed_2(mock_data_frame: pd.DataFrame) -> 
     )
 
 
-@pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_preprocess_data_filtered_root_account(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data does not contain jobs with root account, partition building, or qos updates.
@@ -135,7 +135,7 @@ def test_preprocess_data_filtered_root_account(mock_data_frame: pd.DataFrame) ->
     assert not any(partition_building)
 
 
-@pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_preprocess_data_include_cpu_job(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data includes CPU-only jobs when specified.
@@ -162,7 +162,7 @@ def test_preprocess_data_include_cpu_job(mock_data_frame: pd.DataFrame) -> None:
     assert all(isinstance(row, list | dict) for row in data["GPUType"] if not pd.isna(row))
 
 
-@pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_preprocess_data_include_failed_cancelled_job(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data includes FAILED and CANCELLED jobs when specified.
@@ -187,7 +187,7 @@ def test_preprocess_data_include_failed_cancelled_job(mock_data_frame: pd.DataFr
     assert data["Status"].value_counts()[StatusEnum.CANCELLED.value] == expect_cancelled_status
 
 
-@pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_preprocess_data_include_all(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data includes all jobs when both CPU-only and FAILED/CANCELLED jobs are specified.
@@ -213,7 +213,7 @@ def test_preprocess_data_include_all(mock_data_frame: pd.DataFrame) -> None:
     assert data["Status"].value_counts()[StatusEnum.COMPLETED.value] == expect_completed_status
 
 
-@pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_preprocess_data_fill_missing_interactive(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data fills missing interactive job types with 'non-interactive' correctly.
@@ -232,7 +232,7 @@ def test_preprocess_data_fill_missing_interactive(mock_data_frame: pd.DataFrame)
     assert interactive_stat[InteractiveEnum.NON_INTERACTIVE.value] == expect_non_interactive
 
 
-@pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_preprocess_data_fill_missing_array_id(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data fills missing ArrayID with -1 correctly.
@@ -249,7 +249,7 @@ def test_preprocess_data_fill_missing_array_id(mock_data_frame: pd.DataFrame) ->
     assert array_id_stat[-1] == expect_array_id_null
 
 
-@pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_preprocess_data_fill_missing_gpu_type(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data fills missing GPUType with pd.NA correctly.
@@ -272,7 +272,7 @@ def test_preprocess_data_fill_missing_gpu_type(mock_data_frame: pd.DataFrame) ->
     )
 
 
-@pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_preprocess_data_fill_missing_constraints(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data fills missing Constraints with empty numpy array correctly.
@@ -289,7 +289,7 @@ def test_preprocess_data_fill_missing_constraints(mock_data_frame: pd.DataFrame)
     assert sum(len(x) == 0 for x in data["Constraints"]) == expect_constraints_null
 
 
-@pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_category_interactive(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data has 'Interactive' as a categorical variable and check values contained within it.
@@ -309,7 +309,7 @@ def test_category_interactive(mock_data_frame: pd.DataFrame) -> None:
     assert expected.issubset(set(data["Interactive"].cat.categories))
 
 
-@pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_category_qos(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data has 'QOS' as a categorical variable and check values contained within it.
@@ -328,7 +328,7 @@ def test_category_qos(mock_data_frame: pd.DataFrame) -> None:
     assert expected.issubset(set(data["QOS"].cat.categories))
 
 
-@pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_category_exit_code(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data has 'ExitCode' as a categorical variable and check values contained within it.
@@ -348,7 +348,7 @@ def test_category_exit_code(mock_data_frame: pd.DataFrame) -> None:
     assert expected.issubset(set(data["ExitCode"].cat.categories))
 
 
-@pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_category_partition(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data has 'Partition' as a categorical variable and check values contained within it.
@@ -368,7 +368,7 @@ def test_category_partition(mock_data_frame: pd.DataFrame) -> None:
     assert expected.issubset(set(data["Partition"].cat.categories))
 
 
-@pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_category_account(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data has 'Account' as a categorical variable and check values contained within it.
@@ -388,7 +388,7 @@ def test_category_account(mock_data_frame: pd.DataFrame) -> None:
     assert expected.issubset(set(data["Account"].cat.categories))
 
 
-@pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_preprocess_timedelta_conversion(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data converts elapsed time to timedelta.
@@ -408,7 +408,7 @@ def test_preprocess_timedelta_conversion(mock_data_frame: pd.DataFrame) -> None:
     assert time_limit[max_len - 1].total_seconds() / 60 == ground_truth["TimeLimit"][max_len - 1]
 
 
-@pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_preprocess_gpu_type(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the GPUType column is correctly filled and transformed during preprocessing.
@@ -458,7 +458,7 @@ def test_get_requested_vram_cases() -> None:
     assert pd.isna(_get_requested_vram(pd.NA, pd.NA))
 
 
-@pytest.mark.parametrize("mock_data_frame", [False, True], indirect=True)
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_partition_constraint_and_requested_vram_on_mock_data(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the partition_constraint and requested_vram columns are correctly computed in the preprocessed data.
