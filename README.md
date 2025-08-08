@@ -1,5 +1,4 @@
 ## Introduction
-
 This repository is a place to contain the tools developed over the course of the DS4CG 2025 summer internship project with Unity.
 
 ## Table of Contents
@@ -185,6 +184,23 @@ contains tools to add a number of useful derived columns for plotting and analys
 | StartTime |  TIMESTAMP_NS | Job start time
 | EndTime |  TIMESTAMP_NS | Job end time |
 | Elapsed |  INTEGER | Job runtime (seconds) |
+| TimeLimit |  INTEGER | Job time limit (seconds) |
+| Partition |  VARCHAR | Job partition |
+| Nodes |  VARCHAR | Job nodes as compact string |
+| NodeList |  VARCHAR[] | List of job nodes |
+| CPUs |  SMALLINT | Number of CPUs |
+| Memory |  INTEGER | Job allocated memory (bytes) |
+| GPUs |  SMALLINT | Number of GPUs requested |
+| GPUType |  VARCHAR[] | List of GPU types |
+ytes) |
+| GPUs |  SMALLINT | Number of GPUs requested |
+| GPUType |  DICT | Dictionary with keys as type of GPU (str) and the values as number of GPUs corresponding to that type (int) |
+s |
+| CPUs |  SMALLINT | Number of CPUs |
+| Memory |  INTEGER | Job allocated memory (bytes) |
+| GPUs |  SMALLINT | Number of GPUs requested |
+| GPUType |  VARCHAR[] | List of GPU types |
+ INTEGER | Job runtime (seconds) |
 | TimeLimit |  INTEGER | Job time limit (seconds) |
 | Partition |  VARCHAR | Job partition |
 | Nodes |  VARCHAR | Job nodes as compact string |

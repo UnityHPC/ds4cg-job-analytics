@@ -15,6 +15,7 @@ The generated reports include:
 
 - Python 3.9+ with pandas, numpy, matplotlib, seaborn, and plotly
 - Quarto document converter (https://quarto.org/docs/get-started/)
+- For PDF generation: TinyTeX (install with `quarto install tinytex`)
 
 ## Usage
 
@@ -62,6 +63,7 @@ python scripts/check_report_setup.py
    --db-path PATH      Path to the database file (default: ./slurm_data.db)
    --output-dir PATH   Directory to save the reports (default: ./reports/user_reports)
    --template PATH     Path to the Quarto template file
+   --format FORMAT     Output format: html or pdf (default: html)
    ```
 
 ## Customization
@@ -76,6 +78,18 @@ To generate reports for the top 20 users with efficiency below 20% and at least 
 
 ```bash
 python scripts/generate_user_reports.py top --n-top 20 --efficiency 0.2 --min-jobs 20
+```
+
+To generate PDF reports for specific users:
+
+```bash
+python scripts/generate_user_reports.py users --users user1,user2 --format pdf
+```
+
+To generate HTML reports (default format):
+
+```bash
+python scripts/generate_user_reports.py users --users user1,user2 --format html
 ```
 
 To generate reports for specific users regardless of their efficiency:
@@ -131,6 +145,6 @@ Each report includes:
 3. **Recommendations**: Personalized suggestions for improvement based on usage patterns
 4. **Comparison**: How the user compares to others on the system
 python scripts/generate_user_reports.py --n-top 20 --efficiency 0.2 --min-jobs 20
-```
+
 
 The reports will be saved as HTML files in the specified output directory.

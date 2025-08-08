@@ -90,7 +90,7 @@ class FrequencyAnalysis(EfficiencyAnalysis):
             time_unit_value = time_unit.value
         else:
             time_unit_value = time_unit
-            
+
         if time_unit_value == TimeUnitEnum.MONTHS.value:
             data["TimeGroup"] = pd.to_datetime(data["StartTime"]).dt.to_period("M")
         elif time_unit_value == TimeUnitEnum.WEEKS.value:

@@ -26,7 +26,7 @@ from src.database.database_connection import DatabaseConnection  # noqa: E402
 from src.preprocess.preprocess import preprocess_data  # noqa: E402
 
 
-def load_and_preprocess_data(db_path: str, specific_users: list = None) -> pd.DataFrame:
+def load_and_preprocess_data(db_path: str, specific_users: list | None = None) -> pd.DataFrame:
     """
     Load and preprocess the job data from the database.
 
@@ -37,13 +37,14 @@ def load_and_preprocess_data(db_path: str, specific_users: list = None) -> pd.Da
     Returns:
         Preprocessed DataFrame with job data
     """
-    print(f"Loading data from {db_path}...")
+    print("📊 LOADING DATA")
+    print(f"   Database: {db_path}")
 
     # Connect to the database
     try:
         db = DatabaseConnection(db_path)
     except Exception as e:
-        print(f"Error connecting to database: {e}")
+        print(f"   ❌ Database connection failed: {e}")
         return pd.DataFrame()
 
     # Query jobs - filter by specific users if provided
@@ -54,10 +55,12 @@ def load_and_preprocess_data(db_path: str, specific_users: list = None) -> pd.Da
             users_list = ", ".join(quoted_users)
             query = f"SELECT * FROM Jobs WHERE GPUs > 0 AND User IN ({users_list});"
             job_df = db.fetch_query(query)
+            print(f"   🔍 Filtering for users: {', '.join(specific_users)}")
         else:
             job_df = db.fetch_query("SELECT * FROM Jobs WHERE GPUs > 0;")
+            print("   🔍 Loading all GPU jobs")
     except Exception as e:
-        print(f"Error executing database query: {e}")
+        print(f"   ❌ Database query failed: {e}")
         return pd.DataFrame()
 
     # Preprocess the data
@@ -65,7 +68,7 @@ def load_and_preprocess_data(db_path: str, specific_users: list = None) -> pd.Da
         job_df, min_elapsed_seconds=0, include_failed_cancelled_jobs=False, include_cpu_only_jobs=False
     )
 
-    print(f"Loaded and preprocessed {len(processed_df)} jobs.")
+    print(f"   ✅ Loaded {len(processed_df):,} jobs")
     return processed_df
 
 
@@ -150,12 +153,13 @@ def calculate_analysis_period(jobs_df: pd.DataFrame) -> str:
 
 def generate_user_report(
     user_id: str,
-    user_data: pd.DataFrame,
-    job_data: pd.DataFrame,
-    all_users_data: pd.DataFrame,
+    user_data: pd.DataFrame | pd.Series,
+    job_data: pd.DataFrame | pd.Series,
+    all_users_data: pd.DataFrame | pd.Series,
     output_dir: str,
     template_path: str,
-) -> str:
+    output_format: str = "html",
+) -> str | None:
     """
     Generate a report for a specific user using Quarto.
 
@@ -166,21 +170,20 @@ def generate_user_report(
         all_users_data: DataFrame with all users metrics
         output_dir: Directory to save the report
         template_path: Path to the Quarto template file
+        output_format: Output format ('html' or 'pdf')
 
     Returns:
         Path to the generated report
     """
-    print(f"Generating report for user {user_id}...")
-
     # Filter jobs for this specific user
     user_jobs = job_data[job_data["User"] == user_id].copy()
 
     if len(user_jobs) == 0:
-        print(f"No jobs found for user {user_id}")
+        print(f"      ❌ No jobs found for {user_id}")
         return None
 
-    # Create output filename
-    output_filename = f"user_{user_id}_report.html"
+    # Create output filename based on format
+    output_filename = f"user_{user_id}_report.{output_format}"
     output_file = os.path.join(output_dir, output_filename)
 
     # Check that the template exists
@@ -198,7 +201,7 @@ def generate_user_report(
     end_date = job_data["StartTime"].max().strftime("%Y-%m-%d")
 
     # Calculate analysis period
-    analysis_period = calculate_analysis_period(job_data)
+    analysis_period = calculate_analysis_period(pd.DataFrame(job_data))
 
     # === CALCULATE SUMMARY STATISTICS ===
     total_jobs = len(user_jobs)
@@ -230,22 +233,31 @@ def generate_user_report(
 
     if "GPUType" in user_jobs.columns:
         user_jobs["primary_gpu_type"] = user_jobs["GPUType"].apply(extract_gpu_type)
-        modal_gpu_type = user_jobs["primary_gpu_type"].mode()[0] if len(user_jobs) > 0 else "unknown"
+        model_gpu_type = user_jobs["primary_gpu_type"].mode()[0] if len(user_jobs) > 0 else "unknown"
         a100_count = user_jobs["primary_gpu_type"].str.contains("a100", case=False, na=False).sum()
         a100_pct = (a100_count / total_jobs) * 100 if total_jobs > 0 else 0
     else:
-        modal_gpu_type = "unknown"
+        model_gpu_type = "unknown"
         a100_pct = 0
 
     # Job status
-    modal_job_status = (
+    model_job_status = (
         user_jobs["Status"].mode()[0] if len(user_jobs) > 0 and "Status" in user_jobs.columns else "unknown"
     )
 
     # Time metrics
     avg_time_limit = user_jobs["TimeLimit"].mean() if "TimeLimit" in user_jobs.columns else pd.Timedelta(0)
     avg_elapsed_time = user_jobs["Elapsed"].mean() if "Elapsed" in user_jobs.columns else pd.Timedelta(0)
-    time_usage_pct = (avg_elapsed_time / avg_time_limit) * 100 if avg_time_limit.total_seconds() > 0 else 0
+
+    # Calculate time usage percentage, ensuring it's always a float
+    if (
+        isinstance(avg_time_limit, pd.Timedelta)
+        and isinstance(avg_elapsed_time, pd.Timedelta)
+        and avg_time_limit.total_seconds() > 0
+    ):
+        time_usage_pct = float((avg_elapsed_time.total_seconds() / avg_time_limit.total_seconds()) * 100)
+    else:
+        time_usage_pct = 0.0
 
     # CPU memory metrics
     avg_cpu_mem_req = user_jobs["allocated_cpu_mem_gib"].mean() if "allocated_cpu_mem_gib" in user_jobs.columns else 0
@@ -285,9 +297,9 @@ def generate_user_report(
             "Average GPU VRAM requested (GiB)",
             "Average GPU VRAM used (GiB)",
             "Average VRAM efficiency",
-            "Modal GPU Type",
+            "model GPU Type",
             "A100 usage percentage",
-            "Modal Job Status",
+            "model Job Status",
             "Average time limit",
             "Average elapsed time",
             "Time usage efficiency",
@@ -305,9 +317,9 @@ def generate_user_report(
             f"{avg_vram_requested:.2f}",
             f"{avg_vram_used_gb:.2f} ({vram_usage_pct:.2f}%)",
             f"{vram_efficiency:.2f} ({vram_efficiency * 100:.2f}%)",
-            f"{modal_gpu_type} ({a100_pct:.2f}% A100)" if a100_pct > 0 else modal_gpu_type,
+            f"{model_gpu_type} ({a100_pct:.2f}% A100)" if a100_pct > 0 else model_gpu_type,
             f"{a100_pct:.2f}%",
-            modal_job_status,
+            model_job_status,
             str(avg_time_limit),
             f"{avg_elapsed_time} ({time_usage_pct:.2f}%)",
             f"{time_usage_pct:.2f}%",
@@ -341,7 +353,7 @@ def generate_user_report(
     from src.config.enum_constants import TimeUnitEnum
 
     try:
-        freq_analyzer = FrequencyAnalysis(job_data)
+        freq_analyzer = FrequencyAnalysis(pd.DataFrame(job_data))
         time_series_data = freq_analyzer.prepare_time_series_data(
             users=[user_id], metric="alloc_vram_efficiency", time_unit=TimeUnitEnum.WEEKS, remove_zero_values=False
         )
@@ -369,7 +381,7 @@ def generate_user_report(
     # Time allocation recommendations
     if time_usage_pct < 50:
         recommendations.append(
-            "**Adjust Time Limits**: You're using significantly less time than requested. Consider reducing your " 
+            "**Adjust Time Limits**: You're using significantly less time than requested. Consider reducing your "
             "job time limits to improve job scheduling and resource allocation."
         )
     elif time_usage_pct > 95:
@@ -408,17 +420,15 @@ def generate_user_report(
     user_output_dir = os.path.join(output_dir, f"user_{user_id}")
     os.makedirs(user_output_dir, exist_ok=True)
 
-    # Use a simple output filename
-    simple_output_filename = "report.html"
+    # Use a simple output filename based on format
+    simple_output_filename = f"report.{output_format}"
     final_output_path = os.path.join(output_dir, output_filename)
-
-    # Create a parameters dictionary to pass to Quarto (used later)
 
     # Get template filename for running from reports directory
     template_filename = os.path.basename(template_path)
 
     # Run quarto render command with execute-params
-    cmd = ["quarto", "render", template_filename, "--to", "html", "-o", simple_output_filename, "--execute"]
+    cmd = ["quarto", "render", template_filename, "--to", output_format, "-o", simple_output_filename, "--execute"]
 
     # Save the DataFrames to temporary CSV files for Quarto to load
     temp_dir = os.path.join(output_dir, "temp")
@@ -442,8 +452,8 @@ def generate_user_report(
         "time_series_data": time_series_data.to_dict("records"),
         "gpu_type_data": gpu_type_data.to_dict("records"),
         "recommendations": recommendations,
-        "user_data": user_data.to_dict() if hasattr(user_data, "to_dict") else {},
-        "user_jobs": user_jobs.to_dict("records"),
+        "user_data": (pd.DataFrame(user_data).to_dict()),
+        "user_jobs": pd.DataFrame(user_jobs).to_dict("records"),
     }
 
     # Save to a temporary JSON file
@@ -461,14 +471,12 @@ def generate_user_report(
     data_file = f"{user_id}_data.json"
 
     # Update command to use the working template
-    cmd = ["quarto", "render", template_file, "--to", "html", "-o", simple_output_filename, "--execute"]
+    cmd = ["quarto", "render", template_file, "--to", output_format, "-o", simple_output_filename, "--execute"]
 
     # Add parameters to quarto command
     cmd.extend(["-P", f"data_file:{data_file}"])  # Execute the command
     try:
         # Run Quarto in the working directory
-        print("CMD\n", " ".join(cmd))
-        # Run from the reports directory to avoid path issues
         reports_dir = os.path.dirname(template_path)
         result = subprocess.run(
             cmd,
@@ -480,28 +488,28 @@ def generate_user_report(
 
         # Check if command was successful
         if result.returncode != 0:
-            print(f"Error running Quarto command (return code {result.returncode})")
-            print(f"Stdout: {result.stdout}")
-            print(f"Stderr: {result.stderr}")
+            print(f"      ❌ Quarto rendering failed (code {result.returncode})")
+            if result.stderr:
+                print(f"         Error: {result.stderr.strip()}")
             return None
 
         # Check if output file was created (in the reports directory)
         reports_dir = os.path.dirname(template_path)
         output_file_path = os.path.join(reports_dir, simple_output_filename)
         if not os.path.exists(output_file_path):
-            print(f"Error: Output file not created at {output_file_path}")
+            print("      ❌ Output file not created")
             return None
 
         # Copy the generated report to final location
         os.makedirs(os.path.dirname(final_output_path), exist_ok=True)
         shutil.copy2(output_file_path, final_output_path)
-        print(f"Report generated for {user_id}: {final_output_path}")
+        print(f"      ✅ Report saved: {os.path.basename(final_output_path)}")
 
     except subprocess.CalledProcessError as e:
-        print(f"Error generating report for {user_id}: {e}")
+        print(f"      ❌ Process error: {e}")
         return None
     except Exception as e:
-        print(f"Unexpected error generating report for {user_id}: {e}")
+        print(f"      ❌ Unexpected error: {e}")
         return None
 
     # Clean up temporary files
@@ -545,6 +553,7 @@ def generate_reports_for_specific_users(
     output_dir: str = "./reports/user_reports",
     template_path: str = "./reports/user_report_template.qmd",
     min_jobs: int = 1,
+    output_format: str = "html",
 ) -> list[str]:
     """
     Generate reports for specific users by their user IDs.
@@ -555,6 +564,7 @@ def generate_reports_for_specific_users(
         output_dir: Directory to save the reports
         template_path: Path to the Quarto template file
         min_jobs: Minimum number of jobs a user must have
+        output_format: Output format ('html' or 'pdf')
 
     Returns:
         List of paths to the generated reports
@@ -562,8 +572,6 @@ def generate_reports_for_specific_users(
     if not user_list:
         print("No users specified. Exiting.")
         return []
-
-    print(f"Generating reports for {len(user_list)} specific users: {', '.join(user_list)}")
 
     # Check if the template file exists
     if not os.path.exists(template_path):
@@ -580,9 +588,10 @@ def generate_reports_for_specific_users(
     jobs_df = load_and_preprocess_data(db_path, specific_users=user_list)
 
     if len(jobs_df) == 0:
-        print("No job data found for the specified users.")
+        print("   ❌ No job data found for the specified users")
         return []
 
+    print("\n🔬 ANALYZING USERS")
     # Initialize the efficiency analyzer
     analyzer = EfficiencyAnalysis(jobs_df=jobs_df)
 
@@ -600,19 +609,35 @@ def generate_reports_for_specific_users(
     # Calculate user efficiency metrics
     all_users = analyzer.calculate_user_efficiency_metrics()
 
+    # Print user job counts in a clean format
+    print("   📋 User Analysis Results:")
+    for user in user_list:
+        user_data = all_users[all_users["User"] == user]
+        if len(user_data) > 0:
+            job_count = user_data.iloc[0]["job_count"]
+            print(f"      ✅ {user}: {job_count:,} jobs")
+        else:
+            print(f"      ❌ {user}: No qualifying jobs found")
+
     # Filter users who have minimum required jobs
     filtered_users = all_users[all_users["job_count"] >= min_jobs]
-
-    # Get data only for the users in our list
     users_to_report = filtered_users[filtered_users["User"].isin(user_list)]
+
+    if len(users_to_report) == 0:
+        print(f"   ❌ No users meet the minimum requirement of {min_jobs} jobs")
+        return []
+
+    print(f"   📊 {len(users_to_report)} user(s) will have reports generated")
 
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
 
+    print("\n📝 GENERATING REPORTS")
     # Generate reports for each user
     report_paths = []
-    for _, user_row in users_to_report.iterrows():
+    for i, (_, user_row) in enumerate(users_to_report.iterrows(), 1):
         user_id = user_row["User"]
+        print(f"   [{i}/{len(users_to_report)}] {user_id}")
         report_path = generate_user_report(
             user_id=user_id,
             user_data=user_row,
@@ -620,21 +645,24 @@ def generate_reports_for_specific_users(
             all_users_data=all_users,
             output_dir=output_dir,
             template_path=template_path,
+            output_format=output_format,
         )
         if report_path:
             report_paths.append(report_path)
 
-    print(f"Generated {len(report_paths)} reports.")
+    print("\n✅ REPORTS COMPLETED")
+    print(f"   Generated: {len(report_paths)} reports")
     return report_paths
 
 
 def generate_all_reports(
-    n_top_ineff: int = 5,  # Changed default from 50 to 5
+    n_top_ineff: int = 5,
     efficiency_threshold: float = 0.3,
     min_jobs: int = 10,
     db_path: str = "./slurm_data.db",
     output_dir: str = "./reports/user_reports",
     template_path: str = "./reports/user_report_template.qmd",
+    output_format: str = "html",
 ) -> list[str]:
     """
     Generate reports for the top N inefficient users.
@@ -646,6 +674,7 @@ def generate_all_reports(
         db_path: Path to the database file
         output_dir: Directory to save the reports
         template_path: Path to the Quarto template file
+        output_format: Output format ('html' or 'pdf')
 
     Returns:
         List of paths to the generated reports
@@ -685,11 +714,14 @@ def generate_all_reports(
             all_users_data=all_users,
             output_dir=output_dir,
             template_path=template_path,
+            output_format=output_format,
         )
         if report_path:
             report_paths.append(report_path)
 
-    print(f"Generated {len(report_paths)} reports.")
+    print("\n✅ REPORTS COMPLETED")
+    print(f"   Generated: {len(report_paths)} reports")
+
     return report_paths
 
 
@@ -736,6 +768,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--template", type=str, default="./reports/user_report_template.qmd", help="Path to the Quarto template file"
     )
+    parser.add_argument(
+        "--format",
+        type=str,
+        choices=["html", "pdf"],
+        default="html",
+        help="Output format for the reports (default: html)",
+    )
 
     args = parser.parse_args()
 
@@ -749,7 +788,9 @@ if __name__ == "__main__":
 
     # Generate reports based on the selected mode
     if args.mode == "top":
-        print(f"Generating reports for top {args.n_top} inefficient users...")
+        print(f"🎯 ANALYZING TOP {args.n_top} INEFFICIENT USERS")
+        print(f"   Efficiency threshold: ≤ {args.efficiency:.0%}")
+        print(f"   Minimum jobs required: {args.min_jobs}")
         report_paths = generate_all_reports(
             n_top_ineff=args.n_top,
             efficiency_threshold=args.efficiency,
@@ -757,18 +798,23 @@ if __name__ == "__main__":
             db_path=args.db_path,
             output_dir=args.output_dir,
             template_path=args.template,
+            output_format=args.format,
         )
     elif args.mode == "users":
         # Parse the comma-separated list of users
         user_list = [user.strip() for user in args.users.split(",")]
-        print(f"Generating reports for {len(user_list)} specific users: {', '.join(user_list)}")
+        print("👥 GENERATING REPORTS FOR SPECIFIC USERS")
+        print(f"   Users: {', '.join(user_list)}")
+        print(f"   Minimum jobs required: {args.min_jobs}")
         report_paths = generate_reports_for_specific_users(
             user_list=user_list,
             db_path=args.db_path,
             output_dir=args.output_dir,
             template_path=args.template,
             min_jobs=args.min_jobs,
+            output_format=args.format,
         )
 
-    print(f"Reports saved to {args.output_dir}")
-    print(f"Generated {len(report_paths)} reports")
+    print("\n🎉 ALL TASKS COMPLETED!")
+    print(f"   Output directory: {args.output_dir}")
+    print("   Check the individual function outputs above for details.")

@@ -5,6 +5,7 @@ import numpy as np
 import plotly.graph_objects as go
 import pandas as pd
 from pydantic import ValidationError
+from pathlib import Path
 
 from .models import TimeSeriesVisualizationKwargsModel
 from .visualization import DataVisualizer
@@ -20,10 +21,10 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
     def __init__(self, df: pd.DataFrame) -> None:
         super().__init__(df)
 
-    def visualize(self, output_dir_path: str | None = None, **kwargs: dict) -> None:
+    def visualize(self, output_dir_path: Path | None = None, **kwargs: dict) -> None:
         """
         Base visualize method - should be overridden by subclasses.
-        
+
         Args:
             output_dir_path: Optional output directory path.
             **kwargs: Additional keyword arguments.
@@ -84,7 +85,11 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
         """
         # Filter users if provided
         time_series_df = self.df
-        if users:
+        if time_series_df is None:
+            print("No data available for visualization")
+            return
+
+        if users and time_series_df is not None:
             time_series_df = time_series_df[time_series_df["User"].isin(users)]
 
         # Create figure and axis
@@ -106,7 +111,7 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
         if exclude_fields is None:
             exclude_fields = []
 
-        users = time_series_df["User"].unique()
+        users = time_series_df["User"].unique().tolist()
         for idx, user in enumerate(users):
             user_data = time_series_df[time_series_df["User"] == user]
             if user_data.empty:
@@ -195,6 +200,10 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
         """
         # Filter users if provided
         time_series_df = self.df
+        if time_series_df is None:
+            print("No data available for visualization")
+            return
+
         if users:
             time_series_df = time_series_df[time_series_df["User"].isin(users)]
 
@@ -212,7 +221,7 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
         if exclude_fields is None:
             exclude_fields = []
 
-        users = time_series_df["User"].unique()
+        users = time_series_df["User"].unique().tolist()
         for idx, user in enumerate(users):
             user_data = time_series_df[time_series_df["User"] == user]
             if user_data.empty:
@@ -328,6 +337,10 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
 
         # Filter users if provided
         time_series_df = self.df
+        if time_series_df is None:
+            print("No data available for visualization")
+            return go.Figure()
+
         if users:
             time_series_df = time_series_df[time_series_df["User"].isin(users)]
 
@@ -349,7 +362,7 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
             "#17becf",
         ]
 
-        users = time_series_df["User"].unique()
+        users = time_series_df["User"].unique().tolist()
         user_dfs = []
         hover_texts: list[list[str]] = []
 
@@ -427,6 +440,10 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
 
         # Filter users if provided
         time_series_df = self.df
+        if time_series_df is None:
+            print("No data available for visualization")
+            return go.Figure()
+
         if users:
             time_series_df = time_series_df[time_series_df["User"].isin(users)]
 
@@ -448,7 +465,7 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
             "#17becf",
         ]
 
-        users = time_series_df["User"].unique()
+        users = time_series_df["User"].unique().tolist()
         user_dfs = []
         hover_texts: list[list[str]] = []
 
@@ -503,8 +520,8 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
         return fig
 
     def plot_vram_efficiency_dot(
-            self,
-            exclude_fields: list[str] | None = None,
+        self,
+        exclude_fields: list[str] | None = None,
     ) -> None:
         """
         Plot VRAM efficiency over time as a dot plot.
@@ -519,6 +536,10 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
             exclude_fields (list[str], optional): Fields to exclude from tooltip (unused in static plot).
         """
         time_series_df = self.df
+        if time_series_df is None:
+            print("No data available for visualization")
+            return
+
         if exclude_fields is None:
             exclude_fields = []
 
@@ -551,16 +572,22 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
         ax.set_xlabel("Time Period")
         ax.set_ylabel("VRAM Efficiency")
         ax.set_title("VRAM Efficiency Dot Plot (Size = VRAM Hours)")
-        ax.legend(title="User", bbox_to_anchor=(1.05, 1), loc="upper left")
+
+        # Create legend with consistent small marker size
+        legend = ax.legend(title="User", bbox_to_anchor=(1.05, 1), loc="upper left", markerscale=0.5)
+        for handle in legend.legend_handles:
+            if handle is not None and hasattr(handle, "set_sizes"):
+                handle.set_sizes([50])  # Set consistent small size for all legend markers
+
         plt.tight_layout()
         plt.show()
 
     def plot_vram_efficiency_per_job_dot(
-            self,
-            users: list[str],
-            efficiency_metric: str,
-            vram_metric: str = "job_hours",
-            remove_zero_values: bool = True,
+        self,
+        users: list[str],
+        efficiency_metric: str,
+        vram_metric: str = "job_hours",
+        remove_zero_values: bool = True,
     ) -> None:
         """
         Dot plot of VRAM efficiency for all individual jobs (not grouped).
@@ -571,7 +598,12 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
             vram_metric (str): Column name representing VRAM hours (used for dot size).
             remove_zero_values (bool): Whether to exclude jobs with zero or NaN efficiency.
         """
-        df = self.df.copy()
+        df = self.df
+        if df is None:
+            print("No data available for visualization")
+            return
+
+        df = df.copy()
 
         # Filter by selected users
         df = df[df["User"].isin(users)]
@@ -588,7 +620,7 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
 
         fig, ax = plt.subplots(figsize=(12, 8))
 
-        users = df["User"].unique()
+        users = df["User"].unique().tolist()
         cmap = plt.get_cmap("tab10")
         colors = {user: cmap(i % 10) for i, user in enumerate(users)}
 
@@ -611,10 +643,12 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
         ax.set_xlabel("Job Start Time")
         ax.set_ylabel("VRAM Efficiency")
         ax.set_title("Per-Job VRAM Efficiency Dot Plot (Size = VRAM Hours)")
-        ax.legend(title="User", bbox_to_anchor=(1.05, 1), loc="upper left")
+
+        # Create legend with consistent small marker size
+        legend = ax.legend(title="User", bbox_to_anchor=(1.05, 1), loc="upper left", markerscale=0.5)
+        for handle in legend.legend_handles:
+            if handle is not None and hasattr(handle, "set_sizes"):
+                handle.set_sizes([50])  # Set consistent small size for all legend markers
+
         plt.tight_layout()
         plt.show()
-
-        return fig
-
-

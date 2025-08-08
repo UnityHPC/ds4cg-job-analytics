@@ -1,5 +1,5 @@
 ---
-title: !expr paste("USER", params$user_id, "Unity GPU Jobs Analytics")
+title: "Unity GPU Jobs Analytics Report"
 format: 
   html:
     theme: cosmo
@@ -77,9 +77,24 @@ except Exception as e:
     user_jobs = pd.DataFrame()
 ```
 
-## {analysis_period} GPU Jobs Analytics
+```{python}
+#| echo: false
+#| output: asis
 
-**Analysis Period:** `{python} print(analysis_period)`
+# Set the document title dynamically
+from IPython.display import display, HTML
+title_html = f"""
+<script>
+document.title = 'Unity GPU Jobs Analytics Report - {user_id}';
+</script>
+"""
+display(HTML(title_html))
+```
+
+
+## GPU Jobs Analytics Report for `{python} user_id`
+
+**Analysis Period:** `{python} analysis_period`
 
 ---
 
@@ -247,10 +262,23 @@ else:
 #| fig-height: 6
 
 if len(user_jobs) > 0 and 'used_vram_gib' in user_jobs.columns:
-    # Create histogram of GPU memory usage
-    fig, ax = plt.subplots(figsize=(10, 6))
-    
-    if len(user_jobs) > 0:
+    try:
+        from src.visualization.columns import ColumnVisualizer
+        
+        # Prepare the data for ColumnVisualizer (it expects GPUMemUsage column in bytes)
+        user_jobs_viz = user_jobs.copy()
+        user_jobs_viz['GPUMemUsage'] = user_jobs_viz['used_vram_gib'] * (2**30)  # Convert GiB to bytes
+        
+        # Initialize the visualizer with the user's job data
+        visualizer = ColumnVisualizer(user_jobs_viz)
+        
+        # Use the visualize method to generate the GPU memory usage histogram
+        visualizer.visualize(output_dir_path=None, columns=['GPUMemUsage'])
+        
+    except Exception as e:
+        print(f"Error using ColumnVisualizer for GPU memory chart: {e}")
+        # Fallback to simple histogram
+        fig, ax = plt.subplots(figsize=(10, 6))
         sns.histplot(data=user_jobs, x="used_vram_gib", bins=20, kde=True, color='blue', alpha=0.7, ax=ax)
         
         # Add average and median lines
@@ -266,8 +294,6 @@ if len(user_jobs) > 0 and 'used_vram_gib' in user_jobs.columns:
         ax.legend()
         plt.tight_layout()
         plt.show()
-    else:
-        print("No job data available for this user.")
 else:
     print("GPU memory usage data not available.")
 ```
@@ -281,22 +307,24 @@ else:
 #| fig-height: 6
 
 if len(user_jobs) > 0 and 'Status' in user_jobs.columns:
-    
-    if len(user_jobs) > 0:
-        # Create pie chart of job statuses
+    try:
+        from src.visualization.columns import ColumnVisualizer
+        
+        # Initialize the visualizer with the user's job data
+        visualizer = ColumnVisualizer(user_jobs)
+        
+        # Use the visualize method to generate the Status pie chart
+        visualizer.visualize(output_dir_path=None, columns=['Status'])
+        
+    except Exception as e:
+        print(f"Error using ColumnVisualizer for status chart: {e}")
+        # Fallback to simple visualization
         status_counts = user_jobs['Status'].value_counts()
-        
-        fig, ax = plt.subplots(figsize=(8, 6))
-        colors = plt.cm.Set3(np.linspace(0, 1, len(status_counts)))
-        
-        wedges, texts, autotexts = ax.pie(status_counts.values, labels=status_counts.index, 
-                                         autopct='%1.1f%%', colors=colors, startangle=90)
-        
-        ax.set_title('Distribution of Job Statuses')
+        plt.figure(figsize=(8, 6))
+        plt.pie(status_counts.values, labels=status_counts.index, autopct='%1.1f%%', startangle=90)
+        plt.title('Distribution of Job Statuses')
         plt.tight_layout()
         plt.show()
-    else:
-        print("No job data available for this user.")
 else:
     print("Job status data not available.")
 ```
@@ -309,15 +337,278 @@ else:
 #| fig-width: 10
 #| fig-height: 6
 
-if len(gpu_type_data_df) > 0:
-    # Create GPU type visualization using pre-calculated data
-    plt.figure(figsize=(10, 6))
-    plt.pie(gpu_type_data_df['job_count'], labels=gpu_type_data_df['gpu_type'], autopct='%1.1f%%')
-    plt.title('GPU Type Usage Distribution')
-    plt.axis('equal')
-    plt.show()
+if len(user_jobs) > 0 and 'GPUType' in user_jobs.columns:
+    try:
+        from src.visualization.columns import ColumnVisualizer
+        
+        # Initialize the visualizer with the user's job data
+        visualizer = ColumnVisualizer(user_jobs)
+        
+        # Use the visualize method to generate the GPUType bar plot
+        visualizer.visualize(output_dir_path=None, columns=['GPUType'])
+        
+    except Exception as e:
+        print(f"Error using ColumnVisualizer for GPU type chart: {e}")
+        # Fallback using pre-calculated data if available
+        if len(gpu_type_data_df) > 0:
+            plt.figure(figsize=(10, 6))
+            plt.pie(gpu_type_data_df['job_count'], labels=gpu_type_data_df['gpu_type'], autopct='%1.1f%%')
+            plt.title('GPU Type Usage Distribution')
+            plt.axis('equal')
+            plt.show()
+        else:
+            print("No GPU type data available.")
 else:
     print("No GPU type data available.")
+```
+
+---
+
+## A100 GPU Analysis
+
+```{python}
+#| echo: false
+#| output: asis
+
+# Check if user has used A100 GPUs
+def extract_gpu_type(gpu_type_val):
+    """Extract GPU type from various data formats."""
+    if isinstance(gpu_type_val, list) and len(gpu_type_val) > 0:
+        return gpu_type_val[0]
+    elif isinstance(gpu_type_val, dict) and len(gpu_type_val) > 0:
+        return list(gpu_type_val.keys())[0]
+    elif isinstance(gpu_type_val, str):
+        return gpu_type_val
+    else:
+        return "unknown"
+
+if len(user_jobs) > 0 and 'GPUType' in user_jobs.columns:
+    # Extract primary GPU types
+    user_jobs_a100 = user_jobs.copy()
+    user_jobs_a100['primary_gpu_type'] = user_jobs_a100['GPUType'].apply(extract_gpu_type)
+    
+    # Filter for A100 jobs
+    a100_jobs = user_jobs_a100[user_jobs_a100['primary_gpu_type'].str.contains('a100', case=False, na=False)]
+    
+    if len(a100_jobs) > 0:
+        a100_percentage = (len(a100_jobs) / len(user_jobs)) * 100
+        print(f"## A100 GPU Usage Analysis")
+        print(f"You have used A100 GPUs in **{len(a100_jobs)}** out of **{len(user_jobs)}** jobs ({a100_percentage:.1f}%).")
+        print()
+    else:
+        print("You have not used A100 GPUs in any of your analyzed jobs. This section is not applicable.")
+        a100_jobs = pd.DataFrame()  # Set empty for conditional sections below
+else:
+    print("GPU type data not available for A100 analysis.")
+    a100_jobs = pd.DataFrame()
+```
+
+### A100 vs Other GPU Performance Comparison
+
+```{python}
+#| echo: false
+#| fig-cap: "A100 vs Other GPU Performance"
+#| fig-width: 12
+#| fig-height: 8
+
+if len(a100_jobs) > 0 and len(user_jobs) > 0:
+    try:
+        # Create comparison between A100 and other GPUs
+        user_jobs_comparison = user_jobs.copy()
+        user_jobs_comparison['primary_gpu_type'] = user_jobs_comparison['GPUType'].apply(extract_gpu_type)
+        user_jobs_comparison['is_a100'] = user_jobs_comparison['primary_gpu_type'].str.contains('a100', case=False, na=False)
+        user_jobs_comparison['gpu_category'] = user_jobs_comparison['is_a100'].map({True: 'A100', False: 'Other GPUs'})
+        
+        # Calculate efficiency metrics by GPU category
+        efficiency_metrics = user_jobs_comparison.groupby('gpu_category').agg({
+            'alloc_vram_efficiency': 'mean' if 'alloc_vram_efficiency' in user_jobs_comparison.columns else lambda x: 0,
+            'used_vram_gib': 'mean',
+            'allocated_vram': 'mean',
+            'job_hours': 'mean',
+            'JobID': 'count'
+        }).reset_index()
+        
+        if len(efficiency_metrics) > 1:  # Both A100 and other GPUs present
+            fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 8))
+            
+            # 1. VRAM Efficiency Comparison
+            ax1.bar(efficiency_metrics['gpu_category'], efficiency_metrics['alloc_vram_efficiency'], 
+                   color=['#FF6B6B', '#4ECDC4'], alpha=0.8)
+            ax1.set_title('Average VRAM Efficiency')
+            ax1.set_ylabel('Efficiency')
+            for i, v in enumerate(efficiency_metrics['alloc_vram_efficiency']):
+                ax1.text(i, v + max(efficiency_metrics['alloc_vram_efficiency']) * 0.02, f'{v:.3f}', 
+                        ha='center', va='bottom', fontweight='bold')
+            
+            # 2. Memory Usage Comparison
+            ax2.bar(efficiency_metrics['gpu_category'], efficiency_metrics['used_vram_gib'], 
+                   color=['#FF6B6B', '#4ECDC4'], alpha=0.8)
+            ax2.set_title('Average GPU Memory Used')
+            ax2.set_ylabel('Memory (GiB)')
+            for i, v in enumerate(efficiency_metrics['used_vram_gib']):
+                ax2.text(i, v + max(efficiency_metrics['used_vram_gib']) * 0.02, f'{v:.1f}', 
+                        ha='center', va='bottom', fontweight='bold')
+            
+            # 3. Job Duration Comparison
+            ax3.bar(efficiency_metrics['gpu_category'], efficiency_metrics['job_hours'], 
+                   color=['#FF6B6B', '#4ECDC4'], alpha=0.8)
+            ax3.set_title('Average Job Duration')
+            ax3.set_ylabel('Hours')
+            for i, v in enumerate(efficiency_metrics['job_hours']):
+                ax3.text(i, v + max(efficiency_metrics['job_hours']) * 0.02, f'{v:.1f}', 
+                        ha='center', va='bottom', fontweight='bold')
+            
+            # 4. Job Count
+            ax4.bar(efficiency_metrics['gpu_category'], efficiency_metrics['JobID'], 
+                   color=['#FF6B6B', '#4ECDC4'], alpha=0.8)
+            ax4.set_title('Number of Jobs')
+            ax4.set_ylabel('Job Count')
+            for i, v in enumerate(efficiency_metrics['JobID']):
+                ax4.text(i, v + max(efficiency_metrics['JobID']) * 0.02, f'{int(v)}', 
+                        ha='center', va='bottom', fontweight='bold')
+            
+            plt.tight_layout()
+            plt.show()
+        else:
+            print("Only one GPU type category available - comparison not possible.")
+            
+    except Exception as e:
+        print(f"Error creating A100 comparison: {e}")
+else:
+    print("A100 comparison not available - insufficient A100 usage data.")
+```
+
+### A100 Efficiency Distribution
+
+```{python}
+#| echo: false
+#| fig-cap: "A100 VRAM Efficiency Distribution"
+#| fig-width: 10
+#| fig-height: 6
+
+if len(a100_jobs) > 0 and 'alloc_vram_efficiency' in a100_jobs.columns:
+    try:
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+        
+        # Histogram of A100 efficiency
+        ax1.hist(a100_jobs['alloc_vram_efficiency'], bins=20, alpha=0.7, color='#FF6B6B', edgecolor='black')
+        ax1.axvline(a100_jobs['alloc_vram_efficiency'].mean(), color='red', linestyle='--', 
+                   label=f'Mean: {a100_jobs["alloc_vram_efficiency"].mean():.3f}')
+        ax1.axvline(a100_jobs['alloc_vram_efficiency'].median(), color='orange', linestyle='--',
+                   label=f'Median: {a100_jobs["alloc_vram_efficiency"].median():.3f}')
+        ax1.set_xlabel('VRAM Efficiency')
+        ax1.set_ylabel('Number of A100 Jobs')
+        ax1.set_title('Distribution of A100 VRAM Efficiency')
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+        
+        # Efficiency over time for A100 jobs
+        if 'StartTime' in a100_jobs.columns:
+            a100_sorted = a100_jobs.sort_values('StartTime')
+            ax2.scatter(a100_sorted['StartTime'], a100_sorted['alloc_vram_efficiency'], 
+                       alpha=0.6, color='#FF6B6B', s=50)
+            ax2.set_xlabel('Date')
+            ax2.set_ylabel('VRAM Efficiency')
+            ax2.set_title('A100 Job Efficiency Over Time')
+            ax2.grid(True, alpha=0.3)
+            
+            # Add trend line
+            if len(a100_sorted) > 1:
+                from scipy import stats
+                x_numeric = pd.to_numeric(pd.to_datetime(a100_sorted['StartTime']))
+                slope, intercept, r_value, p_value, std_err = stats.linregress(x_numeric, a100_sorted['alloc_vram_efficiency'])
+                line = slope * x_numeric + intercept
+                ax2.plot(a100_sorted['StartTime'], line, 'r-', alpha=0.8, 
+                        label=f'Trend (R²={r_value**2:.3f})')
+                ax2.legend()
+        else:
+            ax2.text(0.5, 0.5, 'No timestamp data available', ha='center', va='center', transform=ax2.transAxes)
+            ax2.set_title('A100 Timeline Not Available')
+        
+        plt.tight_layout()
+        plt.show()
+        
+    except Exception as e:
+        print(f"Error creating A100 efficiency distribution: {e}")
+        # Simple fallback
+        print(f"A100 jobs summary:")
+        print(f"- Total A100 jobs: {len(a100_jobs)}")
+        if 'alloc_vram_efficiency' in a100_jobs.columns:
+            print(f"- Average efficiency: {a100_jobs['alloc_vram_efficiency'].mean():.3f}")
+            print(f"- Efficiency range: {a100_jobs['alloc_vram_efficiency'].min():.3f} - {a100_jobs['alloc_vram_efficiency'].max():.3f}")
+else:
+    print("A100 efficiency distribution not available - insufficient data.")
+```
+
+### A100 Usage Insights
+
+```{python}
+#| echo: false
+#| output: asis
+
+if len(a100_jobs) > 0:
+    # Calculate A100-specific insights
+    try:
+        total_a100_hours = a100_jobs['job_hours'].sum() if 'job_hours' in a100_jobs.columns else 0
+        avg_a100_efficiency = a100_jobs['alloc_vram_efficiency'].mean() if 'alloc_vram_efficiency' in a100_jobs.columns else 0
+        avg_a100_memory = a100_jobs['used_vram_gib'].mean() if 'used_vram_gib' in a100_jobs.columns else 0
+        a100_allocated_memory = a100_jobs['allocated_vram'].mean() if 'allocated_vram' in a100_jobs.columns else 0
+        
+        print("### Key A100 Insights")
+        print()
+        print(f"**A100 Resource Usage:**")
+        print(f"- Total A100 GPU hours consumed: **{total_a100_hours:.1f} hours**")
+        print(f"- Average memory utilization: **{avg_a100_memory:.1f} GiB** out of **{a100_allocated_memory:.1f} GiB** allocated")
+        print(f"- Average VRAM efficiency: **{avg_a100_efficiency:.1%}**")
+        print()
+        
+        # Efficiency assessment
+        if avg_a100_efficiency < 0.2:
+            efficiency_assessment = "**Low** - Consider if A100s are necessary for your workloads"
+            efficiency_color = "🔴"
+        elif avg_a100_efficiency < 0.5:
+            efficiency_assessment = "**Moderate** - Room for improvement in memory utilization"
+            efficiency_color = "🟡"
+        else:
+            efficiency_assessment = "**Good** - Efficient use of A100 resources"
+            efficiency_color = "🟢"
+        
+        print(f"**A100 Efficiency Assessment:** {efficiency_color} {efficiency_assessment}")
+        print()
+        
+        # Cost implications (approximate)
+        if total_a100_hours > 0:
+            # A100s are typically 4-8x more expensive than other GPUs
+            other_jobs = user_jobs[~user_jobs.index.isin(a100_jobs.index)] if len(user_jobs) > len(a100_jobs) else pd.DataFrame()
+            if len(other_jobs) > 0:
+                other_hours = other_jobs['job_hours'].sum() if 'job_hours' in other_jobs.columns else 0
+                a100_ratio = total_a100_hours / (total_a100_hours + other_hours) if other_hours > 0 else 1
+                print(f"**Resource Distribution:**")
+                print(f"- A100 hours: {total_a100_hours:.1f} ({a100_ratio:.1%} of total GPU hours)")
+                print(f"- Other GPU hours: {other_hours:.1f} ({1-a100_ratio:.1%} of total GPU hours)")
+                print()
+        
+        # Recommendations based on usage pattern
+        print("**A100-Specific Recommendations:**")
+        print()
+        
+        if avg_a100_efficiency < 0.3:
+            print("- 🔧 **Optimize Memory Usage**: Your A100 efficiency is low. Consider using batch size optimization or mixed precision training.")
+            print("- 🔄 **Consider Alternatives**: For jobs with low memory requirements, regular GPUs might be more cost-effective.")
+        
+        if avg_a100_memory < 20:  # Less than 20GB average usage
+            print("- 📊 **Memory Underutilization**: You're using less than half of A100's memory capacity. Consider larger models or batch sizes.")
+        
+        if len(a100_jobs) < 5:
+            print("- 📈 **Limited A100 Experience**: Consider experimenting with larger workloads that can fully utilize A100 capabilities.")
+        else:
+            print("- ✅ **Regular A100 User**: You're making good use of A100 resources. Continue optimizing for better efficiency.")
+            
+    except Exception as e:
+        print(f"Error generating A100 insights: {e}")
+        print("A100 insights could not be generated due to data processing issues.")
+else:
+    print("No A100 usage insights available.")
 ```
 
 ---
@@ -487,133 +778,122 @@ else:
 
 ## Time Series Analysis
 
-### VRAM Efficiency Over Time
+### VRAM Efficiency Over Time (Monthly)
 
 ```{python}
 #| echo: false
-#| fig-cap: "VRAM Efficiency Over Time"
+#| fig-cap: "VRAM Efficiency Over Time - Monthly"
 #| fig-width: 12
 #| fig-height: 8
 
-if len(time_series_data_df) > 0:
+import matplotlib.pyplot as plt
+import pandas as pd
+
+if len(user_jobs) > 0 and 'StartTime' in user_jobs.columns:
     try:
-        # Import the TimeSeriesVisualizer
+        from src.analysis.frequency_analysis import FrequencyAnalysis
+        from src.visualization.time_series import TimeSeriesVisualizer
+        from src.config.enum_constants import TimeUnitEnum
+        
+        # Use frequency analysis to prepare monthly time series data
+        frequency_analyzer = FrequencyAnalysis(user_jobs)
+        
+        # Prepare monthly time series data for the user
+        monthly_data = frequency_analyzer.prepare_time_series_data(
+            users=[user_id],
+            metric="alloc_vram_efficiency" if "alloc_vram_efficiency" in user_jobs.columns else "used_vram_gib",
+            time_unit=TimeUnitEnum.MONTHS,
+            remove_zero_values=False
+        )
+        
+        if len(monthly_data) > 0:
+            # Map columns for TimeSeriesVisualizer
+            monthly_data['Efficiency'] = monthly_data['Metric']
+            monthly_data['GPU_Hours'] = monthly_data['GPUHours']
+            
+            # Create the time series visualizer
+            ts_visualizer = TimeSeriesVisualizer(monthly_data)
+            
+            # Plot VRAM efficiency over time
+            ts_visualizer.plot_vram_efficiency(
+                users=[user_id],
+                annotation_style="none",
+                show_secondary_y=False
+            )
+        else:
+            print("No monthly time series data available for this user.")
+        
+    except Exception as e:
+        print(f"Error using FrequencyAnalysis for monthly time series: {e}")
+        # Fallback to basic time series plot
+        if 'StartTime' in user_jobs.columns:
+            user_jobs_sorted = user_jobs.sort_values('StartTime').copy()
+            
+            # Group by month for fallback
+            user_jobs_sorted['Month'] = pd.to_datetime(user_jobs_sorted['StartTime']).dt.to_period('M')
+            monthly_avg = user_jobs_sorted.groupby('Month').agg({
+                'alloc_vram_efficiency': 'mean' if 'alloc_vram_efficiency' in user_jobs_sorted.columns else lambda x: 0
+            }).reset_index()
+            
+            if len(monthly_avg) > 0:
+                plt.figure(figsize=(12, 6))
+                plt.plot(monthly_avg['Month'].astype(str), monthly_avg['alloc_vram_efficiency'], 
+                        marker='o', linewidth=2, markersize=6)
+                plt.xlabel('Month')
+                plt.ylabel('VRAM Efficiency')
+                plt.title('VRAM Efficiency Over Time (Monthly Average)')
+                plt.xticks(rotation=45)
+                plt.grid(True, alpha=0.3)
+                plt.tight_layout()
+                plt.show()
+            else:
+                print("No time-based data available for efficiency analysis.")
+else:
+    print("No job data with timestamps available for time series analysis.")
+```
+
+### Individual Job Performance (Dot Plot)
+
+```{python}
+#| echo: false
+#| fig-cap: "Individual Job Performance Over Time"
+#| fig-width: 12
+#| fig-height: 8
+
+# Always show the dot plot for individual job performance
+if len(user_jobs) > 0 and 'StartTime' in user_jobs.columns:
+    try:
         from src.visualization.time_series import TimeSeriesVisualizer
         
-        # First, let's check what columns we have and map them to what TimeSeriesVisualizer expects
-        print("Available time series columns:", list(time_series_data_df.columns))
+        # Create time series visualizer with user job data
+        ts_visualizer = TimeSeriesVisualizer(user_jobs)
         
-        # Create a copy and map columns to what TimeSeriesVisualizer expects
-        ts_data = time_series_data_df.copy()
-        
-        # Map our columns to expected column names
-        if 'Metric' in ts_data.columns:
-            ts_data['Efficiency'] = ts_data['Metric']
-        elif 'alloc_vram_efficiency' in ts_data.columns:
-            ts_data['Efficiency'] = ts_data['alloc_vram_efficiency']
-        
-        if 'GPUHours' in ts_data.columns:
-            ts_data['GPU_Hours'] = ts_data['GPUHours']
-        elif 'job_hours' in ts_data.columns:
-            ts_data['GPU_Hours'] = ts_data['job_hours']
-        
-        # Ensure we have a User column
-        if 'User' not in ts_data.columns:
-            ts_data['User'] = user_id
-        
-        # Create visualizer instance with the mapped time series DataFrame
-        ts_visualizer = TimeSeriesVisualizer(ts_data)
-        
-        # Use the appropriate method for VRAM efficiency plotting
-        ts_visualizer.plot_vram_efficiency(
-            annotation_style="none",  # No annotations for cleaner report
-            show_secondary_y=False,   # No secondary axis for simplicity
-            users=[user_id]          # Filter to current user only
+        # Plot individual job performance as dots
+        ts_visualizer.plot_vram_efficiency_per_job_dot(
+            users=[user_id],
+            efficiency_metric='alloc_vram_efficiency' if 'alloc_vram_efficiency' in user_jobs.columns else 'used_vram_gib',
+            vram_metric='vram_hours' if 'vram_hours' in user_jobs.columns else 'job_hours',
+            remove_zero_values=True
         )
         
     except Exception as e:
-        print(f"Error using TimeSeriesVisualizer: {e}")
-        print("Available columns:", list(time_series_data_df.columns) if len(time_series_data_df) > 0 else "No data")
-        print("Falling back to basic plotting...")
-        
-        # Fallback to basic plotting if TimeSeriesVisualizer fails
-        x_col = 'TimeGroup_Datetime' if 'TimeGroup_Datetime' in time_series_data_df.columns else 'TimeGroup_Str'
-        y_col = 'Metric' if 'Metric' in time_series_data_df.columns else 'alloc_vram_efficiency'
-        
-        if x_col in time_series_data_df.columns and y_col in time_series_data_df.columns:
-            # Convert datetime column if needed
-            if 'Datetime' in x_col and time_series_data_df[x_col].dtype == 'object':
-                time_series_data_df[x_col] = pd.to_datetime(time_series_data_df[x_col])
-            
+        print(f"Error creating dot plot: {e}")
+        # Fallback scatter plot
+        if 'alloc_vram_efficiency' in user_jobs.columns:
             plt.figure(figsize=(12, 6))
-            plt.plot(time_series_data_df[x_col], time_series_data_df[y_col], 
-                    marker='o', linewidth=2, markersize=6)
-            plt.xlabel('Time Period')
+            plt.scatter(user_jobs['StartTime'], user_jobs['alloc_vram_efficiency'], 
+                       alpha=0.6, s=50)
+            plt.xlabel('Date')
             plt.ylabel('VRAM Efficiency')
-            plt.title('VRAM Efficiency Over Time')
+            plt.title('Individual Job VRAM Efficiency Over Time')
             plt.xticks(rotation=45)
             plt.grid(True, alpha=0.3)
             plt.tight_layout()
             plt.show()
         else:
-            print(f"Required columns not found. Available columns: {list(time_series_data_df.columns)}")
-            
-elif len(user_jobs) > 0:
-    # Create simple time series from user_jobs using TimeSeriesVisualizer
-    try:
-        from src.visualization.time_series import TimeSeriesVisualizer
-        
-        if 'StartTime' in user_jobs.columns:
-            # Use the per-job dot plot method for individual job analysis
-            # This works directly with job_metrics data like in the notebook
-            ts_visualizer = TimeSeriesVisualizer(user_jobs)
-            
-            # Extract user names as a list (like in the notebook example)
-            user_names = [user_id]
-            print(f"Plotting for user: {user_names}")
-            
-            ts_visualizer.plot_vram_efficiency_per_job_dot(
-                users=user_names,  # Pass list of user strings
-                efficiency_metric='alloc_vram_efficiency' if 'alloc_vram_efficiency' in user_jobs.columns else 'used_vram_gib',
-                vram_metric='vram_hours' if 'vram_hours' in user_jobs.columns else 'job_hours',
-                remove_zero_values=True
-            )
-        else:
-            print("No StartTime column available for time series analysis.")
-    except Exception as e:
-        print(f"Error using TimeSeriesVisualizer: {e}")
-        print("Available columns in user_jobs:", list(user_jobs.columns) if len(user_jobs) > 0 else "No data")
-        print("Falling back to basic time series plot...")
-        
-        # Basic fallback plot
-        if 'StartTime' in user_jobs.columns:
-            user_jobs_sorted = user_jobs.sort_values('StartTime')
-            
-            if 'alloc_vram_efficiency' in user_jobs_sorted.columns:
-                efficiency_col = 'alloc_vram_efficiency'
-                multiplier = 1
-            elif 'used_vram_gib' in user_jobs_sorted.columns and 'allocated_vram' in user_jobs_sorted.columns:
-                user_jobs_sorted['vram_efficiency'] = user_jobs_sorted['used_vram_gib'] / user_jobs_sorted['allocated_vram']
-                efficiency_col = 'vram_efficiency'
-                multiplier = 1
-            else:
-                print("No efficiency data available for fallback plot.")
-                efficiency_col = None
-            
-            if efficiency_col:
-                fig, ax = plt.subplots(figsize=(12, 6))
-                ax.plot(user_jobs_sorted['StartTime'], user_jobs_sorted[efficiency_col] * multiplier, 
-                       marker='o', linewidth=2, markersize=4, alpha=0.7)
-                ax.set_xlabel('Date')
-                ax.set_ylabel('VRAM Efficiency')
-                ax.set_title('VRAM Efficiency Over Time')
-                plt.xticks(rotation=45)
-                plt.tight_layout()
-                plt.show()
-        else:
-            print("No job data available for time series analysis.")
+            print("VRAM efficiency data not available for individual job plot.")
 else:
-    print("No time series data provided.")
+    print("No job data with timestamps available for dot plot.")
 ```
 
 ### Job Count Over Time
@@ -702,4 +982,4 @@ For more information on optimizing your GPU usage, please refer to these resourc
 
 ---
 
-*Report generated on `{python} print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))`*
+*Report generated on `{python} datetime.now().strftime("%Y-%m-%d %H:%M:%S")`*
