@@ -8,14 +8,13 @@ from src.config.remote_config import PartitionInfoFetcher
 import pandas as pd
 
 
-def update_helper_filter_irrelevant_records(
+def helper_filter_irrelevant_records(
     db_path: str,
     table_name: str = "Jobs",
     min_elapsed_seconds: int = 0,
     include_cpu_only_jobs: bool = False,
     include_custom_qos: bool = False,
-    include_failed_jobs: bool = False,
-    include_cancelled_jobs: bool = False,
+    include_failed_cancelled_jobs: bool = False,
 ) -> pd.DataFrame:
     qos_values = "(" + ",".join(f"'{obj.value}'" for obj in QOSEnum) + ")"
     partition_info = PartitionInfoFetcher().get_info()
@@ -37,9 +36,8 @@ def update_helper_filter_irrelevant_records(
             conditions_arr.append(f"QOS in {qos_values}")
         if not include_cpu_only_jobs:
             conditions_arr.append(f"Partition IN {gpu_partitions_str}")
-        if not include_failed_jobs:
+        if not include_failed_cancelled_jobs:
             conditions_arr.append(f"Status != '{StatusEnum.FAILED.value}'")
-        if not include_cancelled_jobs:
             conditions_arr.append(f"Status != '{StatusEnum.CANCELLED.value}'")
 
         query = f"SELECT * FROM {table_name} WHERE {' AND '.join(conditions_arr)}"
@@ -47,48 +45,6 @@ def update_helper_filter_irrelevant_records(
         return mem_db.fetch_query(query=query)
     except Exception as e:
         raise Exception("Exception at helper_filter_irrelevant_records") from e
-
-
-def helper_filter_irrelevant_records(
-    input_df: pd.DataFrame,
-    min_elapsed_seconds: int,
-    include_cpu_only_jobs: bool = False,
-    include_custom_qos: bool = False,
-) -> pd.DataFrame:
-    """
-    Private function to help generate expected ground truth dataframe for test.
-
-    Given a ground truth dataframe, this will create a new dataframe without records meeting the following criteria:
-    - QOS is updates
-    - Account is root
-    - Partition is building
-    - Elasped time is less than min_elapsed
-
-    Args:
-        input_df (pd.DataFrame): Input dataframe to filter. Note that the Elapsed field should be in unit seconds.
-        min_elapsed_seconds (int): Minimum elapsed time in seconds.
-        include_cpu_only_jobs (bool): Whether to include jobs that do not use GPUs (CPU-only jobs). Default is False.
-        include_custom_qos (bool): condition on whether to include records with customized QOS values or not
-
-
-    Returns:
-        pd.DataFrame: Filtered dataframe.
-    """
-    qos_values = set([member.value for member in QOSEnum])
-
-    # TODO(Tan): Update implementation to use the same logic as preprocess_data
-    mask = pd.Series([True] * len(input_df), index=input_df.index)
-
-    mask &= input_df["Elapsed"] >= min_elapsed_seconds
-    mask &= input_df["Account"] != AdminsAccountEnum.ROOT.value
-    mask &= input_df["Partition"] != AdminPartitionEnum.BUILDING.value
-    mask &= (input_df["QOS"] != QOSEnum.UPDATES.value) & (include_custom_qos | input_df["QOS"].isin(qos_values))
-    # Filter out jobs whose partition type is not 'gpu', unless include_cpu_only_jobs is True.
-    partition_info = PartitionInfoFetcher().get_info()
-    gpu_partitions = [p["name"] for p in partition_info if p["type"] == PartitionTypeEnum.GPU.value]
-    mask &= input_df["Partition"].isin(gpu_partitions) | include_cpu_only_jobs
-
-    return input_df[mask].copy()
 
 
 # fixture for returning path to temporary db

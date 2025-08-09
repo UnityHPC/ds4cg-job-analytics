@@ -15,83 +15,75 @@ def test_load_jobs_correct_types(mock_data_path):
     assert isinstance(res, pandas.DataFrame)
 
 
-def test_load_jobs_no_filter(mock_data_frame, mock_data_path):
+def test_load_jobs_no_filter(mock_data_path):
     """
     Test in case there is no filtering, function should return every valid records from database.
     """
-    temp = helper_filter_irrelevant_records(mock_data_frame, 0)
-    ground_truth_csv = temp[
-        (temp["Status"] != StatusEnum.CANCELLED.value) & (temp["Status"] != StatusEnum.FAILED.value)
-    ]
+    ground_truth = helper_filter_irrelevant_records(mock_data_path, min_elapsed_seconds=0)
     res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=mock_data_path)
-    expect_num_records = len(ground_truth_csv)
+    expect_num_records = len(ground_truth)
     assert expect_num_records == len(res)
 
 
-def test_load_jobs_filter_date_back_1(mock_data_frame, mock_data_path, recwarn):
+def test_load_jobs_filter_date_back_1(mock_data_path, recwarn):
     """
     Test for filtering by days_back
     """
-    temp = helper_filter_irrelevant_records(mock_data_frame, 0)
+    temp = helper_filter_irrelevant_records(mock_data_path, min_elapsed_seconds=0)
     res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=mock_data_path, dates_back=90)
     cutoff = datetime.now() - timedelta(days=90)
-    ground_truth_csv = temp[
-        (temp["Status"] != StatusEnum.CANCELLED.value)
-        & (temp["Status"] != StatusEnum.FAILED.value)
-        & (temp["StartTime"] >= cutoff)
-    ]
+    ground_truth_csv = temp[(temp["StartTime"] >= cutoff)].copy()
     expect_job_ids = ground_truth_csv["JobID"].to_numpy()
     assert len(ground_truth_csv) == len(res)
     for id in res["JobID"]:
         assert id in expect_job_ids
 
 
-def test_load_jobs_filter_date_back_2(mock_data_frame, mock_data_path, recwarn):
+def test_load_jobs_filter_date_back_2(mock_data_path, recwarn):
     """
     Test for filtering by days_back
     """
-    temp = helper_filter_irrelevant_records(mock_data_frame, 0)
+    temp = helper_filter_irrelevant_records(mock_data_path, min_elapsed_seconds=0)
     res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=mock_data_path, dates_back=150)
     cutoff = datetime.now() - timedelta(days=150)
-    ground_truth_csv = temp[
-        (temp["Status"] != StatusEnum.CANCELLED.value)
-        & (temp["Status"] != StatusEnum.FAILED.value)
-        & (temp["StartTime"] >= cutoff)
-    ]
+    ground_truth_csv = temp[(temp["StartTime"] >= cutoff)].copy()
     expect_job_ids = ground_truth_csv["JobID"].to_numpy()
     assert len(ground_truth_csv) == len(res)
     for id in res["JobID"]:
         assert id in expect_job_ids
 
 
-def test_load_jobs_filter_min_elapsed(mock_data_frame, mock_data_path, recwarn):
+def test_load_jobs_filter_min_elapsed(mock_data_path, recwarn):
     """
     Test for filtering by days back and minimum elapsed time.
     """
-    temp = helper_filter_irrelevant_records(mock_data_frame, 13000)
+    temp = helper_filter_irrelevant_records(mock_data_path, min_elapsed_seconds=13000)
     res = load_preprocessed_jobs_dataframe_from_duckdb(
         db_path=mock_data_path, min_elapsed_seconds=13000, dates_back=90
     )
     cutoff = datetime.now() - timedelta(days=90)
-    ground_truth_csv = temp[
-        (temp["Status"] != StatusEnum.CANCELLED.value)
-        & (temp["Status"] != StatusEnum.FAILED.value)
-        & (temp["StartTime"] >= cutoff)
-    ]
+    ground_truth_csv = temp[(temp["StartTime"] >= cutoff)].copy()
     expect_job_ids = ground_truth_csv["JobID"].to_numpy()
     assert len(ground_truth_csv) == len(res)
     for id in res["JobID"]:
         assert id in expect_job_ids
 
 
-def test_load_jobs_filter_date_back_include_all(mock_data_frame, mock_data_path, recwarn):
+def test_load_jobs_filter_date_back_include_all(mock_data_path, recwarn):
     """
     Test for filtering by days_back, including CPU only jobs and FAILED/ CANCELLED jobs
     """
-    temp = helper_filter_irrelevant_records(mock_data_frame, 0, include_cpu_only_jobs=True, include_custom_qos=True)
+    temp = helper_filter_irrelevant_records(
+        mock_data_path,
+        min_elapsed_seconds=0,
+        include_cpu_only_jobs=True,
+        include_custom_qos=True,
+        include_failed_cancelled_jobs=True,
+    )
     res = load_preprocessed_jobs_dataframe_from_duckdb(
         db_path=mock_data_path,
         dates_back=90,
+        min_elapsed_seconds=0,
         include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
         include_custom_qos=True,
