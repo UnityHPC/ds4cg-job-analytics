@@ -11,7 +11,7 @@ from src.config.enum_constants import (
 )
 from src.config.constants import ENFORCE_COLUMNS, ESSENTIAL_COLUMNS
 from src.config.remote_config import PartitionInfoFetcher
-from .conftest import helper_filter_irrelevant_records, update_helper_filter_irrelevant_records
+from .conftest import update_helper_filter_irrelevant_records
 import pytest
 
 partition_info = PartitionInfoFetcher().get_info()
@@ -115,7 +115,10 @@ def test_preprocess_data_include_failed_cancelled_job(mock_data_frame, mock_data
     """
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_failed_cancelled_jobs=True)
     ground_truth = update_helper_filter_irrelevant_records(
-        mock_data_path, min_elapsed_seconds=600, include_cancelled_jobs=True, include_failed_jobs=True
+        mock_data_path,
+        min_elapsed_seconds=600,
+        include_cancelled_jobs=True,
+        include_failed_jobs=True,
     )
     expect_failed_status = len(ground_truth[(ground_truth["Status"] == StatusEnum.FAILED.value)])
     expect_cancelled_status = len(ground_truth[(ground_truth["Status"] == StatusEnum.CANCELLED.value)])
@@ -123,9 +126,11 @@ def test_preprocess_data_include_failed_cancelled_job(mock_data_frame, mock_data
     assert sum(x == StatusEnum.CANCELLED.value for x in data["Status"]) == expect_cancelled_status
 
 
-def test_preprocess_data_include_custom_qos(mock_data_frame, recwarn):
+def test_preprocess_data_include_custom_qos(mock_data_frame, mock_data_path, recwarn):
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_custom_qos=True)
-    ground_truth = helper_filter_irrelevant_records(mock_data_frame, 600, include_custom_qos=True)
+    ground_truth = update_helper_filter_irrelevant_records(
+        mock_data_path, min_elapsed_seconds=600, include_custom_qos=True
+    )
     filtered_ground_truth = ground_truth[
         (ground_truth["Status"] != "CANCELLED") & (ground_truth["Status"] != "FAILED")
     ].copy()
@@ -137,7 +142,7 @@ def test_preprocess_data_include_custom_qos(mock_data_frame, recwarn):
         assert id in expect_ids
 
 
-def test_preprocess_data_include_all(mock_data_frame, recwarn):
+def test_preprocess_data_include_all(mock_data_frame, mock_data_path, recwarn):
     """
     Test that the preprocessed data includes all jobs when CPU-only, FAILED/CANCELLED, custom QOS jobs are specified.
     """
@@ -148,8 +153,13 @@ def test_preprocess_data_include_all(mock_data_frame, recwarn):
         include_cpu_only_jobs=True,
         include_custom_qos=True,
     )
-    ground_truth = helper_filter_irrelevant_records(
-        mock_data_frame, 600, include_cpu_only_jobs=True, include_custom_qos=True
+    ground_truth = update_helper_filter_irrelevant_records(
+        mock_data_path,
+        min_elapsed_seconds=600,
+        include_cpu_only_jobs=True,
+        include_custom_qos=True,
+        include_cancelled_jobs=True,
+        include_failed_jobs=True,
     )
     expect_failed_status = len(ground_truth[(ground_truth["Status"] == StatusEnum.FAILED.value)])
     expect_cancelled_status = len(ground_truth[(ground_truth["Status"] == StatusEnum.CANCELLED.value)])
@@ -167,7 +177,7 @@ def test_preprocess_data_include_all(mock_data_frame, recwarn):
     assert sum(x == StatusEnum.COMPLETED.value for x in data["Status"]) == expect_completed_status
 
 
-def test_preprocess_data_fill_missing_interactive(mock_data_frame, recwarn):
+def test_preprocess_data_fill_missing_interactive(mock_data_frame, mock_data_path, recwarn):
     """
     Test that the preprocessed data fills missing interactive job types with 'non-interactive' correctly.
     """
@@ -177,14 +187,20 @@ def test_preprocess_data_fill_missing_interactive(mock_data_frame, recwarn):
         include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
-    ground_truth = helper_filter_irrelevant_records(mock_data_frame, 100, include_cpu_only_jobs=True)
+    ground_truth = update_helper_filter_irrelevant_records(
+        mock_data_path,
+        min_elapsed_seconds=100,
+        include_cpu_only_jobs=True,
+        include_cancelled_jobs=True,
+        include_failed_jobs=True,
+    )
 
     expect_non_interactive = len(ground_truth[(ground_truth["Interactive"].isna())])
 
     assert sum(x == InteractiveEnum.NON_INTERACTIVE.value for x in data["Interactive"]) == expect_non_interactive
 
 
-def test_preprocess_data_fill_missing_array_id(mock_data_frame, recwarn):
+def test_preprocess_data_fill_missing_array_id(mock_data_frame, mock_data_path, recwarn):
     """
     Test that the preprocessed data fills missing ArrayID with -1 correctly.
     """
@@ -194,12 +210,18 @@ def test_preprocess_data_fill_missing_array_id(mock_data_frame, recwarn):
         include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
-    ground_truth = helper_filter_irrelevant_records(mock_data_frame, 100, include_cpu_only_jobs=True)
+    ground_truth = update_helper_filter_irrelevant_records(
+        mock_data_path,
+        min_elapsed_seconds=100,
+        include_cpu_only_jobs=True,
+        include_failed_jobs=True,
+        include_cancelled_jobs=True,
+    )
     expect_array_id_null = len(ground_truth[(ground_truth["ArrayID"].isna())])
     assert sum(x == -1 for x in data["ArrayID"]) == expect_array_id_null
 
 
-def test_preprocess_data_fill_missing_gpu_type(mock_data_frame, recwarn):
+def test_preprocess_data_fill_missing_gpu_type(mock_data_frame, mock_data_path, recwarn):
     """
     Test that the preprocessed data fills missing GPUType with 'cpu' correctly.
     """
@@ -210,7 +232,13 @@ def test_preprocess_data_fill_missing_gpu_type(mock_data_frame, recwarn):
         include_failed_cancelled_jobs=True,
     )
 
-    ground_truth = helper_filter_irrelevant_records(mock_data_frame, 100, include_cpu_only_jobs=True)
+    ground_truth = update_helper_filter_irrelevant_records(
+        mock_data_path,
+        min_elapsed_seconds=100,
+        include_cpu_only_jobs=True,
+        include_failed_jobs=True,
+        include_cancelled_jobs=True,
+    )
     expect_gpu_type_null = len(ground_truth[(ground_truth["GPUType"].isna())])
     expect_gpus_null = len(ground_truth[(ground_truth["GPUs"].isna())])
 
@@ -220,7 +248,7 @@ def test_preprocess_data_fill_missing_gpu_type(mock_data_frame, recwarn):
     )
 
 
-def test_preprocess_data_fill_missing_constraints(mock_data_frame, recwarn):
+def test_preprocess_data_fill_missing_constraints(mock_data_frame, mock_data_path, recwarn):
     """
     Test that the preprocessed data fills missing Constraints with empty numpy array correctly.
     """
@@ -230,91 +258,82 @@ def test_preprocess_data_fill_missing_constraints(mock_data_frame, recwarn):
         include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
-    ground_truth = helper_filter_irrelevant_records(mock_data_frame, 100, include_cpu_only_jobs=True)
+    ground_truth = update_helper_filter_irrelevant_records(
+        mock_data_path,
+        min_elapsed_seconds=100,
+        include_cpu_only_jobs=True,
+        include_failed_jobs=True,
+        include_cancelled_jobs=True,
+    )
     expect_constraints_null = len(ground_truth[(ground_truth["Constraints"].isna())])
 
     assert sum(len(x) == 0 for x in data["Constraints"]) == expect_constraints_null
 
 
-def test_category_interactive(mock_data_frame, recwarn):
+def test_category_interactive(mock_data_frame, mock_data_path, recwarn):
     """
     Test that the preprocessed data has 'Interactive' as a categorical variable and check values contained within it.
     """
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
-    ground_truth = helper_filter_irrelevant_records(mock_data_frame, 600)
-    ground_truth_filtered = ground_truth[
-        (ground_truth["Status"] != StatusEnum.FAILED.value) & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
-    ]
-    expected = set(ground_truth_filtered["Interactive"].dropna().to_numpy()) | set([e.value for e in InteractiveEnum])
+    ground_truth = update_helper_filter_irrelevant_records(mock_data_path, min_elapsed_seconds=600)
+    expected = set(ground_truth["Interactive"].dropna().to_numpy()) | set([e.value for e in InteractiveEnum])
 
     assert data["Interactive"].dtype == "category"
     assert expected.issubset(set(data["Interactive"].cat.categories))
 
 
-def test_category_qos(mock_data_frame, recwarn):
+def test_category_qos(mock_data_frame, mock_data_path, recwarn):
     """
     Test that the preprocessed data has 'QOS' as a categorical variable and check values contained within it.
     """
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
-    ground_truth = helper_filter_irrelevant_records(mock_data_frame, 600)
-    ground_truth_filtered = ground_truth[
-        (ground_truth["Status"] != StatusEnum.FAILED.value) & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
-    ]
-    expected = set(ground_truth_filtered["QOS"].dropna().to_numpy()) | set([e.value for e in QOSEnum])
+    ground_truth = update_helper_filter_irrelevant_records(mock_data_path, min_elapsed_seconds=600)
+    expected = set(ground_truth["QOS"].dropna().to_numpy()) | set([e.value for e in QOSEnum])
 
     assert data["QOS"].dtype == "category"
     assert expected.issubset(set(data["QOS"].cat.categories))
 
 
-def test_category_exit_code(mock_data_frame, recwarn):
+def test_category_exit_code(mock_data_frame, mock_data_path, recwarn):
     """
     Test that the preprocessed data has 'ExitCode' as a categorical variable and check values contained within it.
     """
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
 
-    ground_truth = helper_filter_irrelevant_records(mock_data_frame, 600)
-    ground_truth_filtered = ground_truth[
-        (ground_truth["Status"] != StatusEnum.FAILED.value) & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
-    ]
-    expected = set(ground_truth_filtered["ExitCode"].dropna().to_numpy()) | set([e.value for e in ExitCodeEnum])
+    ground_truth = update_helper_filter_irrelevant_records(mock_data_path, min_elapsed_seconds=600)
+    expected = set(ground_truth["ExitCode"].dropna().to_numpy()) | set([e.value for e in ExitCodeEnum])
 
     assert data["ExitCode"].dtype == "category"
     assert expected.issubset(set(data["ExitCode"].cat.categories))
 
 
-def test_category_partition(mock_data_frame, recwarn):
+def test_category_partition(mock_data_frame, mock_data_path, recwarn):
     """
     Test that the preprocessed data has 'Partition' as a categorical variable and check values contained within it.
     """
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
 
-    ground_truth = helper_filter_irrelevant_records(mock_data_frame, 600)
-    ground_truth_filtered = ground_truth[
-        (ground_truth["Status"] != StatusEnum.FAILED.value) & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
-    ]
-    expected = set(ground_truth_filtered["Partition"].dropna().to_numpy()) | set([e.value for e in AdminPartitionEnum])
+    ground_truth = update_helper_filter_irrelevant_records(mock_data_path, min_elapsed_seconds=600)
+    expected = set(ground_truth["Partition"].dropna().to_numpy()) | set([e.value for e in AdminPartitionEnum])
 
     assert data["Partition"].dtype == "category"
     assert expected.issubset(set(data["Partition"].cat.categories))
 
 
-def test_category_account(mock_data_frame, recwarn):
+def test_category_account(mock_data_frame, mock_data_path, recwarn):
     """
     Test that the preprocessed data has 'Account' as a categorical variable and check values contained within it.
     """
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
 
-    ground_truth = helper_filter_irrelevant_records(mock_data_frame, 600)
-    ground_truth_filtered = ground_truth[
-        (ground_truth["Status"] != StatusEnum.FAILED.value) & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
-    ]
-    expected = set(ground_truth_filtered["Account"].dropna().to_numpy()) | set([e.value for e in AdminsAccountEnum])
+    ground_truth = update_helper_filter_irrelevant_records(mock_data_path, min_elapsed_seconds=600)
+    expected = set(ground_truth["Account"].dropna().to_numpy()) | set([e.value for e in AdminsAccountEnum])
 
     assert data["Account"].dtype == "category"
     assert expected.issubset(set(data["Account"].cat.categories))
 
 
-def test_preprocess_timedelta_conversion(mock_data_frame, recwarn):
+def test_preprocess_timedelta_conversion(mock_data_frame, mock_data_path, recwarn):
     """
     Test that the preprocessed data converts elapsed time to timedelta.
     """
@@ -324,16 +343,23 @@ def test_preprocess_timedelta_conversion(mock_data_frame, recwarn):
         include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
-    ground_truth = helper_filter_irrelevant_records(mock_data_frame, 600, include_cpu_only_jobs=True)
-    max_len = len(ground_truth)
+    ground_truth = update_helper_filter_irrelevant_records(
+        mock_data_path,
+        min_elapsed_seconds=600,
+        include_cpu_only_jobs=True,
+        include_failed_jobs=True,
+        include_cancelled_jobs=True,
+    )
     time_limit = data["TimeLimit"]
+    assert time_limit.dtype == "timedelta64[ns]"  # assert correct type
 
-    assert time_limit.dtype == "timedelta64[ns]"
-    assert time_limit[0].total_seconds() / 60 == ground_truth["TimeLimit"][0]
-    assert time_limit[max_len - 1].total_seconds() / 60 == ground_truth["TimeLimit"][max_len - 1]
+    time_limit = time_limit.tolist()
+    ground_truth_time_limit = ground_truth["TimeLimit"].tolist()
+    for i, timedelta in enumerate(time_limit):
+        assert timedelta.total_seconds() / 60 == ground_truth_time_limit[i]
 
 
-def test_preprocess_gpu_type(mock_data_frame, recwarn):
+def test_preprocess_gpu_type(mock_data_frame, mock_data_path, recwarn):
     """
     Test that the GPUType column is correctly filled and transformed during preprocessing.
     """

@@ -27,11 +27,12 @@ def update_helper_filter_irrelevant_records(
             db_path
         )  # with read_only = True as we don't expect to write into database directly from tests
 
-        conditions_arr = []
-        conditions_arr.append(f"Elapsed >= {min_elapsed_seconds}")
-        conditions_arr.append(f"Account != '{AdminsAccountEnum.ROOT.value}'")
-        conditions_arr.append(f"Partition != '{AdminPartitionEnum.BUILDING.value}'")
-        conditions_arr.append(f"QOS != '{QOSEnum.UPDATES.value}'")
+        conditions_arr = [
+            f"Elapsed >= {min_elapsed_seconds}",
+            f"Account != '{AdminsAccountEnum.ROOT.value}'",
+            f"Partition != '{AdminPartitionEnum.BUILDING.value}'",
+            f"QOS != '{QOSEnum.UPDATES.value}'",
+        ]
         if not include_custom_qos:
             conditions_arr.append(f"QOS in {qos_values}")
         if not include_cpu_only_jobs:
@@ -45,7 +46,7 @@ def update_helper_filter_irrelevant_records(
         print(f"Query: {query}")
         return mem_db.fetch_query(query=query)
     except Exception as e:
-        raise Exception("Exception at helper_filter_irrelevvant_records") from e
+        raise Exception("Exception at helper_filter_irrelevant_records") from e
 
 
 def helper_filter_irrelevant_records(
