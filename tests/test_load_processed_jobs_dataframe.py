@@ -2,7 +2,7 @@ import pytest
 import pandas
 from src.utility import load_preprocessed_jobs_dataframe_from_duckdb
 from .conftest import helper_filter_irrelevant_records
-from src.config.constants import REQUIRED_COLUMNS, OPTIONAL_COLUMNS
+from src.config.enum_constants import OptionalColumnsEnum, RequiredColumnsEnum
 from datetime import datetime, timedelta
 
 
@@ -102,8 +102,9 @@ def test_load_jobs_custom_query(mock_data_frame, mock_data_path, recwarn):
     Warnings are expected to be raised since this select a subset of columns.
     """
     query = (
-        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage, Elapsed FROM Jobs "
-        "WHERE Status != 'CANCELLED' AND Status !='FAILED' AND ArrayID is not NULL AND Interactive is not NULL"
+        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage, CPUMemUsage, Elapsed "
+        "FROM Jobs WHERE Status != 'CANCELLED' AND Status !='FAILED' "
+        "AND ArrayID is not NULL AND Interactive is not NULL"
     )
     res = load_preprocessed_jobs_dataframe_from_duckdb(
         db_path=mock_data_path, custom_query=query, include_cpu_only_jobs=True, include_custom_qos=True
@@ -127,8 +128,9 @@ def test_load_jobs_custom_query_days_back_1(mock_data_frame, mock_data_path, rec
     Expect result will be filtered correctly by dates_back.
     """
     query = (
-        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage, Elapsed FROM Jobs "
-        "WHERE Status != 'CANCELLED' AND Status !='FAILED' AND ArrayID is not NULL AND Interactive is not NULL"
+        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage, CPUMemUsage, Elapsed "
+        "FROM Jobs WHERE Status != 'CANCELLED' AND Status !='FAILED' AND ArrayID is not NULL "
+        "AND Interactive is not NULL"
     )
     res = load_preprocessed_jobs_dataframe_from_duckdb(
         db_path=mock_data_path, custom_query=query, include_cpu_only_jobs=True, dates_back=150
@@ -154,9 +156,9 @@ def test_load_jobs_custom_query_days_back_2(mock_data_frame, mock_data_path, rec
     """
     cutoff = datetime.now() - timedelta(days=150)
     query = (
-        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage, Elapsed FROM Jobs "
-        "WHERE Status != 'CANCELLED' AND Status !='FAILED' AND ArrayID is not NULL AND Interactive is not NULL "
-        f"AND StartTime >= '{cutoff}'"
+        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage, CPUMemUsage, Elapsed "
+        "FROM Jobs WHERE Status != 'CANCELLED' AND Status !='FAILED' AND ArrayID is not NULL "
+        f"AND Interactive is not NULL AND StartTime >= '{cutoff}'"
     )
 
     res = load_preprocessed_jobs_dataframe_from_duckdb(
@@ -203,8 +205,9 @@ def test_preprocess_key_errors_raised(mock_data_path, recwarn):
 
     Expect to raise RuntimeError for any of these columns if they are missing in the dataframe
     """
-    for col in REQUIRED_COLUMNS:
-        col_names = list(REQUIRED_COLUMNS)
+    required_col = {e.value for e in RequiredColumnsEnum}
+    for col in required_col:
+        col_names = required_col.copy()
         col_names.remove(col)
         col_str = ", ".join(col_names)
         query = f"SELECT {col_str} FROM Jobs"
@@ -220,14 +223,14 @@ def test_preprocess_warning_raised(mock_data_path, recwarn):
 
     These columns are not in ENFORCE_COLUMNS so only warnings are expected to be raised
     """
-    for col in OPTIONAL_COLUMNS:
-        if col in REQUIRED_COLUMNS:
-            continue
-        col_names = REQUIRED_COLUMNS.copy()
-        remain_cols = OPTIONAL_COLUMNS.copy()
-        remain_cols.remove(col)
-        col_names = col_names.union(remain_cols)
-        col_str = ", ".join(list(col_names))
+    optional_columns = {e.value for e in OptionalColumnsEnum}
+    required_columns = {e.value for e in RequiredColumnsEnum}
+    for col in optional_columns:
+        required_column_copy = required_columns.copy()
+        optional_column_copy = optional_columns.copy()
+        optional_column_copy.remove(col)
+        final_column_set = required_column_copy.union(optional_column_copy)
+        col_str = ", ".join(final_column_set)
         query = f"SELECT {col_str} FROM Jobs"
 
         expect_warning_msg = (

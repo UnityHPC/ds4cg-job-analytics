@@ -9,7 +9,7 @@ from src.config.enum_constants import (
     AdminsAccountEnum,
     PartitionTypeEnum,
 )
-from src.config.constants import REQUIRED_COLUMNS, OPTIONAL_COLUMNS
+from src.config.enum_constants import OptionalColumnsEnum, RequiredColumnsEnum
 from src.config.remote_config import PartitionInfoFetcher
 from .conftest import helper_filter_irrelevant_records
 import pytest
@@ -370,7 +370,8 @@ def test_preprocess_key_errors_raised(mock_data_frame, recwarn):
 
     Expect to raise KeyError for any of these columns if they are missing in the dataframe.
     """
-    for col in REQUIRED_COLUMNS:
+    required_column_list = [e.value for e in RequiredColumnsEnum]
+    for col in required_column_list:
         cur_df = mock_data_frame.drop(col, axis=1, inplace=False)
         with pytest.raises(KeyError, match=f"Column {col} does not exist in dataframe."):
             _res = preprocess_data(cur_df)
@@ -382,9 +383,8 @@ def test_preprocess_warning_raised(mock_data_frame, recwarn):
 
     These columns are not in ENFORCE_COLUMNS so only warnings are expected to be raised.
     """
-    for col in OPTIONAL_COLUMNS:
-        if col in REQUIRED_COLUMNS:
-            continue
+    optional_columns_list = [e.value for e in OptionalColumnsEnum]
+    for col in optional_columns_list:
         cur_df = mock_data_frame.drop(col, axis=1, inplace=False)
 
         expect_warning_msg = (

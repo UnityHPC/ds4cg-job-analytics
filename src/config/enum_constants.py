@@ -97,7 +97,7 @@ class AdminsAccountEnum(Enum):
 @unique
 class AdminPartitionEnum(Enum):
     """An enumeration representing partitions used by admin in maintenance that need to be omitted from analysis.
-    
+
     Attributes:
         BUILDING: Represents the building partition.
     """
@@ -155,3 +155,49 @@ class MetricsDataFrameNameEnum(Enum):
     JOBS = "jobs_with_efficiency_metrics"
     USERS = "users_with_efficiency_metrics"
     PI_GROUPS = "pi_accounts_with_efficiency_metrics"
+
+
+@unique
+class OptionalColumnsEnum(Enum):
+    """
+    An enumeration representing optional columns used for filtering in preprocess code.
+
+    Attributes:
+        STATUS: Job status column.
+        ACCOUNT: Account column.
+        PARTITION: Partition column.
+        QOS: Quality of Service column.
+    """
+
+    STATUS = "Status"
+    ACCOUNT = "Account"
+    PARTITION = "Partition"
+    QOS = "QOS"
+
+
+@unique
+class RequiredColumnsEnum(Enum):
+    """
+    An enumeration representing required columns that must be present in the dataframe.
+
+    Attributes:
+        GPU_TYPE: GPU type column.
+        CONSTRAINTS: Job constraints column.
+        START_TIME: Job start time column.
+        SUBMIT_TIME: Job submit time column.
+        NODE_LIST: Node list column.
+        GPUS: Number of GPUs column.
+        GPU_MEM_USAGE: GPU memory usage column.
+        ELAPSED: Job elapsed time column.
+        CPU_MEM_USAGE: CPU memory usage column.
+    """
+
+    GPU_TYPE = "GPUType"
+    CONSTRAINTS = "Constraints"
+    START_TIME = "StartTime"
+    SUBMIT_TIME = "SubmitTime"
+    NODE_LIST = "NodeList"
+    GPUS = "GPUs"
+    GPU_MEM_USAGE = "GPUMemUsage"
+    ELAPSED = "Elapsed"
+    CPU_MEM_USAGE = "CPUMemUsage"

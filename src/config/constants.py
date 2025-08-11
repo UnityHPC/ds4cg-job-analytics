@@ -37,24 +37,3 @@ ATTRIBUTE_CATEGORIES = {
 # Storing GPU names that have multiple vram options
 # This is used to determine which GPU variant a job is using based on the VRAM usage
 MULTIVALENT_GPUS = {"a100": [40, 80], "v100": [16, 32]}
-
-
-# Storing columns that are used for filtering in preprocess code
-# This is used to check if all these columns exist in the dataframe for proper warning and handling
-OPTIONAL_COLUMNS = {
-    "GPUType",
-    "GPUs",
-    "Status",
-    "Elapsed",
-    "Account",
-    "Partition",
-    "QOS",
-    "Constraints",
-    "StartTime",
-    "SubmitTime",
-    "NodeList",
-    "GPUMemUsage",
-}
-
-# can add any columns below that we want to raise error anytime it is not there
-REQUIRED_COLUMNS = {"GPUType", "Constraints", "StartTime", "SubmitTime", "NodeList", "GPUs", "GPUMemUsage", "Elapsed"}

@@ -9,10 +9,18 @@ from ..config.constants import (
     DEFAULT_MIN_ELAPSED_SECONDS,
     ATTRIBUTE_CATEGORIES,
     MULTIVALENT_GPUS,
-    REQUIRED_COLUMNS,
-    OPTIONAL_COLUMNS,
+    # REQUIRED_COLUMNS,
+    # OPTIONAL_COLUMNS,
 )
-from ..config.enum_constants import StatusEnum, AdminsAccountEnum, AdminPartitionEnum, QOSEnum, PartitionTypeEnum
+from ..config.enum_constants import (
+    StatusEnum,
+    AdminsAccountEnum,
+    AdminPartitionEnum,
+    QOSEnum,
+    PartitionTypeEnum,
+    OptionalColumnsEnum,
+    RequiredColumnsEnum,
+)
 from ..config.remote_config import PartitionInfoFetcher
 
 
@@ -286,15 +294,16 @@ def preprocess_data(
     qos_values = set([member.value for member in QOSEnum])
     exist_column_set = set(data.columns.to_list())
 
-    # Ensure required columns are present and raise warning if optional columns are missing
-    for col_name in OPTIONAL_COLUMNS:
-        # Process columns that must exist in the dataset
-        if col_name not in exist_column_set and col_name in REQUIRED_COLUMNS:
-            raise KeyError(f"Column {col_name} does not exist in dataframe.")
-        # Process optional columns
-        elif col_name not in exist_column_set:
+    # Ensure required columns are present
+    for col in RequiredColumnsEnum:
+        if col.value not in exist_column_set:
+            raise KeyError(f"Column {col.value} does not exist in dataframe.")
+
+    # raise warnings if optional columns are not present
+    for col in OptionalColumnsEnum:
+        if col.value not in exist_column_set:
             warnings.warn(
-                f"Column {col_name} not exist in dataframe, this may result in unexpected results when filtering.",
+                f"Column {col.value} not exist in dataframe, this may result in unexpected results when filtering.",
                 UserWarning,
                 stacklevel=2,
             )
