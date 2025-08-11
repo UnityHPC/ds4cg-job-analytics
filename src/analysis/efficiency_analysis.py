@@ -858,17 +858,19 @@ class EfficiencyAnalysis:
 
         return gpu_utilization_patterns
 
-    def categorize_users_by_vram_constraint_efficiency(self) -> pd.DataFrame:
+    def categorize_jobs_by_vram_constraint_efficiency(self) -> pd.DataFrame:
         """
-        Bucketize users based on their expected VRAM constraint efficiency.
+        Bucketize jobs based on their VRAM constraint efficiency.
+        
+        This is what your original function was actually doing.
 
         Returns:
-            pd.DataFrame: DataFrame with users categorized into efficiency buckets.
+            pd.DataFrame: DataFrame with jobs categorized into efficiency buckets.
         """
-        if self.users_with_efficiency_metrics is None:
-            self.calculate_user_efficiency_metrics()
+        if self.jobs_with_efficiency_metrics is None:
+            self.calculate_job_efficiency_metrics(self.jobs_df)
 
-        df = self.jobs_with_efficiency_metrics
+        df = self.jobs_with_efficiency_metrics.copy()
 
         # Create efficiency bucket
         def categorize_efficiency(val: float | pd.api.typing.NAType) -> str:
@@ -885,15 +887,17 @@ class EfficiencyAnalysis:
 
         df["vram_constraint_efficiency_bucket"] = df["vram_constraint_efficiency"].apply(categorize_efficiency)
 
-        # Count users in each bucket
+        # Count jobs in each bucket
         bucket_counts = df["vram_constraint_efficiency_bucket"].value_counts(dropna=True).sort_index()
 
-        # Add proportion of users per bucket
-        total_users = len(df)
-        bucket_distribution = bucket_counts.to_frame(name="user_count")
-        bucket_distribution["percentage"] = (bucket_distribution["user_count"] / total_users * 100).round(2)
+        # Add proportion of jobs per bucket
+        total_jobs = len(df)
+        bucket_distribution = bucket_counts.to_frame(name="job_count")
+        bucket_distribution["percentage"] = (bucket_distribution["job_count"] / total_jobs * 100).round(2)
 
-        # Return both detailed and summary views
-        self.users_with_efficiency_metrics["vram_constraint_efficiency_bucket"] = df["vram_constraint_efficiency_bucket"]  # noqa: E501
+        # Update the jobs DataFrame with bucket information
+        self.jobs_with_efficiency_metrics = df
 
         return bucket_distribution
+
+
