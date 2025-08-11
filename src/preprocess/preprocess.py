@@ -394,6 +394,26 @@ def _cast_type_and_add_columns(data: pd.DataFrame) -> None:
         )
 
 
+def _check_for_infinity_values(data: pd.DataFrame) -> None:
+    """
+    Check for infinity values in memory usage columns and raise warnings if found.
+
+    Args:
+        data (pd.DataFrame): The dataframe to check for infinity values.
+
+    Returns:
+        None: The function only raises warnings if infinity values are found.
+    """
+    mem_usage_columns = ["CPUMemUsage", "GPUMemUsage"]
+    for col_name in mem_usage_columns:
+        if col_name not in set(data.columns.to_list()):
+            continue
+        filtered = data[data[col_name] == np.inf].copy()
+        if len(filtered) > 0:
+            message = f"Some entries in {col_name} having infinity values. This may be caused by an overflow."
+            warnings.warn(message=message, stacklevel=2, category=UserWarning)
+
+
 def preprocess_data(
     input_df: pd.DataFrame,
     min_elapsed_seconds: int = DEFAULT_MIN_ELAPSED_SECONDS,
@@ -432,19 +452,11 @@ def preprocess_data(
         include_custom_qos_jobs,
     )
 
-    exist_column_set = set(data.columns.to_list())
-
     _fill_missing(data)
 
     _cast_type_and_add_columns(data)
 
-    # Raise warning if GPUMemUsage or CPUMemUsage having infinity values
-    mem_usage_columns = ["CPUMemUsage", "GPUMemUsage"]
-    for col_name in mem_usage_columns:
-        if col_name not in exist_column_set:
-            continue
-        filtered = data[data[col_name] == np.inf].copy()
-        if len(filtered) > 0:
-            message = f"Some entries in {col_name} having infinity values. This may be caused by an overflow."
-            warnings.warn(message=message, stacklevel=2, category=UserWarning)
+    # Check for infinity values in memory usage columns
+    _check_for_infinity_values(data)
+
     return data
