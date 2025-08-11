@@ -1,6 +1,6 @@
 import pytest
 import pandas
-from src.utility import load_preprocessed_jobs_dataframe_from_duckdb
+from src.utilities import load_preprocessed_jobs_dataframe_from_duckdb
 from .conftest import helper_filter_irrelevant_records
 from src.config.enum_constants import OptionalColumnsEnum, RequiredColumnsEnum
 from datetime import datetime, timedelta
