@@ -652,3 +652,122 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
 
         plt.tight_layout()
         plt.show()
+
+    def plot_vram_efficiency_per_job_dot_interactive(
+        self,
+        users: list[str],
+        efficiency_metric: str,
+        vram_metric: str = "job_hours",
+        remove_zero_values: bool = True,
+        max_points: int = 1000,
+        exclude_fields: list[str] | None = None,
+    ) -> go.Figure:
+        """
+        Interactive dot plot of VRAM efficiency for all individual jobs (not grouped) using Plotly.
+
+        Args:
+            users (list[str]): List of users to include.
+            efficiency_metric (str): Column name representing efficiency.
+            vram_metric (str): Column name representing VRAM hours (used for dot size).
+            remove_zero_values (bool): Whether to exclude jobs with zero or NaN efficiency.
+            max_points (int): Maximum number of points to plot to avoid memory issues.
+            exclude_fields (list[str], optional): List of fields to exclude from hover text.
+
+        Returns:
+            go.Figure: The interactive plot with detailed tooltips.
+        """
+        df = self.df
+        if df is None:
+            print("No data available for visualization")
+            return go.Figure()
+
+        df = df.copy()
+
+        # Filter by selected users
+        df = df[df["User"].isin(users)]
+
+        # Parse time from StartTime
+        df["JobStart"] = pd.to_datetime(df["StartTime"]).dt.to_period("M").dt.to_timestamp()
+
+        # Filter zero or invalid values if needed
+        if remove_zero_values:
+            df = df[df[efficiency_metric] > 0]
+            df = df[df[vram_metric] > 0]
+            df = df[df[efficiency_metric].notna() & df[vram_metric].notna()]
+
+        # Limit points to avoid memory issues
+        if len(df) > max_points:
+            df = df.sample(n=max_points, random_state=42)
+
+        if exclude_fields is None:
+            exclude_fields = []
+
+        fig = go.Figure()
+
+        colors = [
+            "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+            "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
+        ]
+
+        users_list = df["User"].unique().tolist()
+
+        for idx, user in enumerate(users_list):
+            user_df = df[df["User"] == user]
+
+            if user_df.empty:
+                continue
+
+            # Normalize size: square root scaling to keep bubble area proportional to VRAM hours
+            sizes = np.sqrt(user_df[vram_metric] + 1) * 5  # Adjust multiplier for Plotly
+
+            # Create hover text with job details
+            hover_text = []
+            for _, row in user_df.iterrows():
+                fields = {
+                    "User": user,
+                    "JobID": row.get("JobID", "N/A"),
+                    "Job Start": row["JobStart"].strftime("%Y-%m") if pd.notnull(row["JobStart"]) else "N/A",
+                    "Efficiency": f"{row[efficiency_metric]:.6f}",
+                    "VRAM Hours": f"{row[vram_metric]:.1f}",
+                    "GPU Type": row.get("GPUType", "N/A"),
+                    "Exit Code": row.get("ExitCode", "N/A"),
+                }
+
+                # Remove excluded fields
+                for field in exclude_fields:
+                    fields.pop(field, None)
+
+                hover_text.append("<br>".join([f"{k}: {v}" for k, v in fields.items()]))
+
+            fig.add_trace(
+                go.Scatter(
+                    x=user_df["JobStart"],
+                    y=user_df[efficiency_metric],
+                    mode="markers",
+                    name=user,
+                    marker=dict(
+                        size=sizes,
+                        color=colors[idx % len(colors)],
+                        opacity=0.7,
+                        line=dict(width=1, color="black"),
+                        sizemode="diameter",
+                        sizemin=4,
+                    ),
+                    hovertext=hover_text,
+                    hoverinfo="text",
+                )
+            )
+
+        fig.update_layout(
+            title="Interactive Per-Job VRAM Efficiency Dot Plot (Size = VRAM Hours)",
+            xaxis_title="Job Start Time",
+            yaxis_title="VRAM Efficiency",
+            hovermode="closest",
+            width=1000,
+            height=600,
+            showlegend=True,
+        )
+
+        fig.show()
+        return fig
+

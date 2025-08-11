@@ -8,5 +8,8 @@ seaborn
 jupyterlab
 jq
 pydantic
+requests
+requests-cache
+ipykernel
 plotly
 papermill

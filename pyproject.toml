@@ -51,6 +51,7 @@ select = [
     # pydocstyle: D
     # Docstring capitalization: D403, D405
     "D403", "D405",
+    # pydocstyle: D
     # Docstring should not start with this: D404
     "D404",
     # pydocstyle: D
@@ -75,10 +76,6 @@ ignore = [
 
 "mvp_scripts/*" = ["N", "NPY", "PD", "D100", "TD", "ANN"]
 "notebooks/SlurmGPU.ipynb" = ["N", "NPY", "PD", "D100", "TD", "ANN"]
-
-# TODO (Arda): Remove these ignores once the code is fixed
-"tests/*" = ["ANN"]
-"src/database/*" = ["ANN", "DOC", "D"]
 
 [tool.ruff.lint.isort]
 # Combine multiple 'as' imports on a single line (e.g., import foo as bar, baz as qux)
@@ -110,6 +107,11 @@ addopts = [
 ]
 pythonpath = "."
 testpaths = ["tests"]
+env = [
+    # Set the environment variable to indicate that tests are running
+    "RUN_ENV=TEST"
+]
+
 
 [tool.mkdocs]
 # MkDocs configuration options in the YAML file (mkdocs.yml) can be embedded here in pyproject.toml instead
