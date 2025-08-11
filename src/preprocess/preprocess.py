@@ -253,32 +253,32 @@ def _fill_missing(res: pd.DataFrame) -> None:
             res.loc[:, col] = fill_func(res[col])
 
 
-def preprocess_data(
-    input_df: pd.DataFrame,
-    min_elapsed_seconds: int = DEFAULT_MIN_ELAPSED_SECONDS,
-    include_failed_cancelled_jobs: bool = False,
-    include_cpu_only_jobs: bool = False,
-    include_custom_qos_jobs: bool = False,
+def _validate_columns_and_filter_records(
+    data: pd.DataFrame,
+    min_elapsed_seconds: int,
+    include_failed_cancelled_jobs: bool,
+    include_cpu_only_jobs: bool,
+    include_custom_qos_jobs: bool,
 ) -> pd.DataFrame:
     """
-    Preprocess dataframe, filtering out unwanted rows and columns, filling missing values and converting types.
+    Validate required columns and filter records based on specified criteria.
 
-    This function will take in a dataframe to create a new dataframe satisfying given criteria.
-
+    This function performs two main operations:
+    1. Validates that all required columns are present and warns about missing optional columns
+    2. Applies filtering conditions to remove unwanted records based on various criteria
 
     Args:
-        input_df (pd.DataFrame): The input dataframe containing job data.
-        min_elapsed_seconds (int, optional): Minimum elapsed time in seconds to keep a job record. Defaults to 600.
-        include_failed_cancelled_jobs (bool, optional): Whether to include jobs with status FAILED or CANCELLED.
-        include_cpu_only_jobs (bool, optional): Whether to include jobs that do not use GPUs (CPU-only jobs).
-        include_custom_qos_jobs (bool, optional): Whether to include entries with custom qos values or not.
-            Default to False
-
-    Raises:
-        KeyError: If any columns in REQUIRED_COLUMNS do not exist in the dataframe.
+        data (pd.DataFrame): The input dataframe to validate and filter.
+        min_elapsed_seconds (int): Minimum elapsed time in seconds to keep a job record.
+        include_failed_cancelled_jobs (bool): Whether to include jobs with status FAILED or CANCELLED.
+        include_cpu_only_jobs (bool): Whether to include jobs that do not use GPUs (CPU-only jobs).
+        include_custom_qos_jobs (bool): Whether to include entries with custom qos values.
 
     Returns:
-        pd.DataFrame: The preprocessed dataframe
+        pd.DataFrame: The validated and filtered dataframe.
+
+    Raises:
+        KeyError: If any columns in RequiredColumnsEnum do not exist in the dataframe.
 
     Notes:
         # Handling missing columns logic:
@@ -287,10 +287,8 @@ def preprocess_data(
         - For any columns in REQUIRED_COLUMNS that do not exist, a KeyError will be raised.
         - For any columns in OPTIONAL_COLUMNS but not in REQUIRED_COLUMNS, a warning will be raised.
         - _fill_missing, records filtering, and type conversion logic will happen only if columns involved exist
-    """
 
-    # Drop unnecessary columns, ignoring errors in case any of them is not in the dataframe
-    data = input_df.drop(columns=["UUID", "EndTime", "Nodes", "Preempted"], axis=1, inplace=False, errors="ignore")
+    """
     qos_values = set([member.value for member in QOSEnum])
     exist_column_set = set(data.columns.to_list())
 
@@ -334,13 +332,24 @@ def preprocess_data(
             continue
         mask &= func(data)
 
-    data = data[mask].copy()
-    if data.empty:
-        warnings.warn(
-            message="Dataframe results from database and filtering is empty.", category=UserWarning, stacklevel=2
-        )
+    return data[mask].copy()
 
-    _fill_missing(data)
+
+def _cast_type_and_add_columns(data: pd.DataFrame) -> None:
+    """
+    Cast existing columns to appropriate data types and add derived metrics as new columns.
+
+    Handles both empty and non-empty dataframes by applying type casting to existing columns
+        and either adding empty columns with correct dtypes or calculating actual derived values.
+
+    Args:
+        data (pd.DataFrame): The dataframe to modify. Must contain the required columns for processing.
+
+    Returns:
+        None: The function modifies the DataFrame in place.
+    """
+    exist_column_set = set(data.columns.to_list())
+
     # Type casting for columns involving time
     time_columns = ["StartTime", "SubmitTime"]
     for col in time_columns:
@@ -355,18 +364,7 @@ def preprocess_data(
         target_col = data[col] * 60 if col == "TimeLimit" else data[col]
         data[col] = pd.to_timedelta(target_col, unit="s", errors="coerce")
 
-    # Added parameters for calculating VRAM metrics
-    data.loc[:, "Queued"] = data["StartTime"] - data["SubmitTime"]
-    data.loc[:, "vram_constraint"] = data.apply(
-        lambda row: _get_vram_constraint(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1
-    ).astype(pd.Int64Dtype())  # Use Int64Dtype to allow for nullable integers
-    data.loc[:, "allocated_vram"] = data.apply(
-        lambda row: _get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
-        axis=1,
-    )
-
     # Convert columns to categorical
-
     for col, enum_obj in ATTRIBUTE_CATEGORIES.items():
         if col not in exist_column_set:
             continue
@@ -374,6 +372,71 @@ def preprocess_data(
         unique_values = data[col].unique().tolist()
         all_categories = list(set(enum_values) | set(unique_values))
         data[col] = pd.Categorical(data[col], categories=all_categories, ordered=False)
+
+    if data.empty:
+        # Add new columns with correct types for empty dataframe
+        data["Queued"] = pd.Series([], dtype="timedelta64[ns]")
+        data["vram_constraint"] = pd.Series([], dtype=pd.Int64Dtype())
+        data["allocated_vram"] = pd.Series([], dtype="int64")
+    else:
+        # Calculate queue time
+        data.loc[:, "Queued"] = data["StartTime"] - data["SubmitTime"]
+
+        # Calculate VRAM constraint from job constraints
+        data.loc[:, "vram_constraint"] = data.apply(
+            lambda row: _get_vram_constraint(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1
+        ).astype(pd.Int64Dtype())  # Use Int64Dtype to allow for nullable integers
+
+        # Calculate allocated VRAM based on GPU type and nodes
+        data.loc[:, "allocated_vram"] = data.apply(
+            lambda row: _get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
+            axis=1,
+        )
+
+
+def preprocess_data(
+    input_df: pd.DataFrame,
+    min_elapsed_seconds: int = DEFAULT_MIN_ELAPSED_SECONDS,
+    include_failed_cancelled_jobs: bool = False,
+    include_cpu_only_jobs: bool = False,
+    include_custom_qos_jobs: bool = False,
+) -> pd.DataFrame:
+    """
+    Preprocess dataframe, filtering out unwanted rows and columns, filling missing values and converting types.
+
+    This function will take in a dataframe to create a new dataframe satisfying given criteria.
+
+
+    Args:
+        input_df (pd.DataFrame): The input dataframe containing job data.
+        min_elapsed_seconds (int, optional): Minimum elapsed time in seconds to keep a job record. Defaults to 600.
+        include_failed_cancelled_jobs (bool, optional): Whether to include jobs with status FAILED or CANCELLED.
+        include_cpu_only_jobs (bool, optional): Whether to include jobs that do not use GPUs (CPU-only jobs).
+        include_custom_qos_jobs (bool, optional): Whether to include entries with custom qos values or not.
+            Default to False
+
+    Returns:
+        pd.DataFrame: The preprocessed dataframe
+
+    """
+
+    # Drop unnecessary columns, ignoring errors in case any of them is not in the dataframe
+    data = input_df.drop(columns=["UUID", "EndTime", "Nodes", "Preempted"], axis=1, inplace=False, errors="ignore")
+
+    # Perform column validation and filtering
+    data = _validate_columns_and_filter_records(
+        data,
+        min_elapsed_seconds,
+        include_failed_cancelled_jobs,
+        include_cpu_only_jobs,
+        include_custom_qos_jobs,
+    )
+
+    exist_column_set = set(data.columns.to_list())
+
+    _fill_missing(data)
+
+    _cast_type_and_add_columns(data)
 
     # Raise warning if GPUMemUsage or CPUMemUsage having infinity values
     mem_usage_columns = ["CPUMemUsage", "GPUMemUsage"]
