@@ -9,8 +9,8 @@ from ..config.constants import (
     DEFAULT_MIN_ELAPSED_SECONDS,
     ATTRIBUTE_CATEGORIES,
     MULTIVALENT_GPUS,
-    ENFORCE_COLUMNS,
-    ESSENTIAL_COLUMNS,
+    REQUIRED_COLUMNS,
+    OPTIONAL_COLUMNS,
 )
 from ..config.enum_constants import StatusEnum, AdminsAccountEnum, AdminPartitionEnum, QOSEnum, PartitionTypeEnum
 from ..config.remote_config import PartitionInfoFetcher
@@ -266,28 +266,31 @@ def preprocess_data(
         include_custom_qos (bool, optional): Whether to include entries with custom qos values or not. Default to False
 
     Raises:
-        KeyError: If any columns in ENFORCE_COLUMNS do not exist in the dataframe.
+        KeyError: If any columns in REQUIRED_COLUMNS do not exist in the dataframe.
 
     Returns:
         pd.DataFrame: The preprocessed dataframe
 
     Notes:
         # Handling missing columns logic:
-        - columns in ENFORCE_COLUMNS are columns that are must-have for basic metrics calculation.
-        - columns in ESSENTIAL_COLUMNS are columns that are involved in preprocessing logics.
-        - For any columns in ENFORCE_COLUMNS that do not exist, a KeyError will be raised.
-        - For any columns in ESSENTIAL_COLUMNS but not in ENFORCE_COLUMNS, a warning will be raised.
+        - columns in REQUIRED_COLUMNS are columns that are must-have for basic metrics calculation.
+        - columns in OPTIONAL_COLUMNS are columns that are involved in preprocessing logics.
+        - For any columns in REQUIRED_COLUMNS that do not exist, a KeyError will be raised.
+        - For any columns in OPTIONAL_COLUMNS but not in REQUIRED_COLUMNS, a warning will be raised.
         - _fill_missing, records filtering, and type conversion logic will happen only if columns involved exist
     """
 
+    # Drop unnecessary columns, ignoring errors in case any of them is not in the dataframe
     data = input_df.drop(columns=["UUID", "EndTime", "Nodes", "Preempted"], axis=1, inplace=False, errors="ignore")
     qos_values = set([member.value for member in QOSEnum])
     exist_column_set = set(data.columns.to_list())
 
-    # missing columns handling
-    for col_name in ESSENTIAL_COLUMNS:
-        if col_name not in exist_column_set and col_name in ENFORCE_COLUMNS:
+    # Ensure required columns are present and raise warning if optional columns are missing
+    for col_name in OPTIONAL_COLUMNS:
+        # Process columns that must exist in the dataset
+        if col_name not in exist_column_set and col_name in REQUIRED_COLUMNS:
             raise KeyError(f"Column {col_name} does not exist in dataframe.")
+        # Process optional columns
         elif col_name not in exist_column_set:
             warnings.warn(
                 f"Column {col_name} not exist in dataframe, this may result in unexpected results when filtering.",

@@ -2,8 +2,7 @@ import pytest
 import pandas
 from src.utility import load_preprocessed_jobs_dataframe_from_duckdb
 from .conftest import helper_filter_irrelevant_records
-from src.config.enum_constants import StatusEnum
-from src.config.constants import ENFORCE_COLUMNS, ESSENTIAL_COLUMNS
+from src.config.constants import REQUIRED_COLUMNS, OPTIONAL_COLUMNS
 from datetime import datetime, timedelta
 
 
@@ -204,8 +203,8 @@ def test_preprocess_key_errors_raised(mock_data_path, recwarn):
 
     Expect to raise RuntimeError for any of these columns if they are missing in the dataframe
     """
-    for col in ENFORCE_COLUMNS:
-        col_names = list(ENFORCE_COLUMNS)
+    for col in REQUIRED_COLUMNS:
+        col_names = list(REQUIRED_COLUMNS)
         col_names.remove(col)
         col_str = ", ".join(col_names)
         query = f"SELECT {col_str} FROM Jobs"
@@ -221,11 +220,11 @@ def test_preprocess_warning_raised(mock_data_path, recwarn):
 
     These columns are not in ENFORCE_COLUMNS so only warnings are expected to be raised
     """
-    for col in ESSENTIAL_COLUMNS:
-        if col in ENFORCE_COLUMNS:
+    for col in OPTIONAL_COLUMNS:
+        if col in REQUIRED_COLUMNS:
             continue
-        col_names = ENFORCE_COLUMNS.copy()
-        remain_cols = ESSENTIAL_COLUMNS.copy()
+        col_names = REQUIRED_COLUMNS.copy()
+        remain_cols = OPTIONAL_COLUMNS.copy()
         remain_cols.remove(col)
         col_names = col_names.union(remain_cols)
         col_str = ", ".join(list(col_names))
