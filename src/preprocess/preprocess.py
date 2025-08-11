@@ -250,7 +250,7 @@ def preprocess_data(
     min_elapsed_seconds: int = DEFAULT_MIN_ELAPSED_SECONDS,
     include_failed_cancelled_jobs: bool = False,
     include_cpu_only_jobs: bool = False,
-    include_custom_qos: bool = False,
+    include_custom_qos_jobs: bool = False,
 ) -> pd.DataFrame:
     """
     Preprocess dataframe, filtering out unwanted rows and columns, filling missing values and converting types.
@@ -263,7 +263,8 @@ def preprocess_data(
         min_elapsed_seconds (int, optional): Minimum elapsed time in seconds to keep a job record. Defaults to 600.
         include_failed_cancelled_jobs (bool, optional): Whether to include jobs with status FAILED or CANCELLED.
         include_cpu_only_jobs (bool, optional): Whether to include jobs that do not use GPUs (CPU-only jobs).
-        include_custom_qos (bool, optional): Whether to include entries with custom qos values or not. Default to False
+        include_custom_qos_jobs (bool, optional): Whether to include entries with custom qos values or not.
+            Default to False
 
     Raises:
         KeyError: If any columns in REQUIRED_COLUMNS do not exist in the dataframe.
@@ -310,7 +311,8 @@ def preprocess_data(
         "Account": lambda df: df["Account"] != AdminsAccountEnum.ROOT.value,
         "Partition": lambda df: (df["Partition"] != AdminPartitionEnum.BUILDING.value)
         & (include_cpu_only_jobs | df["Partition"].isin(gpu_partitions)),
-        "QOS": lambda df: (df["QOS"] != QOSEnum.UPDATES.value) & (include_custom_qos | df["QOS"].isin(qos_values)),
+        "QOS": lambda df: (df["QOS"] != QOSEnum.UPDATES.value)
+        & (include_custom_qos_jobs | df["QOS"].isin(qos_values)),
         "Status": lambda df: include_failed_cancelled_jobs
         | ((df["Status"] != StatusEnum.FAILED.value) & (df["Status"] != StatusEnum.CANCELLED.value)),
     }

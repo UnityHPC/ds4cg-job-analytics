@@ -125,7 +125,7 @@ def test_preprocess_data_include_failed_cancelled_job(mock_data_frame, mock_data
 
 
 def test_preprocess_data_include_custom_qos(mock_data_frame, mock_data_path, recwarn):
-    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_custom_qos=True)
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_custom_qos_jobs=True)
     ground_truth = helper_filter_irrelevant_records(mock_data_path, min_elapsed_seconds=600, include_custom_qos=True)
     filtered_ground_truth = ground_truth[
         (ground_truth["Status"] != "CANCELLED") & (ground_truth["Status"] != "FAILED")
@@ -147,7 +147,7 @@ def test_preprocess_data_include_all(mock_data_frame, mock_data_path, recwarn):
         min_elapsed_seconds=600,
         include_failed_cancelled_jobs=True,
         include_cpu_only_jobs=True,
-        include_custom_qos=True,
+        include_custom_qos_jobs=True,
     )
     ground_truth = helper_filter_irrelevant_records(
         mock_data_path,
