@@ -293,16 +293,16 @@ def _validate_columns_and_filter_records(
     exist_column_set = set(data.columns.to_list())
 
     # Ensure required columns are present
-    for col in RequiredColumnsEnum:
-        if col.value not in exist_column_set:
-            raise KeyError(f"Column {col.value} does not exist in dataframe.")
+    for required_col in RequiredColumnsEnum:
+        if required_col.value not in exist_column_set:
+            raise KeyError(f"Column {required_col.value} does not exist in dataframe.")
 
     # raise warnings if optional columns are not present
-    for col in OptionalColumnsEnum:
-        if col.value not in exist_column_set:
+    for optional_col in OptionalColumnsEnum:
+        if optional_col.value not in exist_column_set:
             warnings.warn(
                 (
-                    f"Column '{col.value}' is missing from the dataframe. "
+                    f"Column '{optional_col.value}' is missing from the dataframe. "
                     "This may impact filtering operations and downstream processing."
                 ),
                 UserWarning,
