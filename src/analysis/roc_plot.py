@@ -324,6 +324,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         if to_clip:
             plot_data_frame[threshold_metric.value] = plot_data_frame[threshold_metric.value].clip(upper=upper_bound)
 
+    # TODO (Tan): add another function to give ROC plot (jobs) by user for Ayush to generate reports.
     # TODO (Tan): fixed the vectorized version commented below, currently an issue when run alloc_vram_efficiency_score
     # def _roc_calculate_proportion(
     #     self,
