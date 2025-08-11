@@ -11,13 +11,13 @@ import warnings
 def load_preprocessed_jobs_dataframe_from_duckdb(
     db_path: str | Path,
     table_name: str = "Jobs",
-    sample_size: int | None = None,
-    random_state: pd._typing.RandomState | None = None,
     dates_back: int | None = None,
     custom_query: str = "",
+    random_state: pd._typing.RandomState | None = None,
+    sample_size: int | None = None,
     include_failed_cancelled_jobs: bool = False,
     include_cpu_only_jobs: bool = False,
-    include_custom_qos: bool = False,
+    include_custom_qos_jobs: bool = False,
     min_elapsed_seconds: int = DEFAULT_MIN_ELAPSED_SECONDS,
 ) -> pd.DataFrame:
     """
@@ -26,19 +26,19 @@ def load_preprocessed_jobs_dataframe_from_duckdb(
     Args:
         db_path (str or Path): Path to the DuckDB database.
         table_name (str, optional): Table name to query. Defaults to 'Jobs'.
-        sample_size (int, optional): Number of rows to sample from the DataFrame. Defaults to None (no sampling).
-        random_state (pd._typing.RandomState, optional): Random state for reproducibility. Defaults to None.
         dates_back (int, optional): Number of days back to filter jobs based on StartTime.
             Defaults to None. If None, will not filter by startTime.
         custom_query(str, optional): Custom SQL query to execute. Defaults to an empty string.
             If empty, will select all jobs.
+        random_state (pd._typing.RandomState, optional): Random state for reproducibility. Defaults to None.
+        sample_size (int, optional): Number of rows to sample from the DataFrame. Defaults to None (no sampling).
         include_failed_cancelled_jobs (bool, optional): If True, include jobs with FAILED or CANCELLED status.
             Defaults to False.
         include_cpu_only_jobs (bool, optional): If True, include jobs that do not use GPUs (CPU-only jobs).
             Defaults to False.
-        include_custom_qos (bool, optional): If True, include jobs with custom qos values. Defaults to False.
+        include_custom_qos_jobs (bool, optional): If True, include jobs with custom qos values. Defaults to False.
         min_elapsed_seconds (int, optional): Minimum elapsed time in seconds to filter jobs by elapsed time.
-            Defaults to 0.
+            Defaults to DEFAULT_MIN_ELAPSED_SECONDS.
 
     Returns:
         pd.DataFrame: DataFrame containing the table data.
@@ -75,7 +75,11 @@ def load_preprocessed_jobs_dataframe_from_duckdb(
 
         jobs_df = db.fetch_query(custom_query)
         processed_data = preprocess_data(
-            jobs_df, min_elapsed_seconds, include_failed_cancelled_jobs, include_cpu_only_jobs, include_custom_qos
+            jobs_df,
+            min_elapsed_seconds=min_elapsed_seconds,
+            include_failed_cancelled_jobs=include_failed_cancelled_jobs,
+            include_cpu_only_jobs=include_cpu_only_jobs,
+            include_custom_qos_jobs=include_custom_qos_jobs,
         )
         if sample_size is not None:
             processed_data = processed_data.sample(n=sample_size, random_state=random_state)

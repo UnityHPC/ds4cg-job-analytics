@@ -85,7 +85,7 @@ def test_load_jobs_filter_date_back_include_all(mock_data_path, recwarn):
         min_elapsed_seconds=0,
         include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
-        include_custom_qos=True,
+        include_custom_qos_jobs=True,
     )
     cutoff = datetime.now() - timedelta(days=90)
     ground_truth_csv = temp[temp["StartTime"] >= cutoff]
@@ -107,7 +107,7 @@ def test_load_jobs_custom_query(mock_data_frame, mock_data_path, recwarn):
         "AND ArrayID is not NULL AND Interactive is not NULL"
     )
     res = load_preprocessed_jobs_dataframe_from_duckdb(
-        db_path=mock_data_path, custom_query=query, include_cpu_only_jobs=True, include_custom_qos=True
+        db_path=mock_data_path, custom_query=query, include_cpu_only_jobs=True, include_custom_qos_jobs=True
     )
     ground_truth_csv = mock_data_frame[
         (mock_data_frame["Status"] != "CANCELLED")
