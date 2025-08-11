@@ -303,7 +303,10 @@ def preprocess_data(
     for col in OptionalColumnsEnum:
         if col.value not in exist_column_set:
             warnings.warn(
-                f"Column {col.value} not exist in dataframe, this may result in unexpected results when filtering.",
+                (
+                    f"Column '{col.value}' is missing from the dataframe. "
+                    "This may impact filtering operations and downstream processing."
+                ),
                 UserWarning,
                 stacklevel=2,
             )

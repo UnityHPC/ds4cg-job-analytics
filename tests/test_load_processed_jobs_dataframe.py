@@ -234,7 +234,8 @@ def test_preprocess_warning_raised(mock_data_path, recwarn):
         query = f"SELECT {col_str} FROM Jobs"
 
         expect_warning_msg = (
-            f"Column {col} not exist in dataframe, this may result in unexpected results when filtering."
+            f"Column '{col}' is missing from the dataframe. "
+            "This may impact filtering operations and downstream processing."
         )
         with pytest.warns(UserWarning, match=expect_warning_msg):
             _res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=mock_data_path, custom_query=query)

@@ -167,12 +167,36 @@ class OptionalColumnsEnum(Enum):
         ACCOUNT: Account column.
         PARTITION: Partition column.
         QOS: Quality of Service column.
+        ARRAY_ID: Position in job array.
+        JOB_NAME: Name of job.
+        IS_ARRAY: Indicator if job is part of an array.
+        INTERACTIVE: Indicator if job was interactive.
+        USER: Unity user.
+        EXIT_CODE: Job exit code.
+        TIME_LIMIT: Job time limit (seconds).
+        GPU_COMPUTE_USAGE: GPU compute usage (pct).
+        CPUS: Number of CPUs.
+        MEMORY: Job allocated memory (bytes).
+        CPU_MEM_USAGE: CPU memory usage column.
+        CPU_COMPUTE_USAGE: CPU compute usage (pct).
     """
 
     STATUS = "Status"
     ACCOUNT = "Account"
     PARTITION = "Partition"
     QOS = "QOS"
+    ARRAY_ID = "ArrayID"
+    JOB_NAME = "JobName"
+    IS_ARRAY = "IsArray"
+    INTERACTIVE = "Interactive"
+    USER = "User"
+    EXIT_CODE = "ExitCode"
+    TIME_LIMIT = "TimeLimit"
+    GPU_COMPUTE_USAGE = "GPUComputeUsage"
+    CPUS = "CPUs"
+    MEMORY = "Memory"
+    CPU_MEM_USAGE = "CPUMemUsage"
+    CPU_COMPUTE_USAGE = "CPUComputeUsage"
 
 
 @unique
@@ -189,9 +213,9 @@ class RequiredColumnsEnum(Enum):
         GPUS: Number of GPUs column.
         GPU_MEM_USAGE: GPU memory usage column.
         ELAPSED: Job elapsed time column.
-        CPU_MEM_USAGE: CPU memory usage column.
     """
 
+    JOB_ID = "JobID"
     GPU_TYPE = "GPUType"
     CONSTRAINTS = "Constraints"
     START_TIME = "StartTime"
@@ -200,4 +224,3 @@ class RequiredColumnsEnum(Enum):
     GPUS = "GPUs"
     GPU_MEM_USAGE = "GPUMemUsage"
     ELAPSED = "Elapsed"
-    CPU_MEM_USAGE = "CPUMemUsage"

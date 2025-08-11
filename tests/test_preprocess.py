@@ -388,7 +388,8 @@ def test_preprocess_warning_raised(mock_data_frame, recwarn):
         cur_df = mock_data_frame.drop(col, axis=1, inplace=False)
 
         expect_warning_msg = (
-            f"Column {col} not exist in dataframe, this may result in unexpected results when filtering."
+            f"Column '{col}' is missing from the dataframe. "
+            "This may impact filtering operations and downstream processing."
         )
         with pytest.warns(UserWarning, match=expect_warning_msg):
             _res = preprocess_data(cur_df)
