@@ -257,6 +257,7 @@ def preprocess_data(
 
     This function will take in a dataframe to create a new dataframe satisfying given criteria.
 
+
     Args:
         input_df (pd.DataFrame): The input dataframe containing job data.
         min_elapsed_seconds (int, optional): Minimum elapsed time in seconds to keep a job record. Defaults to 600.
@@ -269,6 +270,14 @@ def preprocess_data(
 
     Returns:
         pd.DataFrame: The preprocessed dataframe
+
+    Notes:
+        # Handling missing columns logic:
+        - columns in ENFORCE_COLUMNS are columns that are must-have for basic metrics calculation.
+        - columns in ESSENTIAL_COLUMNS are columns that are involved in preprocessing logics.
+        - For any columns in ENFORCE_COLUMNS that do not exist, a KeyError will be raised.
+        - For any columns in ESSENTIAL_COLUMNS but not in ENFORCE_COLUMNS, a warning will be raised.
+        - _fill_missing, records filtering, and type conversion logic will happen only if columns involved exist
     """
 
     data = input_df.drop(columns=["UUID", "EndTime", "Nodes", "Preempted"], axis=1, inplace=False, errors="ignore")
