@@ -4,7 +4,8 @@
 ### Attributes Omitted
 - **UUID**
 - **Nodes**: NodesList have more specific information
-- **Preempted**: Status have more valid information
+- **Preempted**: Contains unreliable data. Use Status column instead (PREEMPT for
+    unfinished, COMPLETE/FAILED/etc. for finished preempted jobs).
 - **EndTime**: Can be calculated from StartTime and Elapsed
 
 ### Options for Including or Omitting Jobs
