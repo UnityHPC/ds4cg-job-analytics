@@ -3,7 +3,7 @@ import pandas as pd
 from pathlib import Path
 import os
 from typing import Any, TypeVar, Generic
-from pydantic import BaseModel 
+from pydantic import BaseModel
 
 KwargsModelType = TypeVar("KwargsModelType", bound=BaseModel)
 
@@ -30,7 +30,7 @@ class DataVisualizer(Generic[KwargsModelType], ABC):
             self.df = df.copy()
         else:
             raise ValueError("Must provide a DataFrame.")
-        
+
     def validate_dataframe(self) -> pd.DataFrame:
         """Validate that the DataFrame is not empty and has columns.
 
@@ -45,11 +45,9 @@ class DataVisualizer(Generic[KwargsModelType], ABC):
         if self.df.columns.empty:
             raise ValueError("DataFrame has no columns.")
         return self.df
-    
+
     @staticmethod
-    def validate_sampling_arguments(
-        sample_size: int | None, random_seed: int | None
-    ) -> tuple[int | None, int | None]:
+    def validate_sampling_arguments(sample_size: int | None, random_seed: int | None) -> tuple[int | None, int | None]:
         """Validate the sample size and random seed for visualization.
 
         Args:
@@ -74,19 +72,17 @@ class DataVisualizer(Generic[KwargsModelType], ABC):
 
         Args:
             figsize (tuple[float | int, float | int]): Size of the figure.
-        
+
         Raises:
 
             TypeError: If figsize is not a tuple of two numbers (float or int).
-        
+
         Returns:
             tuple[float | int, float | int]: Validated figure size.
         """
-        
+
         if not (
-            isinstance(figsize, tuple)
-            and len(figsize) == 2
-            and all(isinstance(x, (float, int)) for x in figsize)
+            isinstance(figsize, tuple) and len(figsize) == 2 and all(isinstance(x, (float, int)) for x in figsize)
         ):
             raise TypeError("'figsize' must be a tuple of two numbers (float or int)")
         return figsize
@@ -113,7 +109,7 @@ class DataVisualizer(Generic[KwargsModelType], ABC):
             if not os.access(output_dir_path, os.W_OK):
                 raise PermissionError(f"Output directory {output_dir_path} is not writable.")
         return output_dir_path
-    
+
     @staticmethod
     def _generate_summary_stats(
         jobs_df: pd.DataFrame, validated_output_dir_path: Path | None, summary_file_name: str
@@ -147,7 +143,7 @@ class DataVisualizer(Generic[KwargsModelType], ABC):
                 print(f"Column: {col}")
                 print("-" * 50)
                 print(jobs_df[col].describe(include="all"))
-    
+
     @staticmethod
     def pie_chart_autopct_func(p: float, threshold_pct: int = 5) -> str:
         """Format the percentage for pie chart labels.
@@ -167,6 +163,7 @@ class DataVisualizer(Generic[KwargsModelType], ABC):
 
         Args:
             column (str | None): Column name to validate.
+            df (pd.DataFrame): The DataFrame to check against.
 
         Raises:
             TypeError: If 'column' is not a string or None.
@@ -189,6 +186,7 @@ class DataVisualizer(Generic[KwargsModelType], ABC):
 
         Args:
             columns (list[str]): List of column names to validate.
+            df (pd.DataFrame): The DataFrame to check against.
 
         Raises:
             TypeError: If 'columns' is not a list of strings or None.
@@ -199,7 +197,7 @@ class DataVisualizer(Generic[KwargsModelType], ABC):
         """
         if columns is not None and (not all(isinstance(x, str) for x in columns)):
             raise TypeError("'columns' must be a list of strings or None")
-        
+
         if columns is not None and len(columns) == 0:
             raise ValueError("'columns' cannot be an empty list. 'columns' must be a list of strings or None")
 
@@ -220,20 +218,17 @@ class DataVisualizer(Generic[KwargsModelType], ABC):
         Args:
             kwargs (dict[str, Any]): The keyword arguments to validate.
             validated_jobs_df (pd.DataFrame): The validated DataFrame to use for visualization.
-        
+            kwargs_model (type[KwargsModelType]): The Pydantic model to validate against.
+
         Returns:
             KwargsModelType: The validated keyword arguments as a BaseModel.
         """
         pass
 
     @abstractmethod
-    def visualize(
-        self,
-        output_dir_path: Path | None = None,
-        **kwargs: dict[str, Any]
-    ) -> None:
+    def visualize(self, output_dir_path: Path | None = None, **kwargs: dict[str, Any]) -> None:
         """Visualize the data in the DataFrame.
-        
+
         Args:
             output_dir_path (Path | None): Directory to save plots and summaries.
             **kwargs: Additional keyword arguments for flexibility, such as columns to visualize,
@@ -241,7 +236,7 @@ class DataVisualizer(Generic[KwargsModelType], ABC):
 
         Raises:
             ValueError: If any of the provided arguments are invalid.
-        
+
         Returns:
             None
         """

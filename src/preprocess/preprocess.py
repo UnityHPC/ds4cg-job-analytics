@@ -10,7 +10,8 @@ from ..config.constants import (
     ATTRIBUTE_CATEGORIES,
     MULTIVALENT_GPUS,
 )
-from ..config.enum_constants import StatusEnum, AdminsAccountEnum, PartitionEnum, QOSEnum
+from ..config.enum_constants import StatusEnum, AdminsAccountEnum, AdminPartitionEnum, QOSEnum, PartitionTypeEnum
+from ..config.remote_config import PartitionInfoFetcher
 
 
 def _get_vram_from_node(gpu_type: str, node: str) -> int:
@@ -254,7 +255,7 @@ def preprocess_data(
     This function will take in a dataframe to create a new dataframe satisfying given criteria.
 
     Args:
-        data (pd.DataFrame): The input dataframe containing job data.
+        input_df (pd.DataFrame): The input dataframe containing job data.
         min_elapsed_seconds (int, optional): Minimum elapsed time in seconds to keep a job record. Defaults to 600.
         include_failed_cancelled_jobs (bool, optional): Whether to include jobs with status FAILED or CANCELLED.
         include_cpu_only_jobs (bool, optional): Whether to include jobs that do not use GPUs (CPU-only jobs).
@@ -265,62 +266,59 @@ def preprocess_data(
 
     data = input_df.drop(columns=["UUID", "EndTime", "Nodes", "Preempted"], axis=1, inplace=False)
 
-    cond_gpu_type = (
-        data["GPUType"].notna() | include_cpu_only_jobs
-    )  # filter out GPUType is null, except when include_CPU_only_job is True
-    cond_gpus = (
-        data["GPUs"].notna() | include_cpu_only_jobs
-    )  # filter out GPUs is null, except when include_CPU_only_job is True
-    cond_failed_cancelled_jobs = (
-        ((data["Status"] != StatusEnum.FAILED.value) & (data["Status"] != StatusEnum.CANCELLED.value))
-        | include_failed_cancelled_jobs
-    )  # filter out failed or cancelled jobs, except when include_fail_cancel_jobs is True
+    mask = pd.Series([True] * len(data), index=data.index)
 
-    res = data[
-        cond_gpu_type
-        & cond_gpus
-        & cond_failed_cancelled_jobs
-        & (data["Elapsed"] >= min_elapsed_seconds)  # filter in unit of second, not timedelta object
-        & (data["Account"] != AdminsAccountEnum.ROOT.value)
-        & (data["Partition"] != PartitionEnum.BUILDING.value)
-        & (data["QOS"] != QOSEnum.UPDATES.value)
-    ].copy()
+    mask &= data["Elapsed"] >= min_elapsed_seconds
+    mask &= data["Account"] != AdminsAccountEnum.ROOT.value
+    mask &= data["Partition"] != AdminPartitionEnum.BUILDING.value
+    mask &= data["QOS"] != QOSEnum.UPDATES.value
+    # Filter out failed or cancelled jobs, except when include_failed_cancel_jobs is True
+    mask &= (
+        (data["Status"] != StatusEnum.FAILED.value)
+        & (data["Status"] != StatusEnum.CANCELLED.value)
+    ) | include_failed_cancelled_jobs
+    # Filter out jobs whose partition type is not 'gpu', unless include_cpu_only_jobs is True.
+    partition_info = PartitionInfoFetcher().get_info()
+    gpu_partitions = [p['name'] for p in partition_info if p['type'] == PartitionTypeEnum.GPU.value]
+    mask &= data["Partition"].isin(gpu_partitions) | include_cpu_only_jobs
 
-    _fill_missing(res)
+    data = data[mask].copy()
+
+    _fill_missing(data)
     # Type casting for columns involving time
     time_columns = ["StartTime", "SubmitTime"]
     for col in time_columns:
-        res[col] = pd.to_datetime(res[col], errors="coerce")
+        data[col] = pd.to_datetime(data[col], errors="coerce")
 
-    timedelta_columns = ["TimeLimit", "Elapsed"]
-    for col in timedelta_columns:
-        res[col] = pd.to_timedelta(res[col], unit="s", errors="coerce")
+    time_limit_in_seconds = data["TimeLimit"] * 60
+    data["TimeLimit"] = pd.to_timedelta(time_limit_in_seconds, unit="s", errors="coerce")
+    data["Elapsed"] = pd.to_timedelta(data["Elapsed"], unit="s", errors="coerce")
 
     # Added parameters for calculating VRAM metrics
-    res.loc[:, "Queued"] = res["StartTime"] - res["SubmitTime"]
-    res.loc[:, "vram_constraint"] = res.apply(
+    data.loc[:, "Queued"] = data["StartTime"] - data["SubmitTime"]
+    data.loc[:, "vram_constraint"] = data.apply(
         lambda row: _get_vram_constraint(row["Constraints"], row["GPUs"], row["GPUMemUsage"]), axis=1
     ).astype(pd.Int64Dtype())  # Use Int64Dtype to allow for nullable integers
-    res.loc[:, "allocated_vram"] = res.apply(
+    data.loc[:, "allocated_vram"] = data.apply(
         lambda row: _get_approx_allocated_vram(row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]),
         axis=1,
     )
-    res.loc[:, "user_jobs"] = res.groupby("User")["User"].transform("size")
-    res.loc[:, "account_jobs"] = res.groupby("Account")["Account"].transform("size")
+    data.loc[:, "user_jobs"] = data.groupby("User")["User"].transform("size")
+    data.loc[:, "account_jobs"] = data.groupby("Account")["Account"].transform("size")
 
     # Convert columns to categorical
 
     for col, enum_obj in ATTRIBUTE_CATEGORIES.items():
         enum_values = [e.value for e in enum_obj]
-        unique_values = res[col].unique().tolist()
+        unique_values = data[col].unique().tolist()
         all_categories = list(set(enum_values) | set(unique_values))
-        res[col] = pd.Categorical(res[col], categories=all_categories, ordered=False)
+        data[col] = pd.Categorical(data[col], categories=all_categories, ordered=False)
 
-    # raise warning if GPUMemUsage or CPUMemUsage having overflow
+    # Raise warning if GPUMemUsage or CPUMemUsage having infinity values
     mem_usage_columns = ["CPUMemUsage", "GPUMemUsage"]
     for col_name in mem_usage_columns:
-        filtered = res[res[col_name] == np.inf].copy()
+        filtered = data[data[col_name] == np.inf].copy()
         if len(filtered) > 0:
-            message = f"Some entries in {col_name} having infinity values.  This may be caused by overflow values."
+            message = f"Some entries in {col_name} having infinity values. This may be caused by an overflow."
             warnings.warn(message=message, stacklevel=2, category=UserWarning)
-    return res
+    return data

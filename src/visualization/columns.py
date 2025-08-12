@@ -17,7 +17,7 @@ from matplotlib.patches import Patch
 from ..config.constants import VRAM_CATEGORIES
 import textwrap
 import re
-from typing import Any 
+from typing import Any
 from pydantic import ValidationError
 from .visualization import DataVisualizer
 from .models import ColumnVisualizationKwargsModel
@@ -45,10 +45,6 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         Returns:
             None
         """
-        col_data = jobs_df[col]
-        # All nans should be False, so convert to bool
-        if not pd.api.types.is_bool_dtype(col_data):
-            col_data = col_data.astype(bool)
         plt.figure(figsize=(5, 7))
         ax = sns.countplot(x=col, stat="percent", data=jobs_df)
         if isinstance(ax.containers[0], BarContainer):
@@ -74,11 +70,6 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             None
         """
         col_data = jobs_df[col]
-        # Determine unit for conversion
-        if col == "Elapsed" and not pd.api.types.is_timedelta64_dtype(col_data):
-            col_data = pd.to_timedelta(col_data, unit="seconds", errors="coerce")
-        elif col == "TimeLimit" and not pd.api.types.is_timedelta64_dtype(col_data):
-            col_data = pd.to_timedelta(col_data, unit="minutes", errors="coerce")
 
         # Convert to minutes for plotting
         timelimit_minutes = col_data.dropna().dt.total_seconds() / 60
@@ -120,9 +111,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             return f"{(n / total_count * 100):.1f}%" if total_count > 0 else "0.0%"
 
         # Helper to reduce xticks and rotate if width is small
-        def choose_ticks_and_rotation(
-            ticks: list[int], width: float, max_labels: int = 3
-        ) -> tuple[list[int], int]:
+        def choose_ticks_and_rotation(ticks: list[int], width: float, max_labels: int = 3) -> tuple[list[int], int]:
             # Always include first and last tick, and always have at least 4 ticks
             if width < min_width and len(ticks) > max_labels:
                 # Always include first and last, and evenly space the rest
@@ -183,7 +172,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             idx += 1
 
         gs = GridSpec(1, len(section_widths), width_ratios=section_widths, wspace=0.0)
-
+        ax0 = None
         # Minutes axis
         ax_idx = 0
         if not minutes_data.empty:
@@ -570,20 +559,13 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             raise ValueError(msg)
 
         # Flatten all GPU types and count per job
-        multi_count = 0
-        single_count = 0
-
         multi_count = sum(1 for entry in non_null if len(entry) > 1)
         single_count = len(non_null) - multi_count
 
         plt.figure(figsize=(7, 4))
         gpu_counts = pd.Series(sum((Counter(entry) for entry in non_null), Counter())).sort_values(ascending=False)
         ax = sns.barplot(
-            x=gpu_counts.index,
-            y=gpu_counts.values,
-            hue=gpu_counts.index,
-            palette="viridis",
-            legend=False
+            x=gpu_counts.index, y=gpu_counts.values, hue=gpu_counts.index, palette="viridis", legend=False
         )
 
         plt.title(f"GPU Types ({col})")
@@ -812,7 +794,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         jobs_df: pd.DataFrame,
         col: str,
         output_dir_path: Path | None = None,
-        figsize: tuple[float, float] = (7, 4),
+        figsize: tuple[float, float] = (7, 6),
     ) -> None:
         """Generate a bar plot for node lists, combining trailing digits before counting.
 
@@ -822,6 +804,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
             output_dir_path (Path | None): The directory to save the plot.
+            figsize (tuple[float, float]): The size of the figure.
 
         Raises:
             ValueError: If not all entries in the specified column are numpy arrays or list-like.
@@ -887,10 +870,8 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         # Count occurrences of each node prefix
         node_counts = flat_nodes_clean.value_counts()
         node_percents = node_counts / node_counts.sum() * 100
-        plt.figure(figsize=figsize)
-        ax = sns.barplot(
-            x=node_counts.index, y=node_counts.values, hue=node_counts.index, palette="viridis", legend=False
-        )
+        plt.figure(figsize=figsize, layout="constrained")
+        sns.barplot(x=node_counts.index, y=node_counts.values, hue=node_counts.index, palette="viridis", legend=False)
         plt.title(f"{col} (nodes combined by removing trailing numbers)")
         # Set a long xlabel and wrap it to fit within the figure width
         xlabel = "Nodes (trailing numbers removed, e.g., gpu10,gpu50 → gpu,gpu; counts are combined)"
@@ -909,8 +890,8 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         plt.xticks(rotation=45, ha="right")
 
         ax.text(
-            0.98,
-            0.98,
+            0.99,
+            0.99,
             prefix_combo_text,
             ha="right",
             va="top",
@@ -922,7 +903,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
 
         # Annotate bars with counts, ensuring a gap above the tallest bar label
         tallest = node_counts.max()
-        gap = max(2.5, tallest * 0.08)
+        gap = max(2.5, tallest * 0.2)
         ax.set_ylim(0, tallest + gap)
         for i, (pct, count) in enumerate(zip(node_percents.values, node_counts.values, strict=True)):
             label_y = count + gap * 0.2  # offset above bar, proportional to gap
@@ -935,7 +916,6 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
                 fontsize=9,
                 bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7),
             )
-        plt.tight_layout()
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"{col}_barplot.png", bbox_inches="tight")
         plt.show()
@@ -961,10 +941,10 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         col_data = jobs_df[col].astype(str)
         partition_counts = col_data.value_counts()
         partition_percents = partition_counts / partition_counts.sum() * 100
-        plt.figure(figsize=(figsize))
+        plt.figure(figsize=figsize)
         ax = sns.barplot(
             x=partition_counts.index,
-            y=partition_counts, 
+            y=partition_counts,
             hue=partition_counts.index,
             palette="viridis",
             legend=False,
@@ -1018,9 +998,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         # Check if all non-null entries are lists or ndarray of strings
         non_null = jobs_df[col].dropna()
         if not all(isinstance(x, list) and all(isinstance(item, str) for item in x) for x in non_null):
-            msg = (
-                f"Error: Not all entries in column '{col}' are lists of strings."
-            )
+            msg = f"Error: Not all entries in column '{col}' are lists of strings."
             raise ValueError(msg)
 
         # Remove beginning and trailing single quotes from each string
@@ -1132,6 +1110,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
             output_dir_path (Path | None): The directory to save the plot.
+            figsize (tuple[int, int]): The size of the figure for the plot.
 
         Returns:
             None
@@ -1235,7 +1214,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         Args:
             jobs_df (pd.DataFrame): The DataFrame containing job data.
             col (str): The name of the column to plot.
-            unit (str): The unit of the memory column, which can be "B" or "KiB".
+            column_unit (str): The unit of the memory column, which can be "B" or "KiB".
             output_dir_path (Path | None): The directory to save the plot.
             figsize (tuple[int, int]): The size of the figure for the plot.
 
@@ -1398,6 +1377,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
 
         Args:
             columns (list[str]): List of column names to validate.
+            jobs_df (pd.DataFrame): The DataFrame to validate against.
 
         Raises:
             TypeError: If 'columns' is not a list of strings or None.
@@ -1409,7 +1389,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
 
         if columns is not None and (not all(isinstance(x, str) for x in columns)):
             raise TypeError("'columns' must be a list of strings or None")
-        
+
         if columns is not None and len(columns) == 0:
             raise ValueError("'columns' cannot be an empty list. 'columns' must be a list of strings or None")
 
@@ -1421,13 +1401,14 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         self,
         kwargs: dict[str, Any],
         validated_jobs_df: pd.DataFrame,
-        kwargs_model: type[ColumnVisualizationKwargsModel]
+        kwargs_model: type[ColumnVisualizationKwargsModel],
     ) -> ColumnVisualizationKwargsModel:
         """Validate the keyword arguments for the visualize method.
-        
+
         Args:
             kwargs (dict[str, Any]): Keyword arguments to validate.
             validated_jobs_df (pd.DataFrame): The DataFrame to validate against.
+            kwargs_model (type[ColumnVisualizationKwargsModel]): Pydantic model for validation.
 
         Raises:
             TypeError: If any keyword argument has an incorrect type.
@@ -1439,14 +1420,10 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             # Validate the kwargs using Pydantic model
             col_kwargs = kwargs_model(**kwargs)
         except ValidationError as e:
-            allowed_fields = {
-                name: str(field.annotation)
-                for name, field in kwargs_model.model_fields.items()
-            }
+            allowed_fields = {name: str(field.annotation) for name, field in kwargs_model.model_fields.items()}
             allowed_fields_str = "\n".join(f"  {k}: {v}" for k, v in allowed_fields.items())
             raise TypeError(
-                f"Invalid visualize kwargs: {e.json(indent=2)}\n"
-                f"Allowed fields and types:\n{allowed_fields_str}"
+                f"Invalid visualize kwargs: {e.json(indent=2)}\nAllowed fields and types:\n{allowed_fields_str}"
             ) from e
 
         self.validate_columns_argument(col_kwargs.columns, validated_jobs_df)
@@ -1457,11 +1434,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         )
         return col_kwargs
 
-    def visualize(
-        self,
-        output_dir_path: Path | None = None,
-        **kwargs: dict[str, Any]
-    ) -> None:
+    def visualize(self, output_dir_path: Path | None = None, **kwargs: dict[str, Any]) -> None:
         """Visualize and summarize specified columns of the data.
 
         Args:
