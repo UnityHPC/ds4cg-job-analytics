@@ -12,10 +12,6 @@ class ResourceHoarding(EfficiencyAnalysis):
     def __init__(self, jobs_df: pd.DataFrame) -> None:
         super().__init__(jobs_df)
 
-    # TODO(Arda): Implement CPU core hoarding analysis
-    # def calculate_cpu_core_hoarding(self) -> pd.DataFrame:
-    #     return
-
     def _get_resource_totals_for_job(
         self, jobs_node_list: list[str], node_info: list[dict]
     ) -> dict[NodeInfoKeyEnum, int | pd.api.typing.NAType]:
@@ -26,23 +22,42 @@ class ResourceHoarding(EfficiencyAnalysis):
             node_info (list[dict]): Node information dictionary obtained from NodeInfoFetcher.
 
         Returns:
-            dict[NodeInfoKeyEnum, int | pd.api.typing.NAType]: Dictionary containing total RAM and GPU count.
+            dict[NodeInfoKeyEnum, int | pd.api.typing.NAType]:
+                Dictionary containing total RAM, GPU count, and CPU core count.
         """
         if len(jobs_node_list) == 0:
-            return {NodeInfoKeyEnum.RAM: pd.NA, NodeInfoKeyEnum.GPU_COUNT: pd.NA}
+            return {
+                NodeInfoKeyEnum.RAM: pd.NA,
+                NodeInfoKeyEnum.GPU_COUNT: pd.NA,
+                NodeInfoKeyEnum.CORE_COUNT_PER_NODE: pd.NA,
+            }
 
         ram_values = []
         gpu_values = []
+        core_values = []
         for node in jobs_node_list:
             values = NodeInfoFetcher.get_node_info_values(
-                node, node_info, members={NodeInfoKeyEnum.GPU_COUNT, NodeInfoKeyEnum.RAM}, offline=True
+                node,
+                node_info,
+                members={
+                    NodeInfoKeyEnum.GPU_COUNT,
+                    NodeInfoKeyEnum.RAM,
+                    NodeInfoKeyEnum.CORE_COUNT_PER_NODE,
+                },
+                offline=True,
             )
             ram_values.append(values[NodeInfoKeyEnum.RAM])
             gpu_values.append(values[NodeInfoKeyEnum.GPU_COUNT])
+            core_values.append(values[NodeInfoKeyEnum.CORE_COUNT_PER_NODE])
 
         total_ram = pd.Series(ram_values, dtype=pd.Int64Dtype()).sum(skipna=False)
         total_gpu = pd.Series(gpu_values, dtype=pd.Int64Dtype()).sum(skipna=False)
-        return {NodeInfoKeyEnum.RAM: total_ram, NodeInfoKeyEnum.GPU_COUNT: total_gpu}
+        total_cores = pd.Series(core_values, dtype=pd.Int64Dtype()).sum(skipna=False)
+        return {
+            NodeInfoKeyEnum.RAM: total_ram,
+            NodeInfoKeyEnum.GPU_COUNT: total_gpu,
+            NodeInfoKeyEnum.CORE_COUNT_PER_NODE: total_cores,
+        }
 
     def _calculate_total_resources_of_nodes_per_job(
         self, memory_hoarding_jobs: pd.DataFrame
@@ -69,6 +84,11 @@ class ResourceHoarding(EfficiencyAnalysis):
             total_available_gpu_per_job = resource_totals_per_job.apply(lambda d: d[NodeInfoKeyEnum.GPU_COUNT]).astype(
                 pd.Int32Dtype()
             )
+            total_available_cores_per_job = resource_totals_per_job.apply(
+                lambda d: d[NodeInfoKeyEnum.CORE_COUNT_PER_NODE]
+            ).astype(
+                pd.Int32Dtype()
+            )
 
             # Extract node names from warning messages
             for warn in node_warnings:
@@ -90,9 +110,10 @@ class ResourceHoarding(EfficiencyAnalysis):
         return {
             NodeInfoKeyEnum.RAM: total_available_ram_per_job,
             NodeInfoKeyEnum.GPU_COUNT: total_available_gpu_per_job,
+            NodeInfoKeyEnum.CORE_COUNT_PER_NODE: total_available_cores_per_job,
         }
 
-    def calculate_memory_hoarding(self, filtered_jobs: pd.DataFrame) -> pd.DataFrame:
+    def calculate_node_resource_hoarding(self, filtered_jobs: pd.DataFrame) -> pd.DataFrame:
         """Detect memory hoarding in each job
 
         Checks if the ratio of requested memory to the available memory in each node is larger than
@@ -109,20 +130,23 @@ class ResourceHoarding(EfficiencyAnalysis):
             pd.DataFrame: DataFrame with hoarding information for each job.
         """
         memory_hoarding_jobs = self.calculate_job_efficiency_metrics(filtered_jobs)
+
         # check if cpu_mem_efficiency and used_cpu_mem_gib and allocated_cpu_mem_gib are present
         missing_columns = [
             key.value
             for key in RequiredHoardingAnalysisColumnsEnum.__members__.values()
             if key.value not in memory_hoarding_jobs.columns
         ]
-
         if len(missing_columns) > 0:
             raise ValueError(
                 f"Missing required CPU memory efficiency metrics: "
                 f"{', '.join(missing_columns)}. "
                 "CPU-related metrics are required for analysis."
             )
+        
         total_node_resources_per_job = self._calculate_total_resources_of_nodes_per_job(memory_hoarding_jobs)
+
+        # Add memory hoarding metrics
         memory_hoarding_jobs.loc[:, "total_ram_of_nodes_gib"] = total_node_resources_per_job[NodeInfoKeyEnum.RAM]
         memory_hoarding_jobs.loc[:, "total_gpu_count_of_nodes"] = total_node_resources_per_job[
             NodeInfoKeyEnum.GPU_COUNT
@@ -139,6 +163,20 @@ class ResourceHoarding(EfficiencyAnalysis):
 
         memory_hoarding_jobs.loc[:, "ram_hoarding_fraction_diff"] = (
             memory_hoarding_jobs.loc[:, "allocated_ram_fraction"]
+            - memory_hoarding_jobs.loc[:, "gpu_count_fraction"]
+        )
+
+        # Add CPU core hoarding metrics
+        memory_hoarding_jobs.loc[:, "total_cores_of_nodes"] = (
+            total_node_resources_per_job[NodeInfoKeyEnum.CORE_COUNT_PER_NODE]
+        )
+        memory_hoarding_jobs.loc[:, "allocated_cores_fraction"] = (
+            memory_hoarding_jobs.loc[:, "cpu_core_count"]
+            / memory_hoarding_jobs.loc[:, "total_cores_of_nodes"]
+        )
+
+        memory_hoarding_jobs.loc[:, "core_hoarding_fraction_diff"] = (
+            memory_hoarding_jobs.loc[:, "allocated_cores_fraction"]
             - memory_hoarding_jobs.loc[:, "gpu_count_fraction"]
         )
 

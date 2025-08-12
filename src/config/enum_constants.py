@@ -155,6 +155,7 @@ class RequiredHoardingAnalysisColumnsEnum(Enum):
     USED_CPU_MEM_GIB = "used_cpu_mem_gib"
     ALLOCATED_CPU_MEM_GIB = "allocated_cpu_mem_gib"
     CPU_MEM_EFFICIENCY = "cpu_mem_efficiency"
+    CPU_CORE_COUNT = "cpu_core_count"
 
 
 @unique
@@ -174,6 +175,7 @@ class NodeInfoKeyEnum(Enum):
     RAM = "ram"
     COUNT = "count"
     GPU_COUNT = "gpu_count"
+    CORE_COUNT_PER_NODE = "cores"
 
 
 @unique
