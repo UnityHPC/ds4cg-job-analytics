@@ -3,7 +3,7 @@ from preprocess.preprocess import get_estimated_allocated_vram
 
 
 # Test for single node VRAM allocation
-def test_allocated_vram_single_node():
+def test_allocated_vram_single_node() -> None:
     mock_data = pd.DataFrame({
         "GPUType": [["a100"], ["v100"], ["v100"], ["a100"], ["2080_ti"], ["a40"]],
         "NodeList": [
@@ -28,7 +28,7 @@ def test_allocated_vram_single_node():
 
 
 # Test for multiple nodes VRAM allocation
-def test_allocated_vram_multiple_nodes():
+def test_allocated_vram_multiple_nodes() -> None:
     mock_data = pd.DataFrame({
         "GPUType": [["a100", "v100"], ["v100", "2080_ti"], ["a40", "a100"]],
         "NodeList": [
