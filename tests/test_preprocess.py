@@ -8,6 +8,7 @@ from src.config.enum_constants import (
     AdminPartitionEnum,
     AdminsAccountEnum,
     PartitionTypeEnum,
+    ExcludedColumnsEnum,
 )
 from src.config.enum_constants import OptionalColumnsEnum, RequiredColumnsEnum
 from src.config.remote_config import PartitionInfoFetcher
@@ -18,15 +19,13 @@ partition_info = PartitionInfoFetcher().get_info()
 gpu_partitions = [p["name"] for p in partition_info if p["type"] == PartitionTypeEnum.GPU.value]
 
 
-def test_preprocess_data_filtred_columns(mock_data_frame):
+@pytest.mark.parametrize("column", [member.value for member in ExcludedColumnsEnum])
+def test_preprocess_data_filtred_columns(mock_data_frame, column):
     """
     Test that the preprocessed data does not contain irrelevant columns.
     """
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
-    assert "UUID" not in data.columns
-    assert "EndTime" not in data.columns
-    assert "Nodes" not in data.columns
-    assert "Preempted" not in data.columns
+    assert column not in data.columns
 
 
 def test_preprocess_data_filtered_gpu(mock_data_frame):

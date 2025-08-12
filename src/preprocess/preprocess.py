@@ -20,6 +20,7 @@ from ..config.enum_constants import (
     PartitionTypeEnum,
     OptionalColumnsEnum,
     RequiredColumnsEnum,
+    ExcludedColumnsEnum,
 )
 from ..config.remote_config import PartitionInfoFetcher
 
@@ -430,6 +431,7 @@ def preprocess_data(
     include_failed_cancelled_jobs: bool = False,
     include_cpu_only_jobs: bool = False,
     include_custom_qos_jobs: bool = False,
+    apply_filter: bool = True,
 ) -> pd.DataFrame:
     """
     Preprocess dataframe, filtering out unwanted rows and columns, filling missing values and converting types.
@@ -444,23 +446,26 @@ def preprocess_data(
         include_cpu_only_jobs (bool, optional): Whether to include jobs that do not use GPUs (CPU-only jobs).
         include_custom_qos_jobs (bool, optional): Whether to include entries with custom qos values or not.
             Default to False
+        apply_filter (bool, optional): Whether to apply filtering operations and column removal to the data. Defaults to True.
+
 
     Returns:
         pd.DataFrame: The preprocessed dataframe
 
     """
-
     # Drop unnecessary columns, ignoring errors in case any of them is not in the dataframe
-    data = input_df.drop(columns=["UUID", "EndTime", "Nodes", "Preempted"], axis=1, inplace=False, errors="ignore")
-
-    # Perform column validation and filtering
-    data = _validate_columns_and_filter_records(
-        data,
-        min_elapsed_seconds,
-        include_failed_cancelled_jobs,
-        include_cpu_only_jobs,
-        include_custom_qos_jobs,
-    )
+    if apply_filter:
+        data = input_df.drop(
+            columns=[member.value for member in ExcludedColumnsEnum], axis=1, inplace=False, errors="ignore"
+        )
+        # Perform column validation and filtering
+        data = _validate_columns_and_filter_records(
+            data,
+            min_elapsed_seconds,
+            include_failed_cancelled_jobs,
+            include_cpu_only_jobs,
+            include_custom_qos_jobs,
+        )
 
     _fill_missing(data)
 

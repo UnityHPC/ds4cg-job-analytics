@@ -1,6 +1,6 @@
 import pytest
 import pandas
-from src.utilities import load_and_preprocessed_jobs, load_and_preprocessed_jobs_custom_query
+from src.utilities import load_and_preprocess_jobs, load_and_preprocess_jobs_custom_query
 from .conftest import preprocess_mock_data
 from src.config.enum_constants import OptionalColumnsEnum, RequiredColumnsEnum
 from datetime import datetime, timedelta
@@ -10,7 +10,7 @@ def test_return_correct_types(mock_data_path):
     """
     Basic test on return type of function
     """
-    res = load_and_preprocessed_jobs(db_path=mock_data_path)
+    res = load_and_preprocess_jobs(db_path=mock_data_path)
     assert isinstance(res, pandas.DataFrame)
 
 
@@ -19,7 +19,7 @@ def test_no_filter(mock_data_path):
     Test in case there is no filtering, function should return every valid records from database.
     """
     ground_truth = preprocess_mock_data(mock_data_path, min_elapsed_seconds=0)
-    res = load_and_preprocessed_jobs(db_path=mock_data_path)
+    res = load_and_preprocess_jobs(db_path=mock_data_path)
     expect_num_records = len(ground_truth)
     assert expect_num_records == len(res)
 
@@ -32,7 +32,7 @@ def test_filter_date_back(mock_data_path, dates_back):
     Test with multiple different dates_back for higher test coverage.
     """
     temp = preprocess_mock_data(mock_data_path, min_elapsed_seconds=0)
-    res = load_and_preprocessed_jobs(db_path=mock_data_path, dates_back=dates_back)
+    res = load_and_preprocess_jobs(db_path=mock_data_path, dates_back=dates_back)
     cutoff = datetime.now() - timedelta(days=dates_back)
     ground_truth_jobs = temp[(temp["StartTime"] >= cutoff)].copy()
     expect_job_ids = ground_truth_jobs["JobID"].to_numpy()
@@ -46,7 +46,7 @@ def test_filter_min_elapsed(mock_data_path):
     Test for filtering by days back and minimum elapsed time.
     """
     temp = preprocess_mock_data(mock_data_path, min_elapsed_seconds=13000)
-    res = load_and_preprocessed_jobs(db_path=mock_data_path, min_elapsed_seconds=13000, dates_back=90)
+    res = load_and_preprocess_jobs(db_path=mock_data_path, min_elapsed_seconds=13000, dates_back=90)
     cutoff = datetime.now() - timedelta(days=90)
     ground_truth_jobs = temp[(temp["StartTime"] >= cutoff)].copy()
     expect_job_ids = ground_truth_jobs["JobID"].to_numpy()
@@ -66,7 +66,7 @@ def test_filter_date_back_include_all(mock_data_path):
         include_custom_qos_jobs=True,
         include_failed_cancelled_jobs=True,
     )
-    res = load_and_preprocessed_jobs(
+    res = load_and_preprocess_jobs(
         db_path=mock_data_path,
         dates_back=90,
         min_elapsed_seconds=0,
@@ -97,7 +97,7 @@ def test_missing_required_columns_error_raised(mock_data_path, missing_col):
     with pytest.raises(
         RuntimeError, match=f"Failed to load jobs DataFrame: 'Column {missing_col} does not exist in dataframe.'"
     ):
-        _res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)
+        _res = load_and_preprocess_jobs_custom_query(db_path=mock_data_path, custom_query=query)
 
 
 @pytest.mark.parametrize("missing_col", [col.value for col in OptionalColumnsEnum])
@@ -121,7 +121,7 @@ def test_optional_column_warnings(mock_data_path, recwarn, missing_col):
         f"Column '{missing_col}' is missing from the dataframe. "
         "This may impact filtering operations and downstream processing."
     )
-    _res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)
+    _res = load_and_preprocess_jobs_custom_query(db_path=mock_data_path, custom_query=query)
 
     # Check that a warning was raised with the expected message
     assert len(recwarn) > 0
@@ -140,7 +140,7 @@ def test_custom_query(mock_data_frame, mock_data_path, recwarn):
         "FROM Jobs WHERE Status != 'CANCELLED' AND Status !='FAILED' "
         "AND ArrayID is not NULL AND Interactive is not NULL"
     )
-    res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)
+    res = load_and_preprocess_jobs_custom_query(db_path=mock_data_path, custom_query=query)
     ground_truth_jobs = mock_data_frame[
         (mock_data_frame["Status"] != "CANCELLED")
         & (mock_data_frame["Status"] != "FAILED")
@@ -169,7 +169,7 @@ def test_custom_query_days_back(mock_data_frame, mock_data_path, recwarn, days_b
         "FROM Jobs WHERE Status != 'CANCELLED' AND Status !='FAILED' AND ArrayID is not NULL "
         f"AND Interactive is not NULL AND StartTime >= '{cutoff}'"
     )
-    res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)
+    res = load_and_preprocess_jobs_custom_query(db_path=mock_data_path, custom_query=query)
 
     ground_truth_jobs = mock_data_frame[
         (mock_data_frame["Status"] != "CANCELLED")
@@ -193,7 +193,7 @@ def test_empty_dataframe_warning(mock_data_path, recwarn):
     """
     # Query that returns no rows
     query = "SELECT * FROM Jobs WHERE 1=0"
-    res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)
+    res = load_and_preprocess_jobs_custom_query(db_path=mock_data_path, custom_query=query)
     assert res.empty
     # Check that the warning is about empty dataframe
     assert len(recwarn) == 1

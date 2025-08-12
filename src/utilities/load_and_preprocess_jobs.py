@@ -8,7 +8,7 @@ from src.config.remote_config import PartitionInfoFetcher
 from datetime import datetime, timedelta
 
 
-def load_and_preprocessed_jobs(
+def load_and_preprocess_jobs(
     db_path: str | Path,
     table_name: str = "Jobs",
     dates_back: int | None = None,
@@ -94,7 +94,7 @@ def load_and_preprocessed_jobs(
         raise RuntimeError(f"Failed to load jobs DataFrame: {e}") from e
 
 
-def load_and_preprocessed_jobs_custom_query(
+def load_and_preprocess_jobs_custom_query(
     db_path: str | Path,
     table_name: str = "Jobs",
     custom_query: str | None = None,

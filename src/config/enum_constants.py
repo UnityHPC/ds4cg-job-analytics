@@ -224,3 +224,21 @@ class RequiredColumnsEnum(Enum):
     GPUS = "GPUs"
     GPU_MEM_USAGE = "GPUMemUsage"
     ELAPSED = "Elapsed"
+
+
+@unique
+class ExcludedColumnsEnum(Enum):
+    """
+    An enumeration representing columns that should be omitted during preprocessing.
+
+    Attributes:
+        UUID: Unique identifier column.
+        END_TIME: Job end time column.
+        NODES: Number of nodes column.
+        PREEMPTED: Job preemption status column.
+    """
+
+    UUID = "UUID"
+    END_TIME = "EndTime"
+    NODES = "Nodes"
+    PREEMPTED = "Preempted"
