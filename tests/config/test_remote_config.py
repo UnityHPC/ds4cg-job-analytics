@@ -12,17 +12,17 @@ class DummyNodeInfoFetcher(NodeInfoFetcher):
     """Dummy fetcher for testing NodeInfoFetcher with static mock data."""
 
     @property
-    def local_path(self):
+    def local_path(self) -> Path:
         """Return path to static mock node info file."""
         return Path("tests/mock_data/mock_remote_configs/node_info.json")
 
 
 @pytest.fixture
-def dummy_node_info_fetcher():
+def dummy_node_info_fetcher() -> DummyNodeInfoFetcher:
     return DummyNodeInfoFetcher()
 
 
-def test_get_node_memory_valid(dummy_node_info_fetcher):
+def test_get_node_memory_valid(dummy_node_info_fetcher: DummyNodeInfoFetcher) -> None:
     node_info = dummy_node_info_fetcher.get_info()
     found = False
     for batch in node_info:
@@ -39,11 +39,13 @@ def test_get_node_memory_valid(dummy_node_info_fetcher):
     assert found, f"No valid node with '{NodeInfoKeyEnum.RAM.value}' memory found in mock data."
 
 
-def test_get_node_memory_node_not_found(dummy_node_info_fetcher):
+def test_get_node_memory_node_not_found(dummy_node_info_fetcher: DummyNodeInfoFetcher) -> None:
     node_info = dummy_node_info_fetcher.get_info()
-    all_nodes = set()
+    all_nodes: set[str] = set()
     for batch in node_info:
-        all_nodes.update(batch.get(NodeInfoKeyEnum.NODES.value))
+        nodes = batch.get(NodeInfoKeyEnum.NODES.value)
+        if nodes:
+            all_nodes.update(nodes)
     missing_node = "definitely_not_a_real_node"
     while missing_node in all_nodes:
         missing_node += "_x"
@@ -51,7 +53,7 @@ def test_get_node_memory_node_not_found(dummy_node_info_fetcher):
         NodeInfoFetcher.get_node_memory(missing_node, node_info)
 
 
-def test_get_node_memory_missing_ram(dummy_node_info_fetcher):
+def test_get_node_memory_missing_ram(dummy_node_info_fetcher: DummyNodeInfoFetcher) -> None:
     node_info = dummy_node_info_fetcher.get_info()
     for batch in node_info:
         nodes = batch.get(NodeInfoKeyEnum.NODES.value)
@@ -64,7 +66,7 @@ def test_get_node_memory_missing_ram(dummy_node_info_fetcher):
             break
 
 
-def test_get_node_info_values_return_one_key(dummy_node_info_fetcher):
+def test_get_node_info_values_return_one_key(dummy_node_info_fetcher: DummyNodeInfoFetcher) -> None:
     node_info = dummy_node_info_fetcher.get_info()
     found = False
     for batch in node_info:
@@ -81,7 +83,7 @@ def test_get_node_info_values_return_one_key(dummy_node_info_fetcher):
     )
 
 
-def test_get_node_info_values_return_multiple_keys(dummy_node_info_fetcher):
+def test_get_node_info_values_return_multiple_keys(dummy_node_info_fetcher: DummyNodeInfoFetcher) -> None:
     node_info = dummy_node_info_fetcher.get_info()
     found = False
     for batch in node_info:
@@ -105,7 +107,11 @@ def test_get_node_info_values_return_multiple_keys(dummy_node_info_fetcher):
 
 
 @pytest.mark.parametrize("missing_key", [e.value for e in NodeInfoKeyEnum])
-def test_get_node_memory_missing_any_key(dummy_node_info_fetcher, missing_key, monkeypatch):
+def test_get_node_memory_missing_any_key(
+    dummy_node_info_fetcher: DummyNodeInfoFetcher,
+    missing_key: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     node_info = dummy_node_info_fetcher.get_info()
     temp_dir = tempfile.mkdtemp()
     temp_path = f"{temp_dir}/node_info_missing_key.json"

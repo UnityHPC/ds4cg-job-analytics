@@ -77,7 +77,7 @@ ignore = [
 "mvp-scripts/*" = ["N", "NPY", "PD", "D100", "TD", "ANN"]
 "notebooks/SlurmGPU.ipynb" = ["N", "NPY", "PD", "D100", "TD", "ANN"]
 
-# TODO (Arda): Remove these ignores once the code is fixed
+# TODO (Ayush, Karthik): Remove these ignores once the code is fixed
 "tests/*" = ["ANN"]
 
 [tool.ruff.lint.isort]
