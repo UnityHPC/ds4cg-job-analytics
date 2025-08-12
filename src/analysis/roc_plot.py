@@ -28,9 +28,8 @@ from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 import numpy as np
 import sys
-from .main_efficiency_analysis import EfficiencyAnalysis
+from .efficiency_analysis import EfficiencyAnalysis
 from typing import Literal, cast
-import math
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 from src.config.enum_constants import (

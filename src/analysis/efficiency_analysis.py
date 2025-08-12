@@ -127,7 +127,10 @@ class EfficiencyAnalysis:
         if filter is not None:
             if filter is pd.NA or (isinstance(filter, float) and np.isnan(filter)):
                 if FilterTypeEnum.PD_NA not in permissible_filter_types:
-                    raise ValueError(f"{filter_name} cannot be pd.NA or <NA>.")
+                    raise ValueError(
+                        f"{filter_name} cannot be pd.NA or <NA>. "
+                        f"Permissible filter types are {permissible_filter_types}."
+                    )
                 mask &= col.isna()
             elif isinstance(filter, list | set | tuple):
                 # Check if the filter is a list, set, or tuple and if all values are numeric
@@ -285,6 +288,8 @@ class EfficiencyAnalysis:
         job_hour_col_name = JobEfficiencyMetricsEnum.JOB_HOURS.value
         gpu_count_col_name = JobEfficiencyMetricsEnum.GPU_COUNT.value
         used_vram_col_name = JobEfficiencyMetricsEnum.USED_VRAM_GIB.value
+        alloc_vram_eff_col_name = JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY.value
+        vram_constraint_eff_col_name = JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY.value
 
         # rename GPUs to gpu_count for clarity
         filtered_jobs = filtered_jobs.rename(columns={"GPUs": gpu_count_col_name})
@@ -296,24 +301,24 @@ class EfficiencyAnalysis:
         filtered_jobs.loc[:, vram_hour_col_name] = filtered_jobs["allocated_vram"] * filtered_jobs[job_hour_col_name]
         filtered_jobs.loc[:, used_vram_col_name] = filtered_jobs["GPUMemUsage"] / (2**30)
         # Compute alloc_vram_efficiency, a float in the range [0, 1].
-        filtered_jobs.loc[:, JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY.value] = (
+        filtered_jobs.loc[:, alloc_vram_eff_col_name] = (
             filtered_jobs[used_vram_col_name] / filtered_jobs["allocated_vram"]
         )
 
         # Compute vram_constraint_efficiency, a nullable float in the range [0, 1]. Set to NA if vram_constraint is NA
-        filtered_jobs.loc[:, JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY.value] = (
+        filtered_jobs.loc[:, vram_constraint_eff_col_name] = (
             filtered_jobs[used_vram_col_name] / filtered_jobs["vram_constraint"]
         )
 
         # Calculate job allocated VRAM efficiency score
         # This is a log-transformed score that penalizes low efficiency and longer vram_hours
-        alloc_vram_eff = filtered_jobs[JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY.value]
-        filtered_jobs.loc[:, JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE.value] = np.where(
-            alloc_vram_eff > 0, np.log(alloc_vram_eff) * filtered_jobs[vram_hour_col_name], -np.inf
-        )
+        alloc_vram_eff = filtered_jobs[alloc_vram_eff_col_name]
+        filtered_jobs.loc[:, JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE.value] = (
+            np.log(alloc_vram_eff.where(alloc_vram_eff > 0)) * filtered_jobs[vram_hour_col_name]
+        ).where(alloc_vram_eff > 0, -np.inf)
 
         # Calculate vram_constraint_efficiency score
-        vram_constraint_eff = filtered_jobs[JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY.value]
+        vram_constraint_eff = filtered_jobs[vram_constraint_eff_col_name]
         # Avoid log(0) and propagate pd.NA: if NA, score is NA; if 0, score is -np.inf
         score = pd.Series(pd.NA, index=filtered_jobs.index, dtype=pd.Float64Dtype())
         mask_valid = vram_constraint_eff.notna() & (vram_constraint_eff > 0)
@@ -325,7 +330,7 @@ class EfficiencyAnalysis:
         # Add CPU memory metrics if available
         used_cpu_mem_col = JobEfficiencyMetricsEnum.USED_CPU_MEMORY_GIB.value
         allocated_cpu_mem_col = JobEfficiencyMetricsEnum.ALLOCATED_CPU_MEM_GIB.value
-        if "CPUMemUsage" in self.jobs_df.columns and "Memory" in self.jobs_df.columns:
+        if "CPUMemUsage" in filtered_jobs.columns and "Memory" in filtered_jobs.columns:
             filtered_jobs.loc[:, used_cpu_mem_col] = filtered_jobs["CPUMemUsage"] / (2**30)
             filtered_jobs.loc[:, allocated_cpu_mem_col] = filtered_jobs["Memory"] / (2**10)  # Memory is in MiB
             filtered_jobs.loc[:, JobEfficiencyMetricsEnum.CPU_MEM_EFFICIENCY.value] = (
@@ -350,12 +355,18 @@ class EfficiencyAnalysis:
                 "Calculated it using the input jobs DataFrame."
             )
 
+        # Define column names using enums
         job_vram_hour_col = JobEfficiencyMetricsEnum.VRAM_HOURS.value
         job_gpu_count_col = JobEfficiencyMetricsEnum.GPU_COUNT.value
-        job_job_hour_col = JobEfficiencyMetricsEnum.VRAM_HOURS.value
-        # Compute user_job_hours_per_job once and reuse for both metrics
-        user_job_hours_per_job = self.jobs_with_efficiency_metrics.groupby("User", observed=True)[
-            job_job_hour_col
+        job_job_hour_col = JobEfficiencyMetricsEnum.JOB_HOURS.value
+        job_alloc_vram_eff_col = JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY.value
+        job_vram_constraint_eff_col = JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY.value
+        job_alloc_vram_eff_score_col = JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE.value
+        job_vram_constraint_eff_score_col = JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY_SCORE.value
+
+        # Compute user_vram_hours_per_job once and reuse for both metrics
+        user_vram_hours_per_job = self.jobs_with_efficiency_metrics.groupby("User", observed=True)[
+            job_vram_hour_col
         ].transform("sum")
 
         def avg_non_inf(x: pd.Series) -> float | pd.api.typing.NAType:
@@ -376,30 +387,28 @@ class EfficiencyAnalysis:
             .agg(
                 job_count=("JobID", "count"),
                 user_job_hours=(job_job_hour_col, "sum"),
-                Account=("Account", "first"),
-                avg_alloc_vram_eff_score=(JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE.value, avg_non_inf),
-                avg_vram_constraint_eff_score=(
-                    JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY_SCORE.value,
-                    avg_non_inf,
-                ),
+                pi_account=("Account", "first"),
+                avg_alloc_vram_eff_score=(job_alloc_vram_eff_score_col, avg_non_inf),
+                avg_vram_constraint_eff_score=(job_vram_constraint_eff_score_col, avg_non_inf),
             )
             .reset_index()
         )
 
-        # change names of aggregated columns to predefined metrics/ proportions enum
+        # rename to use enum values
         users_w_efficiency_metrics = users_w_efficiency_metrics.rename(
             columns={
                 "job_count": UserEfficiencyMetricsEnum.JOBS.value,
                 "user_job_hours": UserEfficiencyMetricsEnum.JOB_HOURS.value,
                 "avg_alloc_vram_eff_score": UserEfficiencyMetricsEnum.AVG_ALLOC_VRAM_EFFICIENCY_SCORE.value,
                 "avg_vram_constraint_eff_score": UserEfficiencyMetricsEnum.AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE.value,
+                "pi_account": "Account",
             },
         )
 
         self.jobs_with_efficiency_metrics.loc[:, "weighted_alloc_vram_efficiency"] = (
-            self.jobs_with_efficiency_metrics[JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY.value]
+            self.jobs_with_efficiency_metrics[job_alloc_vram_eff_col]
             * self.jobs_with_efficiency_metrics[job_vram_hour_col]
-            / user_job_hours_per_job
+            / user_vram_hours_per_job
         )
 
         users_w_efficiency_metrics.loc[:, UserEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY.value] = (
@@ -409,9 +418,9 @@ class EfficiencyAnalysis:
         )
 
         self.jobs_with_efficiency_metrics.loc[:, "weighted_vram_constraint_efficiency"] = (
-            self.jobs_with_efficiency_metrics[JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY.value]
+            self.jobs_with_efficiency_metrics[job_vram_constraint_eff_col]
             * self.jobs_with_efficiency_metrics[job_vram_hour_col]
-            / user_job_hours_per_job
+            / user_vram_hours_per_job
         ).astype(pd.Float64Dtype())
 
         users_w_efficiency_metrics.loc[
@@ -425,7 +434,7 @@ class EfficiencyAnalysis:
         self.jobs_with_efficiency_metrics.loc[:, "weighted_gpu_count"] = (
             self.jobs_with_efficiency_metrics[job_gpu_count_col]
             * self.jobs_with_efficiency_metrics[job_vram_hour_col]
-            / user_job_hours_per_job
+            / user_vram_hours_per_job
         )
         users_w_efficiency_metrics.loc[:, UserEfficiencyMetricsEnum.EXPECTED_VALUE_GPU_COUNT.value] = (
             self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_gpu_count"]
@@ -481,7 +490,9 @@ class EfficiencyAnalysis:
         if alloc_vram_efficiency_filter is not None:
             try:
                 mask &= EfficiencyAnalysis.apply_numeric_filter(
-                    self.users_with_efficiency_metrics["expected_value_alloc_vram_efficiency"],
+                    self.users_with_efficiency_metrics[
+                        UserEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY.value
+                    ],
                     alloc_vram_efficiency_filter,
                     {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY},
                     filter_name="expected_value_alloc_vram_efficiency",
@@ -489,13 +500,15 @@ class EfficiencyAnalysis:
             except ValueError as e:
                 raise ValueError("Invalid filter for expected_value_alloc_vram_efficiency.") from e
 
-        col = self.users_with_efficiency_metrics["job_count"]
+        col = self.users_with_efficiency_metrics[UserEfficiencyMetricsEnum.JOBS.value]
         mask &= col.ge(min_jobs)
 
         inefficient_users = self.users_with_efficiency_metrics[mask]
 
         # Sort by the metric ascending (lower is worse)
-        inefficient_users = inefficient_users.sort_values("expected_value_alloc_vram_efficiency", ascending=True)
+        inefficient_users = inefficient_users.sort_values(
+            UserEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY.value, ascending=True
+        )
         return inefficient_users
 
     def find_inefficient_users_by_vram_hours(
@@ -531,7 +544,7 @@ class EfficiencyAnalysis:
         if vram_hours_filter is not None:
             try:
                 mask &= EfficiencyAnalysis.apply_numeric_filter(
-                    self.users_with_efficiency_metrics["vram_hours"],
+                    self.users_with_efficiency_metrics[UserEfficiencyMetricsEnum.VRAM_HOURS.value],
                     vram_hours_filter,
                     {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY},
                     filter_name="vram_hours_filter",
@@ -539,13 +552,13 @@ class EfficiencyAnalysis:
             except ValueError as e:
                 raise ValueError("Invalid filter for vram_hours.") from e
 
-        col = self.users_with_efficiency_metrics["job_count"]
+        col = self.users_with_efficiency_metrics[UserEfficiencyMetricsEnum.JOBS.value]
         mask &= col.ge(min_jobs)
 
         inefficient_users = self.users_with_efficiency_metrics[mask]
 
         # Sort by the metric descending (higher is worse)
-        inefficient_users = inefficient_users.sort_values("vram_hours", ascending=False)
+        inefficient_users = inefficient_users.sort_values(UserEfficiencyMetricsEnum.VRAM_HOURS.value, ascending=False)
         return inefficient_users
 
     def calculate_all_efficiency_metrics(self, filtered_jobs: pd.DataFrame) -> dict:
@@ -609,7 +622,7 @@ class EfficiencyAnalysis:
             .reset_index()
         )
 
-        # rename to follow enums
+        # rename to use enums value
         pi_efficiency_metrics = pi_efficiency_metrics.rename(
             columns={
                 "job_count": PIEfficiencyMetricsEnum.JOBS.value,
@@ -716,7 +729,7 @@ class EfficiencyAnalysis:
         if vram_hours_filter is not None:
             try:
                 mask &= EfficiencyAnalysis.apply_numeric_filter(
-                    self.pi_accounts_with_efficiency_metrics["pi_acc_vram_hours"],
+                    self.pi_accounts_with_efficiency_metrics[PIEfficiencyMetricsEnum.VRAM_HOURS.value],
                     vram_hours_filter,
                     {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY},
                     filter_name="pi_acc_vram_hours_filter",
@@ -724,13 +737,15 @@ class EfficiencyAnalysis:
             except ValueError as e:
                 raise ValueError("Invalid filter for pi_acc_vram_hours.") from e
 
-        col = self.pi_accounts_with_efficiency_metrics["job_count"]
+        col = self.pi_accounts_with_efficiency_metrics[PIEfficiencyMetricsEnum.JOBS.value]
         mask &= col.ge(min_jobs)
 
         inefficient_pi_accounts = self.pi_accounts_with_efficiency_metrics[mask]
 
         # Sort by the metric descending (higher is worse)
-        inefficient_pi_accounts = inefficient_pi_accounts.sort_values("pi_acc_vram_hours", ascending=False)
+        inefficient_pi_accounts = inefficient_pi_accounts.sort_values(
+            PIEfficiencyMetricsEnum.VRAM_HOURS.value, ascending=False
+        )
         return inefficient_pi_accounts
 
     def sort_and_filter_records_with_metrics(
