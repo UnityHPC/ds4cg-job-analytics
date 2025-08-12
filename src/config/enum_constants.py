@@ -228,9 +228,9 @@ class UserEfficiencyMetricsEnum(Enum):
     JOB_HOURS = "job_hours"
     VRAM_HOURS = "vram_hours"
     JOBS = "job_count"
-    WEIGHTED_AVG_ALLOC_VRAM_EFFICIENCY = "expected_value_alloc_vram_efficiency"
-    WEIGHTED_AVG_VRAM_CONSTRAINTS_EFFICIENCY = "expected_value_vram_constraint_efficiency"
-    WEIGHTED_AVG_GPU_COUNT = "expected_value_gpu_count"
+    EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY = "expected_value_alloc_vram_efficiency"
+    EXPECTED_VALUE_VRAM_CONSTRAINTS_EFFICIENCY = "expected_value_vram_constraint_efficiency"
+    EXPECTED_VALUE_GPU_COUNT = "expected_value_gpu_count"
     AVG_ALLOC_VRAM_EFFICIENCY_SCORE = "avg_alloc_vram_efficiency_score"
     AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE = "avg_vram_constraint_efficiency_score"
 

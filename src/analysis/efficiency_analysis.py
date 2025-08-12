@@ -402,7 +402,7 @@ class EfficiencyAnalysis:
             / user_job_hours_per_job
         )
 
-        users_w_efficiency_metrics.loc[:, UserEfficiencyMetricsEnum.WEIGHTED_AVG_ALLOC_VRAM_EFFICIENCY.value] = (
+        users_w_efficiency_metrics.loc[:, UserEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY.value] = (
             self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_alloc_vram_efficiency"]
             .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
             .to_numpy()
@@ -414,7 +414,9 @@ class EfficiencyAnalysis:
             / user_job_hours_per_job
         ).astype(pd.Float64Dtype())
 
-        users_w_efficiency_metrics.loc[:, UserEfficiencyMetricsEnum.WEIGHTED_AVG_VRAM_CONSTRAINTS_EFFICIENCY.value] = (
+        users_w_efficiency_metrics.loc[
+            :, UserEfficiencyMetricsEnum.EXPECTED_VALUE_VRAM_CONSTRAINTS_EFFICIENCY.value
+        ] = (
             self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_vram_constraint_efficiency"]
             .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
             .to_numpy()
@@ -425,7 +427,7 @@ class EfficiencyAnalysis:
             * self.jobs_with_efficiency_metrics[job_vram_hour_col]
             / user_job_hours_per_job
         )
-        users_w_efficiency_metrics.loc[:, UserEfficiencyMetricsEnum.WEIGHTED_AVG_GPU_COUNT.value] = (
+        users_w_efficiency_metrics.loc[:, UserEfficiencyMetricsEnum.EXPECTED_VALUE_GPU_COUNT.value] = (
             self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_gpu_count"]
             .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
             .to_numpy()
@@ -623,9 +625,9 @@ class EfficiencyAnalysis:
 
         # declare user columns that would be used throughout the calculation
         user_vram_hours_col = UserEfficiencyMetricsEnum.VRAM_HOURS.value
-        user_exepected_alloc_eff_col = UserEfficiencyMetricsEnum.WEIGHTED_AVG_ALLOC_VRAM_EFFICIENCY.value
-        user_expected_vram_eff_col = UserEfficiencyMetricsEnum.WEIGHTED_AVG_VRAM_CONSTRAINTS_EFFICIENCY.value
-        user_expected_gpu_count_col = UserEfficiencyMetricsEnum.WEIGHTED_AVG_GPU_COUNT.value
+        user_exepected_alloc_eff_col = UserEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY.value
+        user_expected_vram_eff_col = UserEfficiencyMetricsEnum.EXPECTED_VALUE_VRAM_CONSTRAINTS_EFFICIENCY.value
+        user_expected_gpu_count_col = UserEfficiencyMetricsEnum.EXPECTED_VALUE_GPU_COUNT.value
 
         # Compute pi_acc_vram_hours once and reuse for both metrics
         pi_acc_vram_hours = self.users_with_efficiency_metrics.groupby("Account", observed=True)[

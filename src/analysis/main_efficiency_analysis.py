@@ -356,9 +356,18 @@ class EfficiencyAnalysis:
                 "Calculated it using the input jobs DataFrame."
             )
 
+        # Define column names using enums
+        job_vram_hour_col = JobEfficiencyMetricsEnum.VRAM_HOURS.value
+        job_gpu_count_col = JobEfficiencyMetricsEnum.GPU_COUNT.value
+        job_job_hour_col = JobEfficiencyMetricsEnum.JOB_HOURS.value
+        job_alloc_vram_eff_col = JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY.value
+        job_vram_constraint_eff_col = JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY.value
+        job_alloc_vram_eff_score_col = JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE.value
+        job_vram_constraint_eff_score_col = JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY_SCORE.value
+
         # Compute user_vram_hours_per_job once and reuse for both metrics
         user_vram_hours_per_job = self.jobs_with_efficiency_metrics.groupby("User", observed=True)[
-            "vram_hours"
+            job_vram_hour_col
         ].transform("sum")
 
         def avg_non_inf(x: pd.Series) -> float | pd.api.typing.NAType:
@@ -378,44 +387,56 @@ class EfficiencyAnalysis:
             self.jobs_with_efficiency_metrics.groupby("User", observed=True)
             .agg(
                 job_count=("JobID", "count"),
-                user_job_hours=("job_hours", "sum"),
+                user_job_hours=(job_job_hour_col, "sum"),
                 pi_account=("Account", "first"),
-                avg_alloc_vram_efficiency_score=("alloc_vram_efficiency_score", avg_non_inf),
-                avg_vram_constraint_efficiency_score=("vram_constraint_efficiency_score", avg_non_inf),
+                avg_alloc_vram_eff_score=(job_alloc_vram_eff_score_col, avg_non_inf),
+                avg_vram_constraint_eff_score=(job_vram_constraint_eff_score_col, avg_non_inf),
             )
             .reset_index()
         )
 
+        # change names of aggregated columns to predefined metrics/ proportions enum
+        users_w_efficiency_metrics = users_w_efficiency_metrics.rename(
+            columns={
+                "job_count": UserEfficiencyMetricsEnum.JOBS.value,
+                "user_job_hours": UserEfficiencyMetricsEnum.JOB_HOURS.value,
+                "avg_alloc_vram_eff_score": UserEfficiencyMetricsEnum.AVG_ALLOC_VRAM_EFFICIENCY_SCORE.value,
+                "avg_vram_constraint_eff_score": UserEfficiencyMetricsEnum.AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE.value,
+            },
+        )
+
         self.jobs_with_efficiency_metrics.loc[:, "weighted_alloc_vram_efficiency"] = (
-            self.jobs_with_efficiency_metrics["alloc_vram_efficiency"]
-            * self.jobs_with_efficiency_metrics["vram_hours"]
+            self.jobs_with_efficiency_metrics[job_alloc_vram_eff_col]
+            * self.jobs_with_efficiency_metrics[job_vram_hour_col]
             / user_vram_hours_per_job
         )
 
-        users_w_efficiency_metrics.loc[:, "expected_value_alloc_vram_efficiency"] = (
+        users_w_efficiency_metrics.loc[:, UserEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY.value] = (
             self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_alloc_vram_efficiency"]
             .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
             .to_numpy()
         )
 
         self.jobs_with_efficiency_metrics.loc[:, "weighted_vram_constraint_efficiency"] = (
-            self.jobs_with_efficiency_metrics["vram_constraint_efficiency"]
-            * self.jobs_with_efficiency_metrics["vram_hours"]
+            self.jobs_with_efficiency_metrics[job_vram_constraint_eff_col]
+            * self.jobs_with_efficiency_metrics[job_vram_hour_col]
             / user_vram_hours_per_job
         ).astype(pd.Float64Dtype())
 
-        users_w_efficiency_metrics.loc[:, "expected_value_vram_constraint_efficiency"] = (
+        users_w_efficiency_metrics.loc[
+            :, UserEfficiencyMetricsEnum.EXPECTED_VALUE_VRAM_CONSTRAINTS_EFFICIENCY.value
+        ] = (
             self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_vram_constraint_efficiency"]
             .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
             .to_numpy()
         )
 
         self.jobs_with_efficiency_metrics.loc[:, "weighted_gpu_count"] = (
-            self.jobs_with_efficiency_metrics["gpu_count"]
-            * self.jobs_with_efficiency_metrics["vram_hours"]
+            self.jobs_with_efficiency_metrics[job_gpu_count_col]
+            * self.jobs_with_efficiency_metrics[job_vram_hour_col]
             / user_vram_hours_per_job
         )
-        users_w_efficiency_metrics.loc[:, "expected_value_gpu_count"] = (
+        users_w_efficiency_metrics.loc[:, UserEfficiencyMetricsEnum.EXPECTED_VALUE_GPU_COUNT.value] = (
             self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_gpu_count"]
             .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
             .to_numpy()
@@ -423,8 +444,8 @@ class EfficiencyAnalysis:
 
         # Calculate metric representing the total amount of GPU memory resources a user has been allocated over time.
         # It answers the question: “How much VRAM, and for how long, did this user occupy?”
-        users_w_efficiency_metrics.loc[:, "vram_hours"] = (
-            (self.jobs_with_efficiency_metrics["allocated_vram"] * self.jobs_with_efficiency_metrics["job_hours"])
+        users_w_efficiency_metrics.loc[:, UserEfficiencyMetricsEnum.VRAM_HOURS.value] = (
+            (self.jobs_with_efficiency_metrics["allocated_vram"] * self.jobs_with_efficiency_metrics[job_job_hour_col])
             .groupby(self.jobs_with_efficiency_metrics["User"], observed=True)
             .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
             .to_numpy()

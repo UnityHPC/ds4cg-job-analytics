@@ -639,7 +639,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         min_threshold: float = 0.0,
         max_threshold: float = 100.0,
         threshold_step: float = 1.0,
-        threshold_metric: UserEfficiencyMetricsEnum = UserEfficiencyMetricsEnum.WEIGHTED_AVG_ALLOC_VRAM_EFFICIENCY,
+        threshold_metric: UserEfficiencyMetricsEnum = UserEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY,
         proportion_metric: ProportionMetricsEnum = ProportionMetricsEnum.JOBS,
         plot_percentage: bool = True,
         num_markers: int = 10,
