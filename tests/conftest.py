@@ -48,6 +48,7 @@ def preprocess_mock_data(
         - Root account
         - Building partition
         - Updates QOS
+        - Smaller elapsed time than min_elapsed_seconds
         And applies additional filters based on the provided parameters.
     """
     qos_values = "(" + ",".join(f"'{obj.value}'" for obj in QOSEnum) + ")"
