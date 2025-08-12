@@ -317,7 +317,9 @@ class EfficiencyAnalysis:
         # Add CPU memory metrics if available
         if "CPUMemUsage" in self.jobs_df.columns and "Memory" in self.jobs_df.columns:
             filtered_jobs.loc[:, "used_cpu_mem_gib"] = filtered_jobs["CPUMemUsage"] / (2**30)
-            filtered_jobs.loc[:, "allocated_cpu_mem_gib"] = filtered_jobs["Memory"] / (2**10)  # Memory is in MiB
+            filtered_jobs.loc[:, "allocated_cpu_mem_gib"] = (
+                filtered_jobs["Memory"] / (2**10) * filtered_jobs["NodeList"].apply(len)
+            )  # Memory is in MiB
             filtered_jobs.loc[:, "cpu_mem_efficiency"] = (
                 filtered_jobs["used_cpu_mem_gib"] / filtered_jobs["allocated_cpu_mem_gib"]
             )

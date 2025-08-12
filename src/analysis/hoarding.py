@@ -127,5 +127,20 @@ class ResourceHoarding(EfficiencyAnalysis):
         memory_hoarding_jobs.loc[:, "total_gpu_count_of_nodes"] = total_node_resources_per_job[
             NodeInfoKeyEnum.GPU_COUNT
         ]
+        memory_hoarding_jobs.loc[:, "gpu_count_fraction"] = (
+            memory_hoarding_jobs.loc[:, "gpu_count"]
+            / memory_hoarding_jobs.loc[:, "total_gpu_count_of_nodes"]
+        )
 
-        return memory_hoarding_jobs
+        memory_hoarding_jobs.loc[:, "allocated_ram_fraction"] = (
+            memory_hoarding_jobs.loc[:, "allocated_cpu_mem_gib"]
+            / memory_hoarding_jobs.loc[:, "total_ram_of_nodes_gib"]
+        )
+
+        memory_hoarding_jobs.loc[:, "ram_hoarding_fraction_diff"] = (
+            memory_hoarding_jobs.loc[:, "allocated_ram_fraction"]
+            - memory_hoarding_jobs.loc[:, "gpu_count_fraction"]
+        )
+
+        self.jobs_with_efficiency_metrics = memory_hoarding_jobs
+        return self.jobs_with_efficiency_metrics
