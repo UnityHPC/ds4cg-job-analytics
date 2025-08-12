@@ -97,7 +97,7 @@ class AdminsAccountEnum(Enum):
 @unique
 class AdminPartitionEnum(Enum):
     """An enumeration representing partitions used by admin in maintenance that need to be omitted from analysis.
-    
+
     Attributes:
         BUILDING: Represents the building partition.
     """
@@ -139,6 +139,22 @@ class PartitionTypeEnum(Enum):
 
     CPU = "cpu"
     GPU = "gpu"
+
+
+@unique
+class RequiredHoardingAnalysisColumnsEnum(Enum):
+    """
+    An enumeration representing required columns for hoarding analysis.
+
+    Attributes:
+        USED_CPU_MEM_GIB: Represents the used CPU memory in GiB.
+        ALLOCATED_CPU_MEM_GIB: Represents the allocated CPU memory in GiB.
+        CPU_MEM_EFFICIENCY: Represents the CPU memory efficiency.
+    """
+
+    USED_CPU_MEM_GIB = "used_cpu_mem_gib"
+    ALLOCATED_CPU_MEM_GIB = "allocated_cpu_mem_gib"
+    CPU_MEM_EFFICIENCY = "cpu_mem_efficiency"
 
 
 @unique

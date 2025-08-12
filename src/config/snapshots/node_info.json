@@ -1835,10 +1835,9 @@
     "owner_email": ""
   },
   {
-    "nodes_folded": "gypsum-gpu[160-164,166,168,171,173-177,181,190-192]",
-    "count": 17,
+    "nodes_folded": "gypsum-gpu[161-164,166,168,171,173-177,181,190-192]",
+    "count": 16,
     "nodes": [
-      "gypsum-gpu160",
       "gypsum-gpu161",
       "gypsum-gpu162",
       "gypsum-gpu163",

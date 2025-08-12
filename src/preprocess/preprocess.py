@@ -274,12 +274,11 @@ def preprocess_data(
     mask &= data["QOS"] != QOSEnum.UPDATES.value
     # Filter out failed or cancelled jobs, except when include_failed_cancel_jobs is True
     mask &= (
-        (data["Status"] != StatusEnum.FAILED.value)
-        & (data["Status"] != StatusEnum.CANCELLED.value)
+        (data["Status"] != StatusEnum.FAILED.value) & (data["Status"] != StatusEnum.CANCELLED.value)
     ) | include_failed_cancelled_jobs
     # Filter out jobs whose partition type is not 'gpu', unless include_cpu_only_jobs is True.
     partition_info = PartitionInfoFetcher().get_info()
-    gpu_partitions = [p['name'] for p in partition_info if p['type'] == PartitionTypeEnum.GPU.value]
+    gpu_partitions = [p["name"] for p in partition_info if p["type"] == PartitionTypeEnum.GPU.value]
     mask &= data["Partition"].isin(gpu_partitions) | include_cpu_only_jobs
 
     data = data[mask].copy()
