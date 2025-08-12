@@ -183,20 +183,19 @@ def test_custom_query_days_back_2(mock_data_frame, mock_data_path, recwarn):
         assert id in expect_ids
 
 
-# TODO (Tan): implement proper empty dataframe handling and run this test again
-# def test_preprocess_empty_dataframe_warning(mock_data_path, recwarn):
-#     """
-#     Test handling the dataframe loads from database when the result is empty.
+def test_preprocess_empty_dataframe_warning(mock_data_path, recwarn):
+    """
+    Test handling the dataframe loads from database when the result is empty.
 
-#     Expect a UserWarning to be raised with the appropriate message.
-#     """
-#     # Query that returns no rows
-#     query = "SELECT * FROM Jobs WHERE 1=0"
-#     res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=mock_data_path, custom_query=query)
-#     assert res.empty
-#     # Check that the warning is about empty dataframe
-#     assert len(recwarn) == 1
-#     assert str(recwarn[0].message) == "Dataframe results from database and filtering is empty."
+    Expect a UserWarning to be raised with the appropriate message.
+    """
+    # Query that returns no rows
+    query = "SELECT * FROM Jobs WHERE 1=0"
+    res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=mock_data_path, custom_query=query)
+    assert res.empty
+    # Check that the warning is about empty dataframe
+    assert len(recwarn) == 1
+    assert str(recwarn[0].message) == "Dataframe results from database and filtering is empty."
 
 
 def test_missing_required_columns_error_raised(mock_data_path, recwarn):

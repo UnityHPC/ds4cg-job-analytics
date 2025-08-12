@@ -364,7 +364,7 @@ def test_preprocess_gpu_type(mock_data_frame, mock_data_path, recwarn):
 
 def test_preprocess_missing_required_columns(mock_data_frame, recwarn):
     """
-    Test handling the dataframe when missing one of the ENFORCE_COLUMNS in constants.py
+    Test handling the dataframe when missing one of the ENFORCE_COLUMNS in constants.py.
 
     Expect to raise KeyError for any of these columns if they are missing in the dataframe.
     """
@@ -377,7 +377,7 @@ def test_preprocess_missing_required_columns(mock_data_frame, recwarn):
 
 def test_preprocess_missing_optional_columns(mock_data_frame, recwarn):
     """
-    Test handling the dataframe when missing one of the columns
+    Test handling the dataframe when missing one of the columns.
 
     These columns are not in ENFORCE_COLUMNS so only warnings are expected to be raised.
     """
@@ -391,3 +391,54 @@ def test_preprocess_missing_optional_columns(mock_data_frame, recwarn):
         )
         with pytest.warns(UserWarning, match=expect_warning_msg):
             _res = preprocess_data(cur_df)
+
+
+def test_preprocess_empty_dataframe_warning(mock_data_frame, recwarn):
+    """
+    Test handling when preprocess_data results in an empty dataframe.
+
+    Expect a UserWarning to be raised with the appropriate message.
+    Also verify that columns added and type-casted in _cast_type_and_add_columns have correct data types.
+    """
+    # Make a copy of mock_data_frame and remove all entries to make it empty
+    empty_df = mock_data_frame.copy()
+    empty_df = empty_df.iloc[0:0]
+
+    # This should trigger the warning since the dataframe is empty
+    result = preprocess_data(empty_df)
+
+    # Check that the result is still empty
+    assert result.empty
+
+    # Check that a warning was raised about empty dataframe
+    assert len(recwarn) == 1
+    assert str(recwarn[0].message) == "Dataframe results from database and filtering is empty."
+
+    # Test that columns added in _cast_type_and_add_columns have correct types
+    # New columns added for empty dataframes
+    assert "Queued" in result.columns
+    assert result["Queued"].dtype == "timedelta64[ns]"
+
+    assert "vram_constraint" in result.columns
+    assert result["vram_constraint"].dtype == pd.Int64Dtype()
+
+    assert "allocated_vram" in result.columns
+    assert result["allocated_vram"].dtype == pd.Int64Dtype()
+
+    # Test that time columns were converted to datetime (if they exist)
+    time_columns = ["StartTime", "SubmitTime"]
+    for col in time_columns:
+        if col in result.columns:
+            assert pd.api.types.is_datetime64_any_dtype(result[col])
+
+    # Test that duration columns were converted to timedelta (if they exist)
+    duration_columns = ["TimeLimit", "Elapsed"]
+    for col in duration_columns:
+        if col in result.columns:
+            assert pd.api.types.is_timedelta64_dtype(result[col])
+
+    # Test that categorical columns have correct dtype (if they exist)
+    categorical_columns = ["Interactive", "QOS", "ExitCode", "Partition", "Account", "Status"]
+    for col in categorical_columns:
+        if col in result.columns:
+            assert result[col].dtype == "category"

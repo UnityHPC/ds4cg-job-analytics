@@ -342,13 +342,22 @@ def _cast_type_and_add_columns(data: pd.DataFrame) -> None:
     Handles both empty and non-empty dataframes by applying type casting to existing columns
         and either adding empty columns with correct dtypes or calculating actual derived values.
 
+    Raises a warning if the dataframe is empty after preprocessing operations.
+
     Args:
         data (pd.DataFrame): The dataframe to modify. Must contain the required columns for processing.
 
     Returns:
         None: The function modifies the DataFrame in place.
+
+    Warnings:
+        UserWarning: If the dataframe is empty after filtering and preprocessing operations.
     """
     exist_column_set = set(data.columns.to_list())
+
+    if data.empty:
+        # Raise warning for empty dataframe
+        warnings.warn("Dataframe results from database and filtering is empty.", UserWarning, stacklevel=3)
 
     # Type casting for columns involving time
     time_columns = ["StartTime", "SubmitTime"]
@@ -377,7 +386,7 @@ def _cast_type_and_add_columns(data: pd.DataFrame) -> None:
         # Add new columns with correct types for empty dataframe
         data["Queued"] = pd.Series([], dtype="timedelta64[ns]")
         data["vram_constraint"] = pd.Series([], dtype=pd.Int64Dtype())
-        data["allocated_vram"] = pd.Series([], dtype="int64")
+        data["allocated_vram"] = pd.Series([], dtype=pd.Int64Dtype())
     else:
         # Calculate queue time
         data.loc[:, "Queued"] = data["StartTime"] - data["SubmitTime"]
@@ -405,8 +414,9 @@ def _check_for_infinity_values(data: pd.DataFrame) -> None:
         None: The function only raises warnings if infinity values are found.
     """
     mem_usage_columns = ["CPUMemUsage", "GPUMemUsage"]
+    exist_column_set = set(data.columns.to_list())
     for col_name in mem_usage_columns:
-        if col_name not in set(data.columns.to_list()):
+        if col_name not in exist_column_set:
             continue
         filtered = data[data[col_name] == np.inf].copy()
         if len(filtered) > 0:
