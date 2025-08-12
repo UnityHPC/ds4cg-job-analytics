@@ -24,13 +24,16 @@ def test_no_filter(mock_data_path):
     assert expect_num_records == len(res)
 
 
-def test_filter_date_back_1(mock_data_path, recwarn):
+@pytest.mark.parametrize("dates_back", [90, 150])
+def test_filter_date_back(mock_data_path, dates_back):
     """
-    Test for filtering by days_back
+    Test for filtering by dates_back.
+
+    Test with multiple different dates_back for higher test coverage.
     """
     temp = preprocess_mock_data(mock_data_path, min_elapsed_seconds=0)
-    res = load_and_preprocessed_jobs(db_path=mock_data_path, dates_back=90)
-    cutoff = datetime.now() - timedelta(days=90)
+    res = load_and_preprocessed_jobs(db_path=mock_data_path, dates_back=dates_back)
+    cutoff = datetime.now() - timedelta(days=dates_back)
     ground_truth_jobs = temp[(temp["StartTime"] >= cutoff)].copy()
     expect_job_ids = ground_truth_jobs["JobID"].to_numpy()
     assert len(ground_truth_jobs) == len(res)
@@ -38,21 +41,7 @@ def test_filter_date_back_1(mock_data_path, recwarn):
         assert id in expect_job_ids
 
 
-def test_filter_date_back_2(mock_data_path, recwarn):
-    """
-    Test for filtering by days_back
-    """
-    temp = preprocess_mock_data(mock_data_path, min_elapsed_seconds=0)
-    res = load_and_preprocessed_jobs(db_path=mock_data_path, dates_back=150)
-    cutoff = datetime.now() - timedelta(days=150)
-    ground_truth_jobs = temp[(temp["StartTime"] >= cutoff)].copy()
-    expect_job_ids = ground_truth_jobs["JobID"].to_numpy()
-    assert len(ground_truth_jobs) == len(res)
-    for id in res["JobID"]:
-        assert id in expect_job_ids
-
-
-def test_filter_min_elapsed(mock_data_path, recwarn):
+def test_filter_min_elapsed(mock_data_path):
     """
     Test for filtering by days back and minimum elapsed time.
     """
@@ -66,7 +55,7 @@ def test_filter_min_elapsed(mock_data_path, recwarn):
         assert id in expect_job_ids
 
 
-def test_filter_date_back_include_all(mock_data_path, recwarn):
+def test_filter_date_back_include_all(mock_data_path):
     """
     Test for filtering by days_back, including CPU only jobs and FAILED/ CANCELLED jobs
     """
@@ -97,7 +86,8 @@ def test_custom_query(mock_data_frame, mock_data_path, recwarn):
     """
     Test if function fetches expected records when using custom sql query.
 
-    Warnings are expected to be raised since this select a subset of columns.
+    Warnings are ignored since test_optional_column_warnings and test_missing_required_columns_error_raised
+        covers warning for columns missing.
     """
     query = (
         "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage, CPUMemUsage, Elapsed "
@@ -117,46 +107,22 @@ def test_custom_query(mock_data_frame, mock_data_path, recwarn):
         assert id in expect_ids
 
 
-def test_custom_query_days_back_1(mock_data_frame, mock_data_path, recwarn):
+@pytest.mark.parametrize("days_back", [90, 150])
+def test_custom_query_days_back(mock_data_frame, mock_data_path, recwarn, days_back):
     """
-    Test in case custom query does not contain dates_back and dates_back parameter is given.
-
-    Expect result will be filtered correctly by dates_back.
-    """
-    cutoff = datetime.now() - timedelta(days=90)
-    query = (
-        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage, CPUMemUsage, Elapsed "
-        "FROM Jobs WHERE Status != 'CANCELLED' AND Status !='FAILED' AND ArrayID is not NULL "
-        f"AND Interactive is not NULL AND StartTime >= '{cutoff}'"
-    )
-    res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)
-    cutoff = datetime.now() - timedelta(days=90)
-    ground_truth_jobs = mock_data_frame[
-        (mock_data_frame["Status"] != "CANCELLED")
-        & (mock_data_frame["Status"] != "FAILED")
-        & (mock_data_frame["ArrayID"].notna())
-        & (mock_data_frame["Interactive"].notna())
-        & (mock_data_frame["StartTime"] >= cutoff)
-    ].copy()
-    assert len(res) == len(ground_truth_jobs)
-    expect_ids = ground_truth_jobs["JobID"].to_list()
-    for id in res["JobID"]:
-        assert id in expect_ids
-
-
-def test_custom_query_days_back_2(mock_data_frame, mock_data_path, recwarn):
-    """
-    Test in case custom_query contains dates_back condition.
+    Test custom query with dates_back condition.
 
     Expect the result will be filtered by dates_back condition in the query.
+
+    Warnings are ignored since test_optional_column_warnings and test_missing_required_columns_error_raised
+        covers test warning for columns missing.
     """
-    cutoff = datetime.now() - timedelta(days=150)
+    cutoff = datetime.now() - timedelta(days=days_back)
     query = (
         "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage, CPUMemUsage, Elapsed "
         "FROM Jobs WHERE Status != 'CANCELLED' AND Status !='FAILED' AND ArrayID is not NULL "
         f"AND Interactive is not NULL AND StartTime >= '{cutoff}'"
     )
-
     res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)
 
     ground_truth_jobs = mock_data_frame[
@@ -168,7 +134,6 @@ def test_custom_query_days_back_2(mock_data_frame, mock_data_path, recwarn):
     ].copy()
     expect_ids = ground_truth_jobs["JobID"].to_list()
 
-    # No warning expected since we're not passing dates_back parameter
     assert len(res) == len(ground_truth_jobs)
     for id in res["JobID"]:
         assert id in expect_ids
@@ -189,25 +154,26 @@ def test_empty_dataframe_warning(mock_data_path, recwarn):
     assert str(recwarn[0].message) == "Dataframe results from database and filtering is empty."
 
 
-def test_missing_required_columns_error_raised(mock_data_path, recwarn):
+@pytest.mark.parametrize("missing_col", [col.value for col in RequiredColumnsEnum])
+def test_missing_required_columns_error_raised(mock_data_path, missing_col):
     """
-    Test enforcement of errorss when the database is missing a required column.
+    Test enforcement of errors when the database is missing a required column.
 
     Expect to raise RuntimeError for any of these columns if they are missing in the dataframe.
     """
     required_col = {e.value for e in RequiredColumnsEnum}
-    for col in required_col:
-        col_names = required_col.copy()
-        col_names.remove(col)
-        col_str = ", ".join(col_names)
-        query = f"SELECT {col_str} FROM Jobs"
-        with pytest.raises(
-            RuntimeError, match=f"Failed to load jobs DataFrame: 'Column {col} does not exist in dataframe.'"
-        ):
-            _res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)
+    col_names = required_col.copy()
+    col_names.remove(missing_col)
+    col_str = ", ".join(col_names)
+    query = f"SELECT {col_str} FROM Jobs"
+    with pytest.raises(
+        RuntimeError, match=f"Failed to load jobs DataFrame: 'Column {missing_col} does not exist in dataframe.'"
+    ):
+        _res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)
 
 
-def test_optional_column_warnings(mock_data_path, recwarn):
+@pytest.mark.parametrize("missing_col", [col.value for col in OptionalColumnsEnum])
+def test_optional_column_warnings(mock_data_path, recwarn, missing_col):
     """
     Test handling the dataframe loads from database when missing one of the columns
 
@@ -215,17 +181,20 @@ def test_optional_column_warnings(mock_data_path, recwarn):
     """
     optional_columns = {e.value for e in OptionalColumnsEnum}
     required_columns = {e.value for e in RequiredColumnsEnum}
-    for col in optional_columns:
-        required_column_copy = required_columns.copy()
-        optional_column_copy = optional_columns.copy()
-        optional_column_copy.remove(col)
-        final_column_set = required_column_copy.union(optional_column_copy)
-        col_str = ", ".join(final_column_set)
-        query = f"SELECT {col_str} FROM Jobs"
 
-        expect_warning_msg = (
-            f"Column '{col}' is missing from the dataframe. "
-            "This may impact filtering operations and downstream processing."
-        )
-        with pytest.warns(UserWarning, match=expect_warning_msg):
-            _res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)
+    required_column_copy = required_columns.copy()
+    optional_column_copy = optional_columns.copy()
+    optional_column_copy.remove(missing_col)
+    final_column_set = required_column_copy.union(optional_column_copy)
+    col_str = ", ".join(final_column_set)
+    query = f"SELECT {col_str} FROM Jobs"
+
+    expect_warning_msg = (
+        f"Column '{missing_col}' is missing from the dataframe. "
+        "This may impact filtering operations and downstream processing."
+    )
+    _res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)
+
+    # Check that a warning was raised with the expected message
+    assert len(recwarn) > 0
+    assert str(recwarn[-1].message) == expect_warning_msg
