@@ -127,7 +127,9 @@ class DatabaseConnection:
             except duckdb.BinderException as e:
                 valid_columns = self.fetch_all_column_names()
                 raise ValueError(
-                    f"This query does not match the database schema. Valid columns are: {valid_columns}."
+                    f"This query does not match the database schema. "
+                    f"Error: {str(e)}.\n"
+                    f"Valid columns are: {valid_columns}."
                 ) from e
         else:
             raise ConnectionError("Database connection is not established. Connect to the database first.")

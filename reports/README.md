@@ -13,7 +13,7 @@ The generated reports include:
 
 ## Requirements
 
-- Python 3.9+ with pandas, numpy, matplotlib, seaborn, and plotly
+- Python 3.10+ with pandas, numpy, matplotlib, seaborn, and plotly
 - Quarto document converter (https://quarto.org/docs/get-started/)
 - For PDF generation: TinyTeX (install with `quarto install tinytex`)
 

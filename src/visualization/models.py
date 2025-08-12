@@ -8,6 +8,7 @@ class ColumnVisualizationKwargsModel(BaseModel):
     columns: list[str] | None = None
     sample_size: int | None = None
     random_seed: int | None = None
+    generate_statistics: bool = True
     summary_file_name: str = "columns_stats_summary.txt"
     figsize: tuple[int | float, int | float] = (7, 4)
 

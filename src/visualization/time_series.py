@@ -705,8 +705,16 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
         fig = go.Figure()
 
         colors = [
-            "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
-            "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
+            "#1f77b4",
+            "#ff7f0e",
+            "#2ca02c",
+            "#d62728",
+            "#9467bd",
+            "#8c564b",
+            "#e377c2",
+            "#7f7f7f",
+            "#bcbd22",
+            "#17becf",
         ]
 
         users_list = df["User"].unique().tolist()
@@ -726,7 +734,7 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
                 fields = {
                     "User": user,
                     "JobID": row.get("JobID", "N/A"),
-                    "Job Start": row["JobStart"].strftime("%Y-%m") if pd.notnull(row["JobStart"]) else "N/A",
+                    "Job Start": row["JobStart"].strftime("%Y-%m") if pd.notna(row["JobStart"]) else "N/A",
                     "Efficiency": f"{row[efficiency_metric]:.6f}",
                     "VRAM Hours": f"{row[vram_metric]:.1f}",
                     "GPU Type": row.get("GPUType", "N/A"),
@@ -770,4 +778,3 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
 
         fig.show()
         return fig
-

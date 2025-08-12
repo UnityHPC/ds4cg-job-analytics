@@ -6,9 +6,11 @@ The aim is to identify potential inefficiencies in GPU usage and notify users or
 
 from pathlib import Path
 from typing import cast
+import datetime
 
 import numpy as np
 import pandas as pd
+from pandas.api.types import is_datetime64_any_dtype
 
 from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
 from src.config.enum_constants import FilterTypeEnum, MetricsDataFrameNameEnum
@@ -89,7 +91,6 @@ class EfficiencyAnalysis:
         Check if the value is a numeric type (int, float, np.integer, np.floating, pd.Int64Dtype, pd.Float64Dtype).
 
         Args:
-
             val (object): The value to check.
 
         Returns:
@@ -122,8 +123,7 @@ class EfficiencyAnalysis:
 
         Args:
             col (pd.Series): The column to filter.
-            filter (str | datetime | int | float | list | set | tuple | dict | pd.api.typing.NAType):
-              The filter value(s).
+            filter (str | datetime | int | float | list | set | tuple | dict | NAType): The filter value(s).
             permissible_filter_types (set[FilterTypeEnum]): Set of permissible filter types.
             filter_name (str): Name of the filter.
 
@@ -248,8 +248,8 @@ class EfficiencyAnalysis:
         # vram_constraint
         if vram_constraint_filter is not None:
             try:
-                mask &= EfficiencyAnalysis.apply_numeric_filter(
-                    self.jobs_df["vram_constraint"],
+                mask &= EfficiencyAnalysis.apply_column_filter(
+                    self.jobs_df["requested_vram"],
                     vram_constraint_filter,
                     set(FilterTypeEnum.__members__.values()),
                     "vram_constraint_filter",

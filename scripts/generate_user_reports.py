@@ -10,6 +10,7 @@ import json
 import os
 import subprocess
 import sys
+import shutil
 
 import numpy as np
 import pandas as pd
@@ -24,56 +25,121 @@ if project_root not in sys.path:
 from src.analysis.efficiency_analysis import EfficiencyAnalysis  # noqa: E402
 from src.database.database_connection import DatabaseConnection  # noqa: E402
 from src.preprocess.preprocess import preprocess_data  # noqa: E402
+from src.analysis.frequency_analysis import FrequencyAnalysis  # noqa: E402
+from src.config.enum_constants import TimeUnitEnum, EfficiencyCategoryEnum  # noqa: E402
+from src.analysis.user_comparison import UserComparison  # noqa: E402
 
 
-def load_and_preprocess_data(db_path: str, specific_users: list | None = None) -> pd.DataFrame:
+def get_comparison_statistics(
+    db: DatabaseConnection,
+    user_jobs: pd.DataFrame,
+    user_id: str
+) -> pd.DataFrame:
     """
-    Load and preprocess the job data from the database.
+    Calculate comparison statistics between the user and all other users.
+
+    This function efficiently fetches only the necessary fields from the database
+    to calculate meaningful comparison metrics, using the UserComparison module.
 
     Args:
-        db_path: Path to the database file
+        db: Database connection object
+        user_jobs: DataFrame containing the user's job data
+        user_id: The user ID to compare against all others
+
+    Returns:
+        pd.DataFrame: Comparison statistics with user vs average values
+    """
+    try:
+        # Initialize the UserComparison class with the database connection
+        comparison = UserComparison(db)
+
+        # Get comparison statistics using the optimized method
+        # If user_jobs already has efficiency metrics calculated, pass it to avoid recalculation
+        has_efficiency_metrics = 'alloc_vram_efficiency' in user_jobs.columns
+
+        # Define the metrics we want to include in the comparison
+        metrics = [
+            ('alloc_vram_efficiency', 'VRAM Efficiency'),
+            ('time_usage_efficiency', 'Time Usage'),
+            ('used_vram_gib', 'Total GPU Memory'),
+            ('allocated_vram', 'Allocated VRAM'),
+            ('requested_vram', 'Requested VRAM'),
+            ('job_hours', 'GPU Hours')
+        ]
+
+        # Get the comparison statistics
+        comparison_stats = comparison.get_user_comparison_statistics(
+            user_id,
+            user_jobs=user_jobs if has_efficiency_metrics else None,
+            metrics=metrics
+        )
+
+        return comparison_stats
+
+    except Exception as e:
+        raise ValueError("Error calculating comparison statistics") from e
+        print(f"Error calculating comparison statistics: {e}")
+        return create_fallback_comparison(user_jobs)
+
+
+def create_fallback_comparison(user_jobs: pd.DataFrame) -> pd.DataFrame:
+    """
+    Create fallback comparison statistics when database query fails.
+
+    Args:
+        user_jobs: DataFrame containing the user's job data
+
+    Returns:
+        pd.DataFrame: Basic comparison statistics
+    """
+    your_vram_efficiency = user_jobs['alloc_vram_efficiency'].mean() * 100 if 'alloc_vram_efficiency' in user_jobs.columns else 0
+    your_time_usage = (user_jobs['Elapsed'].dt.total_seconds() / user_jobs['TimeLimit'].dt.total_seconds()).mean() * 100 if 'TimeLimit' in user_jobs.columns else 0
+    your_total_gpu_memory = user_jobs['used_vram_gib'].sum() if 'used_vram_gib' in user_jobs.columns else 0
+
+    # Use placeholder values for averages when comparison data is unavailable
+    comparison_stats = pd.DataFrame({
+        'Category': ['VRAM Efficiency', 'Time Usage', 'Total GPU Memory'],
+        'Your_Value': [your_vram_efficiency, your_time_usage, your_total_gpu_memory],
+        'Average_Value': [30.0, 75.0, your_total_gpu_memory * 0.8],  # Reasonable defaults
+    })
+
+    return comparison_stats
+
+
+def load_cached_data(user_comparison: UserComparison, specific_users: list | None = None) -> tuple[pd.DataFrame, pd.DataFrame | None]:
+    """
+    Load cached job data using UserComparison and optionally filter for specific users.
+
+    Args:
+        user_comparison: Instance of UserComparison class
         specific_users: Optional list of specific users to filter by
 
     Returns:
-        Preprocessed DataFrame with job data
+        tuple: (DataFrame with all cached job data, filtered DataFrame for specific users or None)
     """
-    print("📊 LOADING DATA")
-    print(f"   Database: {db_path}")
+    print("📊 LOADING CACHED DATA USING USER_COMPARISON")
 
-    # Connect to the database
-    try:
-        db = DatabaseConnection(db_path)
-    except Exception as e:
-        print(f"   ❌ Database connection failed: {e}")
-        return pd.DataFrame()
+    # Get all cached jobs data from UserComparison
+    all_jobs = user_comparison._cached_all_users_metrics
 
-    # Query jobs - filter by specific users if provided
-    try:
-        if specific_users and len(specific_users) > 0:
-            # Create quoted strings for each user
-            quoted_users = [f"'{user}'" for user in specific_users]
-            users_list = ", ".join(quoted_users)
-            query = f"SELECT * FROM Jobs WHERE GPUs > 0 AND User IN ({users_list});"
-            job_df = db.fetch_query(query)
-            print(f"   🔍 Filtering for users: {', '.join(specific_users)}")
-        else:
-            job_df = db.fetch_query("SELECT * FROM Jobs WHERE GPUs > 0;")
-            print("   🔍 Loading all GPU jobs")
-    except Exception as e:
-        print(f"   ❌ Database query failed: {e}")
-        return pd.DataFrame()
+    if all_jobs is None or len(all_jobs) == 0:
+        print("   ❌ No cached job data found")
+        return pd.DataFrame(), None
 
-    # Preprocess the data
-    processed_df = preprocess_data(
-        job_df, min_elapsed_seconds=0, include_failed_cancelled_jobs=False, include_cpu_only_jobs=False
-    )
+    # Filter for specific users if requested
+    filtered_jobs = None
+    if specific_users and len(specific_users) > 0:
+        filtered_jobs = all_jobs[all_jobs['User'].isin(specific_users)].copy()
+        print(f"   🔍 Filtering for users: {', '.join(specific_users)}")
+        print(f"   ✅ Loaded {len(filtered_jobs):,} jobs for specific users out of {len(all_jobs):,} total jobs")
+    else:
+        print(f"   ✅ Loaded {len(all_jobs):,} jobs")
 
-    print(f"   ✅ Loaded {len(processed_df):,} jobs")
-    return processed_df
+    return all_jobs, filtered_jobs
 
 
 def identify_inefficient_users(
-    jobs_df: pd.DataFrame, efficiency_threshold: float = 0.3, min_jobs: int = 10, top_n: int = 50
+    jobs_df: pd.DataFrame, efficiency_threshold: float = EfficiencyCategoryEnum.LOW_THRESHOLD.value, min_jobs: int = 10, top_n: int = 50
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Identify the most inefficient users based on VRAM usage.
@@ -151,14 +217,33 @@ def calculate_analysis_period(jobs_df: pd.DataFrame) -> str:
         return f"Last {duration.days} days"
 
 
+def get_total_job_count(db: DatabaseConnection) -> int:
+    """
+    Get the total count of all jobs in the database.
+
+    Args:
+        db: Database connection object
+
+    Returns:
+        Total number of jobs in the database
+    """
+    try:
+        result = db.fetch_query("SELECT COUNT(*) as total_jobs FROM Jobs;")
+        return result.iloc[0]['total_jobs'] if len(result) > 0 else 0
+    except Exception as e:
+        print(f"Error getting total job count: {e}")
+        return 0
+
+
 def generate_user_report(
     user_id: str,
     user_data: pd.DataFrame | pd.Series,
     job_data: pd.DataFrame | pd.Series,
-    all_users_data: pd.DataFrame | pd.Series,
     output_dir: str,
     template_path: str,
     output_format: str = "html",
+    db: DatabaseConnection | None = None,
+    user_comparison: UserComparison | None = None,
 ) -> str | None:
     """
     Generate a report for a specific user using Quarto.
@@ -167,10 +252,11 @@ def generate_user_report(
         user_id: User ID to generate report for
         user_data: DataFrame row with user metrics
         job_data: DataFrame with all job metrics
-        all_users_data: DataFrame with all users metrics
         output_dir: Directory to save the report
         template_path: Path to the Quarto template file
         output_format: Output format ('html' or 'pdf')
+        db: Database connection object (optional, for comparison stats)
+        user_comparison: UserComparison instance (optional, for efficient comparison stats)
 
     Returns:
         Path to the generated report
@@ -205,7 +291,11 @@ def generate_user_report(
 
     # === CALCULATE SUMMARY STATISTICS ===
     total_jobs = len(user_jobs)
-    total_all_jobs = len(job_data)
+    # Use the get_total_job_count function if db connection is provided
+    if db:
+        total_all_jobs = get_total_job_count(db)
+    else:
+        total_all_jobs = len(job_data)  # Fallback to current dataset size
     job_percentage = (total_jobs / total_all_jobs) * 100 if total_all_jobs > 0 else 0
 
     # VRAM metrics
@@ -233,17 +323,10 @@ def generate_user_report(
 
     if "GPUType" in user_jobs.columns:
         user_jobs["primary_gpu_type"] = user_jobs["GPUType"].apply(extract_gpu_type)
-        model_gpu_type = user_jobs["primary_gpu_type"].mode()[0] if len(user_jobs) > 0 else "unknown"
         a100_count = user_jobs["primary_gpu_type"].str.contains("a100", case=False, na=False).sum()
         a100_pct = (a100_count / total_jobs) * 100 if total_jobs > 0 else 0
     else:
-        model_gpu_type = "unknown"
         a100_pct = 0
-
-    # Job status
-    model_job_status = (
-        user_jobs["Status"].mode()[0] if len(user_jobs) > 0 and "Status" in user_jobs.columns else "unknown"
-    )
 
     # Time metrics
     avg_time_limit = user_jobs["TimeLimit"].mean() if "TimeLimit" in user_jobs.columns else pd.Timedelta(0)
@@ -272,42 +355,31 @@ def generate_user_report(
     zero_usage_pct = (zero_usage_jobs / total_jobs) * 100 if total_jobs > 0 else 0
 
     # Efficiency category
-    if vram_efficiency < 0.10:
-        efficiency_category = "Low Efficiency"
-    elif vram_efficiency < 0.30:
-        efficiency_category = "Moderate Efficiency"
-    elif vram_efficiency < 0.70:
-        efficiency_category = "Good Efficiency"
-    else:
-        efficiency_category = "Excellent Efficiency"
+    efficiency_category = EfficiencyCategoryEnum.get_efficiency_category(vram_efficiency)
 
     # Time estimation
     if time_usage_pct > 95:
-        time_estimate = "underestimated"
+        time_estimate = "Underestimated"
     elif time_usage_pct < 60:
-        time_estimate = "overestimated"
+        time_estimate = "Overestimated"
     else:
-        time_estimate = "well estimated"
+        time_estimate = "Well estimated"
 
     # Create summary statistics DataFrame
     summary_stats = pd.DataFrame({
         "Metric": [
-            "Total number of jobs",
+            "Total number of GPU jobs",
             f"Percentage of all jobs in {analysis_period}",
             "Average GPU VRAM requested (GiB)",
             "Average GPU VRAM used (GiB)",
-            "Average VRAM efficiency",
-            "model GPU Type",
+            "Average GPU VRAM efficiency",
             "A100 usage percentage",
-            "model Job Status",
-            "Average time limit",
-            "Average elapsed time",
-            "Time usage efficiency",
+            "Time usage efficiency (Avg limit/Avg elapsed time)",
             "Average CPU memory requested (GiB)",
             "Average CPU memory used (GiB)",
             "CPU memory usage efficiency",
             "CPU/GPU memory ratio",
-            "Zero usage jobs",
+            "Zero GPU usage jobs",
             "Efficiency category",
             "Time estimation",
         ],
@@ -317,11 +389,7 @@ def generate_user_report(
             f"{avg_vram_requested:.2f}",
             f"{avg_vram_used_gb:.2f} ({vram_usage_pct:.2f}%)",
             f"{vram_efficiency:.2f} ({vram_efficiency * 100:.2f}%)",
-            f"{model_gpu_type} ({a100_pct:.2f}% A100)" if a100_pct > 0 else model_gpu_type,
             f"{a100_pct:.2f}%",
-            model_job_status,
-            str(avg_time_limit),
-            f"{avg_elapsed_time} ({time_usage_pct:.2f}%)",
             f"{time_usage_pct:.2f}%",
             f"{avg_cpu_mem_req:.2f}",
             f"{avg_cpu_mem_used:.2f} ({cpu_mem_usage_pct:.2f}%)",
@@ -334,24 +402,35 @@ def generate_user_report(
     })
 
     # === CALCULATE COMPARISON STATISTICS ===
-    # Calculate all-user averages for comparison
-    all_avg_vram_efficiency = all_users_data["expected_value_alloc_vram_efficiency"].mean() * 100
-    all_avg_elapsed_pct = (
-        job_data["Elapsed"].dt.total_seconds() / job_data["TimeLimit"].dt.total_seconds()
-    ).mean() * 100
-    all_avg_total_vram = job_data.groupby("User")["used_vram_gib"].sum().mean()
-    user_total_vram = user_jobs["used_vram_gib"].sum()
-
-    comparison_stats = pd.DataFrame({
-        "Category": ["VRAM Efficiency", "Time Usage", "Total GPU Memory"],
-        "Your_Value": [vram_efficiency * 100, time_usage_pct, user_total_vram],
-        "Average_Value": [all_avg_vram_efficiency, all_avg_elapsed_pct, all_avg_total_vram],
-    })
+    # Use the UserComparison instance if available for efficient comparison
+    if user_comparison:
+        # Use the passed UserComparison instance for efficient comparison
+        try:
+            # Define the metrics we want to include in the comparison
+            metrics = [
+                ('alloc_vram_efficiency', 'VRAM Efficiency'),
+                ('time_usage_efficiency', 'Time Usage'),
+                ('used_vram_gib', 'Total GPU Memory'),
+                ('allocated_vram', 'Allocated VRAM'),
+                ('requested_vram', 'Requested VRAM'),
+                ('job_hours', 'GPU Hours')
+            ]
+            
+            comparison_stats = user_comparison.get_user_comparison_statistics(
+                user_id,
+                user_jobs=user_jobs,
+                metrics=metrics
+            )
+        except Exception as e:
+            print(f"Warning: Could not get comparison stats from UserComparison: {e}")
+            comparison_stats = create_fallback_comparison(user_jobs)
+    elif db:
+        # Fallback to the helper function if no UserComparison instance
+        comparison_stats = get_comparison_statistics(db, user_jobs, user_id)
+    else:
+        comparison_stats = create_fallback_comparison(user_jobs)
 
     # === PREPARE TIME SERIES DATA ===
-    from src.analysis.frequency_analysis import FrequencyAnalysis
-    from src.config.enum_constants import TimeUnitEnum
-
     try:
         freq_analyzer = FrequencyAnalysis(pd.DataFrame(job_data))
         time_series_data = freq_analyzer.prepare_time_series_data(
@@ -368,11 +447,17 @@ def generate_user_report(
     else:
         gpu_type_data = pd.DataFrame(columns=["gpu_type", "job_count"])
 
-    # === GENERATE RECOMMENDATIONS ===
+    # === PREPARE ALL USERS DATA FOR ROC ANALYSIS ===
+    # TODO (Ayush): Work on using existing data so that preprocess/analysis doesn't run multiple times
+    all_users_job_metrics = None
+    if user_comparison and user_comparison._cached_all_users_metrics is not None:
+        # Get the full job metrics data (this already has efficiency calculations)
+        all_users_job_metrics = user_comparison._cached_all_users_metrics.to_dict("records")
+        print(f"      ✅ Prepared {len(all_users_job_metrics)} job records with metrics for ROC analysis")    # === GENERATE RECOMMENDATIONS ===
     recommendations = []
 
     # VRAM efficiency recommendations
-    if vram_efficiency < 0.3:
+    if vram_efficiency < EfficiencyCategoryEnum.LOW_THRESHOLD.value:
         recommendations.append(
             "**Optimize VRAM Usage**: Your GPU memory utilization is low. Consider using smaller models, reducing "
             "batch sizes, or using mixed precision to more efficiently use allocated GPU memory."
@@ -441,6 +526,16 @@ def generate_user_report(
 
     # === SAVE DATA TO JSON FOR QUARTO ===
 
+    # Get all users data for ROC analysis in template
+    all_users_data = None
+    if user_comparison and user_comparison._cached_all_users_metrics is not None:
+        # Only include essential columns to reduce JSON size
+        essential_cols = ['User', 'alloc_vram_efficiency', 'used_vram_gib', 'allocated_vram', 'GPUCount']
+        all_users_df = user_comparison._cached_all_users_metrics
+        available_cols = [col for col in essential_cols if col in all_users_df.columns]
+        if available_cols:
+            all_users_data = all_users_df[available_cols].to_dict("records")
+
     # Create a temporary JSON file with all the data
     temp_data = {
         "user_id": user_id,
@@ -451,6 +546,8 @@ def generate_user_report(
         "comparison_stats": comparison_stats.to_dict("records"),
         "time_series_data": time_series_data.to_dict("records"),
         "gpu_type_data": gpu_type_data.to_dict("records"),
+        "all_users_job_metrics": all_users_job_metrics,
+        "all_users_data": all_users_data,
         "recommendations": recommendations,
         "user_data": (pd.DataFrame(user_data).to_dict()),
         "user_jobs": pd.DataFrame(user_jobs).to_dict("records"),
@@ -460,9 +557,6 @@ def generate_user_report(
     temp_json_file = os.path.join(temp_dir, f"{user_id}_data.json")
     with open(temp_json_file, "w") as f:
         json.dump(temp_data, f, default=str)  # default=str handles datetime objects
-
-    # Create a separate working directory for this user's report
-    import shutil
 
     # get abs path to the template in the reports folder
     template_file = os.path.join(project_root, "reports", "user_report_template.qmd")
@@ -513,10 +607,10 @@ def generate_user_report(
         return None
 
     # Clean up temporary files
-    import contextlib
+    # import contextlib
 
-    with contextlib.suppress(Exception):
-        os.remove(temp_json_file)
+    # with contextlib.suppress(Exception):
+    #     os.remove(temp_json_file)
 
     return output_file
 
@@ -584,68 +678,34 @@ def generate_reports_for_specific_users(
         print(f"Error: Output directory is not writable: {output_dir}")
         return []
 
-    # Load and preprocess data, filtering for specific users
-    jobs_df = load_and_preprocess_data(db_path, specific_users=user_list)
-
-    if len(jobs_df) == 0:
-        print("   ❌ No job data found for the specified users")
-        return []
+    # Initialize database connection and UserComparison
+    db = DatabaseConnection(db_path)
+    user_comparison = UserComparison(db)
 
     print("\n🔬 ANALYZING USERS")
-    # Initialize the efficiency analyzer
-    analyzer = EfficiencyAnalysis(jobs_df=jobs_df)
 
-    # Filter jobs for analysis (only GPU jobs with allocated VRAM > 0)
-    filtered_jobs = analyzer.filter_jobs_for_analysis(
-        gpu_count_filter={"min": 1, "max": np.inf, "inclusive": True},
-        vram_constraint_filter=None,
-        allocated_vram_filter={"min": 0, "max": np.inf, "inclusive": False},
-        gpu_mem_usage_filter=None,
-    )
-
-    # Calculate job efficiency metrics
-    job_metrics = analyzer.calculate_job_efficiency_metrics(filtered_jobs=filtered_jobs)
-
-    # Calculate user efficiency metrics
-    all_users = analyzer.calculate_user_efficiency_metrics()
-
-    # Print user job counts in a clean format
-    print("   📋 User Analysis Results:")
-    for user in user_list:
-        user_data = all_users[all_users["User"] == user]
-        if len(user_data) > 0:
-            job_count = user_data.iloc[0]["job_count"]
-            print(f"      ✅ {user}: {job_count:,} jobs")
-        else:
-            print(f"      ❌ {user}: No qualifying jobs found")
-
-    # Filter users who have minimum required jobs
-    filtered_users = all_users[all_users["job_count"] >= min_jobs]
-    users_to_report = filtered_users[filtered_users["User"].isin(user_list)]
-
-    if len(users_to_report) == 0:
-        print(f"   ❌ No users meet the minimum requirement of {min_jobs} jobs")
-        return []
-
-    print(f"   📊 {len(users_to_report)} user(s) will have reports generated")
-
-    # Create output directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok=True)
-
-    print("\n📝 GENERATING REPORTS")
     # Generate reports for each user
     report_paths = []
-    for i, (_, user_row) in enumerate(users_to_report.iterrows(), 1):
-        user_id = user_row["User"]
-        print(f"   [{i}/{len(users_to_report)}] {user_id}")
+    for i, user_id in enumerate(user_list, 1):
+        print(f"   [{i}/{len(user_list)}] {user_id}")
+
+        # Get user metrics
+        user_jobs = user_comparison.get_user_metrics(user_id)
+
+        if len(user_jobs) < min_jobs:
+            print(f"      ❌ {user_id}: Not enough jobs ({len(user_jobs)} found, minimum required: {min_jobs})")
+            continue
+
+        # Generate report
         report_path = generate_user_report(
             user_id=user_id,
-            user_data=user_row,
-            job_data=job_metrics,
-            all_users_data=all_users,
+            user_data=user_jobs,
+            job_data=user_jobs,
             output_dir=output_dir,
             template_path=template_path,
             output_format=output_format,
+            db=db,
+            user_comparison=user_comparison,  # Pass the UserComparison instance for efficient comparison
         )
         if report_path:
             report_paths.append(report_path)
@@ -690,31 +750,44 @@ def generate_all_reports(
         print(f"Error: Output directory is not writable: {output_dir}")
         return []
 
-    # Load and preprocess data
-    jobs_df = load_and_preprocess_data(db_path)
+    # Initialize database connection and UserComparison (this loads all data once)
+    db = DatabaseConnection(db_path)
+    user_comparison = UserComparison(db)
+    
+    # Get all cached job data from UserComparison
+    jobs_df, _ = load_cached_data(user_comparison)
 
     # Check if we have any data
     if len(jobs_df) == 0:
         print("No job data found. Cannot generate reports.")
         return []
 
-    # Identify inefficient users
+    # Identify inefficient users using the cached data
     inefficient_users, job_metrics, all_users = identify_inefficient_users(
         jobs_df, efficiency_threshold=efficiency_threshold, min_jobs=min_jobs, top_n=n_top_ineff
     )
 
-    # Generate reports for each user
+    # Generate reports for each user using the efficient UserComparison
     report_paths = []
     for _, user_row in inefficient_users.iterrows():
         user_id = user_row["User"]
+        
+        # Get user-specific data efficiently from UserComparison
+        user_jobs = user_comparison.get_user_metrics(user_id)
+        
+        if len(user_jobs) == 0:
+            print(f"      ❌ No jobs found for {user_id}")
+            continue
+            
         report_path = generate_user_report(
             user_id=user_id,
             user_data=user_row,
-            job_data=job_metrics,
-            all_users_data=all_users,
+            job_data=user_jobs,  # Pass user-specific jobs instead of all job_metrics
             output_dir=output_dir,
             template_path=template_path,
             output_format=output_format,
+            db=db,  # Pass the database connection for comparison stats
+            user_comparison=user_comparison,  # Pass the UserComparison instance for efficient comparison
         )
         if report_path:
             report_paths.append(report_path)
@@ -726,8 +799,6 @@ def generate_all_reports(
 
 
 if __name__ == "__main__":
-    import argparse
-
     parser = argparse.ArgumentParser(description="Generate GPU usage reports for inefficient users")
 
     # Add a subparser for different modes
@@ -737,7 +808,7 @@ if __name__ == "__main__":
     top_parser = subparsers.add_parser("top", help="Generate reports for top inefficient users")
     top_parser.add_argument("--n-top", type=int, default=5, help="Number of top inefficient users (default: 5)")
     top_parser.add_argument(
-        "--efficiency", type=float, default=0.3, help="Maximum efficiency threshold (0-1) (default: 0.3)"
+        "--efficiency", type=float, default=EfficiencyCategoryEnum.LOW_THRESHOLD.value, help="Maximum efficiency threshold (0-1) (default: 0.3)"
     )
     top_parser.add_argument(
         "--min-jobs", type=int, default=10, help="Minimum number of jobs a user must have (default: 10)"
@@ -818,3 +889,8 @@ if __name__ == "__main__":
     print("\n🎉 ALL TASKS COMPLETED!")
     print(f"   Output directory: {args.output_dir}")
     print("   Check the individual function outputs above for details.")
+
+
+# TODO (Ayush): Simplify table, remove rows not needed. Focus on recommendations. Add recommendation->plot.
+# TODO (Ayush): Remove / make time plots harder to read optional
+# TODO (Ayush): Define efficiency metrics in constants and use that everywhere.

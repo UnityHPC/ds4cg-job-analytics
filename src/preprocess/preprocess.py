@@ -574,6 +574,7 @@ def preprocess_data(
     min_elapsed_seconds: int = DEFAULT_MIN_ELAPSED_SECONDS,
     include_failed_cancelled_jobs: bool = False,
     include_cpu_only_jobs: bool = False,
+    filtered: bool = False,
 ) -> pd.DataFrame:
     """
     Preprocess dataframe, filtering out unwanted rows and columns, filling missing values and converting types.
@@ -598,7 +599,10 @@ def preprocess_data(
           and new columns added for VRAM and job statistics.
     """
 
-    data = input_df.drop(columns=["UUID", "EndTime", "Nodes", "Preempted"], axis=1, inplace=False)
+    # Only drop columns that actually exist in the dataframe
+    columns_to_drop = ["UUID", "EndTime", "Nodes", "Preempted"]
+    existing_columns = [col for col in columns_to_drop if col in input_df.columns]
+    data = input_df.drop(columns=existing_columns, inplace=False)
 
     first_non_null = data["GPUType"].dropna().iloc[0]
     # Log the format of GPUType being used
@@ -607,22 +611,23 @@ def preprocess_data(
     elif isinstance(first_non_null, list):
         print("[Preprocessing] Running with old database format: GPU types as list.")
 
-    mask = pd.Series([True] * len(data), index=data.index)
+    if not filtered:
+        mask = pd.Series([True] * len(data), index=data.index)
 
-    mask &= data["Elapsed"] >= min_elapsed_seconds
-    mask &= data["Account"] != AdminsAccountEnum.ROOT.value
-    mask &= data["Partition"] != AdminPartitionEnum.BUILDING.value
-    mask &= data["QOS"] != QOSEnum.UPDATES.value
-    # Filter out failed or cancelled jobs, except when include_failed_cancel_jobs is True
-    mask &= (
-        (data["Status"] != StatusEnum.FAILED.value) & (data["Status"] != StatusEnum.CANCELLED.value)
-    ) | include_failed_cancelled_jobs
-    # Filter out jobs whose partition type is not 'gpu', unless include_cpu_only_jobs is True.
-    partition_info = PartitionInfoFetcher().get_info()
-    gpu_partitions = [p["name"] for p in partition_info if p["type"] == PartitionTypeEnum.GPU.value]
-    mask &= data["Partition"].isin(gpu_partitions) | include_cpu_only_jobs
+        mask &= data["Elapsed"] >= min_elapsed_seconds
+        mask &= data["Account"] != AdminsAccountEnum.ROOT.value
+        mask &= data["Partition"] != AdminPartitionEnum.BUILDING.value
+        mask &= data["QOS"] != QOSEnum.UPDATES.value
+        # Filter out failed or cancelled jobs, except when include_failed_cancel_jobs is True
+        mask &= (
+            (data["Status"] != StatusEnum.FAILED.value) & (data["Status"] != StatusEnum.CANCELLED.value)
+        ) | include_failed_cancelled_jobs
+        # Filter out jobs whose partition type is not 'gpu', unless include_cpu_only_jobs is True.
+        partition_info = PartitionInfoFetcher().get_info()
+        gpu_partitions = [p["name"] for p in partition_info if p["type"] == PartitionTypeEnum.GPU.value]
+        mask &= data["Partition"].isin(gpu_partitions) | include_cpu_only_jobs
 
-    data = data[mask].copy()
+        data = data[mask].copy()
 
     _fill_missing(data)
 

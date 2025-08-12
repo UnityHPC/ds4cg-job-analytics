@@ -184,6 +184,21 @@ class TimeUnitEnum(Enum):
 
 
 @unique
+class ProportionMetricsEnum(Enum):
+    """
+    Contains metrics for calculating proportion of data on ROC plot (y-axis).
+
+    JOB_HOURS and JOBS elements are both used for y-axis ROC plot and as metrics in EfficiencyAnalysis class.
+    """
+
+    JOB_HOURS = "job_hours"
+    VRAM_HOURS = "vram_hours"
+    JOBS = "job_count"
+    USERS = "User"
+    PI_GROUPS = "Account"
+
+
+@unique
 class JobEfficiencyMetricsEnum(Enum):
     """
     Contains efficiency metrics for calculating efficiency of jobs.
@@ -213,7 +228,7 @@ class UserEfficiencyMetricsEnum(Enum):
     """
     Contains efficiency metrics for calculating efficiency of users.
 
-    These are used as jobs metrics (in EfficiencyAnalysis class) and also metrics for x-axis in ROC Plot (for users).
+    These are used as users metrics (in EfficiencyAnalysis class) and also metrics for x-axis in ROC Plot (for users).
 
     For all members, if it is similar to a member in ProportionMetricsEnum (the member can be both
         x-axis and y-axis in ROC), it must have the same value to that member in ProportionMetricsEnum.
@@ -230,6 +245,40 @@ class UserEfficiencyMetricsEnum(Enum):
 
 
 @unique
+class PIEfficiencyMetricsEnum(Enum):
+    """
+    Contains efficiency metrics for calculating efficiency of pi groups.
+
+    These are used as pi groups metrics (in EfficiencyAnalysis class) and also metrics for x-axis
+        in ROC Plot (for pi groups).
+
+    For all members, if it is similar to a member in ProportionMetricsEnum (the member can be both
+        x-axis and y-axis in ROC), it must have the same value to that member in ProportionMetricsEnum.
+    """
+
+    JOB_HOURS = "job_hours"
+    VRAM_HOURS = "vram_hours"
+    JOBS = "job_count"
+    USERS = "User"
+    WEIGHTED_AVG_ALLOC_VRAM_EFFICIENCY = "expected_value_alloc_vram_efficiency"
+    WEIGHTED_AVG_VRAM_CONSTRAINTS_EFFICIENCY = "expected_value_vram_constraint_efficiency"
+    WEIGHTED_AVG_GPU_COUNT = "expected_value_gpu_count"
+    AVG_ALLOC_VRAM_EFFICIENCY_SCORE = "avg_alloc_vram_efficiency_score"
+    AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE = "avg_vram_constraint_efficiency_score"
+
+
+@unique
+class ROCPlotTypes(Enum):
+    """
+    Contain different plot types for ROC
+    """
+
+    JOB = "JOB"
+    USER = "USER"
+    PI_GROUP = "PI_GROUP"
+
+
+@unique
 class ErrorTypeEnum(Enum):
     """An enumeration representing different error types.
 
@@ -240,3 +289,51 @@ class ErrorTypeEnum(Enum):
 
     MALFORMED_CONSTRAINT = "malformed_constraint"
     UNKNOWN_GPU_TYPE = "unknown_gpu_type"
+
+
+@unique
+class EfficiencyCategoryEnum(Enum):
+    """
+    An enumeration representing efficiency category thresholds and labels.
+
+    Attributes:
+        VERY_LOW_THRESHOLD: Threshold for very low efficiency (below 0.1).
+        LOW_THRESHOLD: Threshold for low efficiency (below 0.3).
+        GOOD_THRESHOLD: Threshold for good efficiency (below 0.7).
+        VERY_LOW_LABEL: Label for very low efficiency.
+        LOW_LABEL: Label for low efficiency.
+        GOOD_LABEL: Label for good efficiency.
+        EXCELLENT_LABEL: Label for excellent efficiency.
+    """
+
+    # Thresholds
+    VERY_LOW_THRESHOLD = 0.1
+    LOW_THRESHOLD = 0.3
+    GOOD_THRESHOLD = 0.7
+
+    # Labels
+    VERY_LOW_LABEL = "Very Low Efficiency"
+    LOW_LABEL = "Low Efficiency"
+    GOOD_LABEL = "Good Efficiency"
+    EXCELLENT_LABEL = "Excellent Efficiency"
+
+    @classmethod
+    def get_efficiency_category(cls, efficiency: float) -> str:
+        """
+        Get the efficiency category label based on the efficiency value.
+
+        Args:
+            efficiency (float): The efficiency value to categorize.
+
+        Returns:
+            str: The efficiency category label.
+        """
+        if efficiency < cls.VERY_LOW_THRESHOLD.value:
+            return cls.VERY_LOW_LABEL.value
+        elif efficiency < cls.LOW_THRESHOLD.value:
+            return cls.LOW_LABEL.value
+        elif efficiency < cls.GOOD_THRESHOLD.value:
+            return cls.GOOD_LABEL.value
+        else:
+            return cls.EXCELLENT_LABEL.value
+

@@ -1446,6 +1446,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
                 - columns (list[str], optional): Columns to visualize. If None, all columns are used.
                 - sample_size (int, optional): Number of rows to sample. If None, uses all rows.
                 - random_seed (int, optional): Seed for reproducible sampling.
+                - generate_statistics (bool, optional): Whether to generate summary statistics. True by default.
                 - summary_file_name (str): Name of the text file to save column summaries in the output
                     directory. If it already exists, the file is overwritten.
                 - figsize (tuple[int, int]): Size of the figure for plots.
@@ -1464,6 +1465,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         summary_file_name = validated_kwargs.summary_file_name
         figsize = validated_kwargs.figsize
         output_dir_path = self.validate_output_dir(output_dir_path)
+        generate_statistics = validated_kwargs.generate_statistics
 
         jobs_df = jobs_df.copy()
 
@@ -1477,7 +1479,8 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
                 raise ValueError(f"Sample size {sample_size} is larger than the DataFrame size {len(jobs_df)}.")
             jobs_df = jobs_df.sample(sample_size, random_state=random_seed)
 
-        self._generate_summary_stats(jobs_df, output_dir_path, summary_file_name)
+        if generate_statistics:
+            self._generate_summary_stats(jobs_df, output_dir_path, summary_file_name)
 
         # Generate visualizations for each column
         for col in jobs_df.columns:
