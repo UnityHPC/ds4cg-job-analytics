@@ -5,9 +5,10 @@ Actions item:
 - Need to check if proportion metric = USER, PI_GROUP works corectly when we look at plot for users/ group of users
 - refactor roc_plot to use less arguments, consider printing out statistics info of thresholds
 - Maybe put own threshold metrics into a single dictionary parameter and validate_and_filter will modify min_threshold
-- Multiple line plot, but with proportion metrics as User for PI_Group
+- Multiple line plot, but with proportion metrics as User for PI_Group.
 - When plotting PI_Group, also consider how many pi_group have only 1 unique users.
 - When done, create a class visualization in visualization folder.
+- Add lines like visualization class that includes annotation for how many is filtered out
 
 - Issue: some new metric of user (user_job_hours, user_vram_hours) will be also on both x-axis and y-axis
  -> Need to add a bunch more to ProportionMetrics Enum, maybe best if we let it as jobs and vram_hours
@@ -27,8 +28,9 @@ from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 import numpy as np
 import sys
-from .efficiency_analysis import EfficiencyAnalysis
+from .main_efficiency_analysis import EfficiencyAnalysis
 from typing import Literal, cast
+import math
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 from src.config.enum_constants import (
@@ -325,60 +327,6 @@ class ROCVisualizer(EfficiencyAnalysis):
             plot_data_frame[threshold_metric.value] = plot_data_frame[threshold_metric.value].clip(upper=upper_bound)
 
     # TODO (Tan): add another function to give ROC plot (jobs) by user for Ayush to generate reports.
-    # TODO (Tan): fixed the vectorized version commented below, currently an issue when run alloc_vram_efficiency_score
-    # def _roc_calculate_proportion(
-    #     self,
-    #     plot_data_frame: pd.DataFrame,
-    #     proportion_metric: ProportionMetricsEnum,
-    #     thresholds_arr: np.ndarray[float],
-    #     threshold_metric: JobEfficiencyMetricsEnum,
-    #     plot_percentage: bool = True,
-    # ) -> np.ndarray[float]:
-    #     """
-    #     Calculate the proportion of data that meet the alloc_vram_efficiency threshold for each threshold value.
-
-    #     For each given threshold, this function will calculate the proportion of data (in terms of the
-    #         specified metric) whose alloc_vram_efficiency is less than or equal to the threshold.
-
-    #     Args:
-    #         plot_data_frame (pd.DataFrame): DataFrame containing the data to plot.
-    #         proportion_metric (ROCMetricsEnum): The metric to calculate proportions for.
-    #         thresholds_arr (np.ndarray[float]): List of predefined threshold values.
-    #         threshold_metric (EfficiencyMetricsJobsEnum): The specific efficiency metric used as thresholds_arr.
-    #         plot_percentage (bool): Whether to return the proportion as percentage or as raw value. Defaults to True.
-    #     Returns:
-    #         np.ndarray[float]: List of proportions corresponding to each threshold.
-
-    #     """
-    #     proportions = []
-    #     threshold_metric_column = plot_data_frame[threshold_metric.value].to_numpy()
-    #     if proportion_metric == ProportionMetricsEnum.JOBS:
-    #         comparison_mask = threshold_metric_column[:, np.newaxis] <= thresholds_arr
-    #         proportions = comparison_mask.sum(axis=0)
-    #         if plot_percentage:
-    #             proportions = (proportions / len(threshold_metric_column)) * 100
-    #     else:
-    #         proportion_metric_column = plot_data_frame[proportion_metric.value].to_numpy()
-    #         count_unique_proportion_metric = {ProportionMetricsEnum.USER, ProportionMetricsEnum.PI_GROUP}
-    #         # check if we are dealing with USER/ PI_GROUP metrics
-    #         if proportion_metric in count_unique_proportion_metric:
-    #             total_unique = len(np.unique(proportion_metric_column))
-    #             for threshold in thresholds_arr:
-    #                 mask = threshold_metric_column <= threshold
-    #                 unique_count = len(np.unique(proportion_metric_column[mask]))
-    #                 res = unique_count / total_unique * 100 if plot_percentage else unique_count
-    #                 proportions.append(res)
-    #         else:
-    #             total_sum = proportion_metric_column.sum()
-    #             if total_sum == 0:
-    #                 return np.zeros(len(thresholds_arr))
-    #             # broadcast comparison to each threshold to each data in threshold_metric_column
-    #             comparison_mask = threshold_metric_column[:, np.newaxis] <= thresholds_arr
-    #             weighted_filtered_matrix = proportion_metric_column[:, np.newaxis] * comparison_mask
-    #             proportions = weighted_filtered_matrix.sum(axis=0)
-    #             if plot_percentage:
-    #                 proportions = proportions / total_sum * 100
-    #     return np.array(proportions).astype(float)
 
     def _roc_calculate_proportion(
         self,
@@ -530,6 +478,8 @@ class ROCVisualizer(EfficiencyAnalysis):
         axe.set_xlabel(f"Threshold values ({threshold_metric.value})")
         axe.plot(thresholds_arr, proportions_data)
         axe.legend()
+        y_max = proportions_data.max()
+        axe.set_ylim(bottom=0, top=y_max * 1.1)
 
         self._generate_num_marker(axe, thresholds_arr, proportions_data, num_markers)
 
@@ -695,6 +645,8 @@ class ROCVisualizer(EfficiencyAnalysis):
         axe.set_ylabel(y_label)
         axe.set_xlabel(f"Threshold values ({threshold_metric.value})")
         axe.plot(thresholds_arr, proportions_data)
+        y_max = proportions_data.max()
+        axe.set_ylim(bottom=0, top=y_max * 1.1)
 
         self._generate_num_marker(axe, thresholds_arr, proportions_data, num_markers)
 
@@ -762,6 +714,8 @@ class ROCVisualizer(EfficiencyAnalysis):
         axe.set_ylabel(y_label)
         axe.set_xlabel(f"Threshold values ({threshold_metric.value})")
         axe.plot(thresholds_arr, proportions_data)
+        y_max = proportions_data.max()
+        axe.set_ylim(bottom=0, top=y_max * 1.1)
 
         self._generate_num_marker(axe, thresholds_arr, proportions_data, num_markers)
 

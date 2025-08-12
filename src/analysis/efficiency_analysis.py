@@ -352,7 +352,7 @@ class EfficiencyAnalysis:
 
         job_vram_hour_col = JobEfficiencyMetricsEnum.VRAM_HOURS.value
         job_gpu_count_col = JobEfficiencyMetricsEnum.GPU_COUNT.value
-        job_job_hour_col = JobEfficiencyMetricsEnum.JOB_HOURS.value
+        job_job_hour_col = JobEfficiencyMetricsEnum.VRAM_HOURS.value
         # Compute user_job_hours_per_job once and reuse for both metrics
         user_job_hours_per_job = self.jobs_with_efficiency_metrics.groupby("User", observed=True)[
             job_job_hour_col

@@ -250,7 +250,7 @@ class PIEfficiencyMetricsEnum(Enum):
     JOB_HOURS = "job_hours"
     VRAM_HOURS = "vram_hours"
     JOBS = "job_count"
-    USERS = "user_count"
+    USERS = "User"
     EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY = "expected_value_alloc_vram_efficiency"
     EXPECTED_VALUE_VRAM_CONSTRAINTS_EFFICIENCY = "expected_value_vram_constraint_efficiency"
     EXPECTED_VALUE_GPU_COUNT = "expected_value_gpu_count"
