@@ -1,6 +1,6 @@
 import pytest
 import pandas
-from src.utilities import load_preprocessed_jobs_dataframe_from_duckdb
+from src.utilities import load_and_preprocessed_jobs, load_and_preprocessed_jobs_custom_query
 from .conftest import preprocess_mock_data
 from src.config.enum_constants import OptionalColumnsEnum, RequiredColumnsEnum
 from datetime import datetime, timedelta
@@ -10,7 +10,7 @@ def test_return_correct_types(mock_data_path):
     """
     Basic test on return type of function
     """
-    res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=mock_data_path)
+    res = load_and_preprocessed_jobs(db_path=mock_data_path)
     assert isinstance(res, pandas.DataFrame)
 
 
@@ -19,7 +19,7 @@ def test_no_filter(mock_data_path):
     Test in case there is no filtering, function should return every valid records from database.
     """
     ground_truth = preprocess_mock_data(mock_data_path, min_elapsed_seconds=0)
-    res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=mock_data_path)
+    res = load_and_preprocessed_jobs(db_path=mock_data_path)
     expect_num_records = len(ground_truth)
     assert expect_num_records == len(res)
 
@@ -29,7 +29,7 @@ def test_filter_date_back_1(mock_data_path, recwarn):
     Test for filtering by days_back
     """
     temp = preprocess_mock_data(mock_data_path, min_elapsed_seconds=0)
-    res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=mock_data_path, dates_back=90)
+    res = load_and_preprocessed_jobs(db_path=mock_data_path, dates_back=90)
     cutoff = datetime.now() - timedelta(days=90)
     ground_truth_jobs = temp[(temp["StartTime"] >= cutoff)].copy()
     expect_job_ids = ground_truth_jobs["JobID"].to_numpy()
@@ -43,7 +43,7 @@ def test_filter_date_back_2(mock_data_path, recwarn):
     Test for filtering by days_back
     """
     temp = preprocess_mock_data(mock_data_path, min_elapsed_seconds=0)
-    res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=mock_data_path, dates_back=150)
+    res = load_and_preprocessed_jobs(db_path=mock_data_path, dates_back=150)
     cutoff = datetime.now() - timedelta(days=150)
     ground_truth_jobs = temp[(temp["StartTime"] >= cutoff)].copy()
     expect_job_ids = ground_truth_jobs["JobID"].to_numpy()
@@ -57,9 +57,7 @@ def test_filter_min_elapsed(mock_data_path, recwarn):
     Test for filtering by days back and minimum elapsed time.
     """
     temp = preprocess_mock_data(mock_data_path, min_elapsed_seconds=13000)
-    res = load_preprocessed_jobs_dataframe_from_duckdb(
-        db_path=mock_data_path, min_elapsed_seconds=13000, dates_back=90
-    )
+    res = load_and_preprocessed_jobs(db_path=mock_data_path, min_elapsed_seconds=13000, dates_back=90)
     cutoff = datetime.now() - timedelta(days=90)
     ground_truth_jobs = temp[(temp["StartTime"] >= cutoff)].copy()
     expect_job_ids = ground_truth_jobs["JobID"].to_numpy()
@@ -76,10 +74,10 @@ def test_filter_date_back_include_all(mock_data_path, recwarn):
         mock_data_path,
         min_elapsed_seconds=0,
         include_cpu_only_jobs=True,
-        include_custom_qos=True,
+        include_custom_qos_jobs=True,
         include_failed_cancelled_jobs=True,
     )
-    res = load_preprocessed_jobs_dataframe_from_duckdb(
+    res = load_and_preprocessed_jobs(
         db_path=mock_data_path,
         dates_back=90,
         min_elapsed_seconds=0,
@@ -106,9 +104,7 @@ def test_custom_query(mock_data_frame, mock_data_path, recwarn):
         "FROM Jobs WHERE Status != 'CANCELLED' AND Status !='FAILED' "
         "AND ArrayID is not NULL AND Interactive is not NULL"
     )
-    res = load_preprocessed_jobs_dataframe_from_duckdb(
-        db_path=mock_data_path, custom_query=query, include_cpu_only_jobs=True, include_custom_qos_jobs=True
-    )
+    res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)
     ground_truth_jobs = mock_data_frame[
         (mock_data_frame["Status"] != "CANCELLED")
         & (mock_data_frame["Status"] != "FAILED")
@@ -127,19 +123,19 @@ def test_custom_query_days_back_1(mock_data_frame, mock_data_path, recwarn):
 
     Expect result will be filtered correctly by dates_back.
     """
+    cutoff = datetime.now() - timedelta(days=90)
     query = (
         "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage, CPUMemUsage, Elapsed "
         "FROM Jobs WHERE Status != 'CANCELLED' AND Status !='FAILED' AND ArrayID is not NULL "
-        "AND Interactive is not NULL"
+        f"AND Interactive is not NULL AND StartTime >= '{cutoff}'"
     )
-    res = load_preprocessed_jobs_dataframe_from_duckdb(
-        db_path=mock_data_path, custom_query=query, include_cpu_only_jobs=True, dates_back=150
-    )
-    cutoff = datetime.now() - timedelta(days=150)
+    res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)
+    cutoff = datetime.now() - timedelta(days=90)
     ground_truth_jobs = mock_data_frame[
         (mock_data_frame["Status"] != "CANCELLED")
         & (mock_data_frame["Status"] != "FAILED")
         & (mock_data_frame["ArrayID"].notna())
+        & (mock_data_frame["Interactive"].notna())
         & (mock_data_frame["StartTime"] >= cutoff)
     ].copy()
     assert len(res) == len(ground_truth_jobs)
@@ -150,9 +146,9 @@ def test_custom_query_days_back_1(mock_data_frame, mock_data_path, recwarn):
 
 def test_custom_query_days_back_2(mock_data_frame, mock_data_path, recwarn):
     """
-    Test in case custom_query already contains dates_back condtion and date_back parameter is given
+    Test in case custom_query contains dates_back condition.
 
-    Expect the result will be filtered by dates_back condition in the query only and warning is correctly raised
+    Expect the result will be filtered by dates_back condition in the query.
     """
     cutoff = datetime.now() - timedelta(days=150)
     query = (
@@ -161,29 +157,24 @@ def test_custom_query_days_back_2(mock_data_frame, mock_data_path, recwarn):
         f"AND Interactive is not NULL AND StartTime >= '{cutoff}'"
     )
 
-    res = load_preprocessed_jobs_dataframe_from_duckdb(
-        db_path=mock_data_path, custom_query=query, include_cpu_only_jobs=True, dates_back=100
-    )
+    res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)
 
     ground_truth_jobs = mock_data_frame[
         (mock_data_frame["Status"] != "CANCELLED")
         & (mock_data_frame["Status"] != "FAILED")
         & (mock_data_frame["ArrayID"].notna())
+        & (mock_data_frame["Interactive"].notna())
         & (mock_data_frame["StartTime"] >= cutoff)
     ].copy()
     expect_ids = ground_truth_jobs["JobID"].to_list()
-    expect_warning_msg = (
-        "Parameter dates_back = 100 is passed but custom_query already contained conditions for "
-        "filtering by dates_back. dates_back condition in custom_query will be used."
-    )
 
-    assert str(recwarn[0].message) == expect_warning_msg
+    # No warning expected since we're not passing dates_back parameter
     assert len(res) == len(ground_truth_jobs)
     for id in res["JobID"]:
         assert id in expect_ids
 
 
-def test_preprocess_empty_dataframe_warning(mock_data_path, recwarn):
+def test_empty_dataframe_warning(mock_data_path, recwarn):
     """
     Test handling the dataframe loads from database when the result is empty.
 
@@ -191,7 +182,7 @@ def test_preprocess_empty_dataframe_warning(mock_data_path, recwarn):
     """
     # Query that returns no rows
     query = "SELECT * FROM Jobs WHERE 1=0"
-    res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=mock_data_path, custom_query=query)
+    res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)
     assert res.empty
     # Check that the warning is about empty dataframe
     assert len(recwarn) == 1
@@ -213,7 +204,7 @@ def test_missing_required_columns_error_raised(mock_data_path, recwarn):
         with pytest.raises(
             RuntimeError, match=f"Failed to load jobs DataFrame: 'Column {col} does not exist in dataframe.'"
         ):
-            _res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=mock_data_path, custom_query=query)
+            _res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)
 
 
 def test_optional_column_warnings(mock_data_path, recwarn):
@@ -237,4 +228,4 @@ def test_optional_column_warnings(mock_data_path, recwarn):
             "This may impact filtering operations and downstream processing."
         )
         with pytest.warns(UserWarning, match=expect_warning_msg):
-            _res = load_preprocessed_jobs_dataframe_from_duckdb(db_path=mock_data_path, custom_query=query)
+            _res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)

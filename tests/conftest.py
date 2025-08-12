@@ -52,6 +52,8 @@ def preprocess_mock_data(
         And applies additional filters based on the provided parameters.
     """
     qos_values = "(" + ",".join(f"'{obj.value}'" for obj in QOSEnum) + ")"
+
+    # get cpu partition list
     partition_info = PartitionInfoFetcher().get_info()
     gpu_partitions = [p["name"] for p in partition_info if p["type"] == PartitionTypeEnum.GPU.value]
     gpu_partitions_str = "(" + ",".join(f"'{partition_name}'" for partition_name in gpu_partitions) + ")"
