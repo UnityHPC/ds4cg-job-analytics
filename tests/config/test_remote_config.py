@@ -64,6 +64,46 @@ def test_get_node_memory_missing_ram(dummy_node_info_fetcher):
             break
 
 
+def test_get_node_info_values_return_one_key(dummy_node_info_fetcher):
+    node_info = dummy_node_info_fetcher.get_info()
+    found = False
+    for batch in node_info:
+        nodes = batch.get(NodeInfoKeyEnum.NODES.value)
+        if nodes:
+            node_name = nodes[0]
+            values = NodeInfoFetcher.get_node_info_values(node_name, node_info, members={NodeInfoKeyEnum.RAM})
+            assert NodeInfoKeyEnum.RAM in values, f"RAM value not found for node '{node_name}'."
+            found = True
+            break
+    assert found, "No valid node with RAM information found in mock data."
+    assert values[NodeInfoKeyEnum.RAM] == batch[NodeInfoKeyEnum.RAM.value], (
+        f"Unexpected RAM value for node '{node_name}': {values[NodeInfoKeyEnum.RAM]}"
+    )
+
+
+def test_get_node_info_values_return_multiple_keys(dummy_node_info_fetcher):
+    node_info = dummy_node_info_fetcher.get_info()
+    found = False
+    for batch in node_info:
+        nodes = batch.get(NodeInfoKeyEnum.NODES.value)
+        if nodes:
+            node_name = nodes[0]
+            values = NodeInfoFetcher.get_node_info_values(
+                node_name, node_info, members={NodeInfoKeyEnum.RAM, NodeInfoKeyEnum.GPU_COUNT}
+            )
+            assert NodeInfoKeyEnum.RAM in values, f"RAM value not found for node '{node_name}'."
+            assert NodeInfoKeyEnum.GPU_COUNT in values, f"GPU_COUNT value not found for node '{node_name}'."
+            found = True
+            break
+    assert found, "No valid node with RAM and GPU_COUNT information found in mock data."
+    assert values[NodeInfoKeyEnum.RAM] == batch[NodeInfoKeyEnum.RAM.value], (
+        f"Unexpected RAM value for node '{node_name}': {values[NodeInfoKeyEnum.RAM]}"
+    )
+    assert values[NodeInfoKeyEnum.GPU_COUNT] == batch[NodeInfoKeyEnum.GPU_COUNT.value], (
+        f"Unexpected GPU_COUNT value for node '{node_name}': {values[NodeInfoKeyEnum.GPU_COUNT]}"
+    )
+
+
 @pytest.mark.parametrize("missing_key", [e.value for e in NodeInfoKeyEnum])
 def test_get_node_memory_missing_any_key(dummy_node_info_fetcher, missing_key, monkeypatch):
     node_info = dummy_node_info_fetcher.get_info()
