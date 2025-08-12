@@ -13,7 +13,7 @@ def preprocess_mock_data(
     table_name: str = "Jobs",
     min_elapsed_seconds: int = 0,
     include_cpu_only_jobs: bool = False,
-    include_custom_qos: bool = False,
+    include_custom_qos_jobs: bool = False,
     include_failed_cancelled_jobs: bool = False,
 ) -> pd.DataFrame:
     """
@@ -30,7 +30,7 @@ def preprocess_mock_data(
             Jobs with elapsed time below this threshold are excluded. Defaults to 0.
         include_cpu_only_jobs (bool, optional): If True, include jobs that run on CPU-only
             partitions. If False, only include jobs from GPU partitions. Defaults to False.
-        include_custom_qos (bool, optional): If True, include jobs with custom QOS values
+        include_custom_qos_jobs (bool, optional): If True, include jobs with custom QOS values
             (not in the standard QOS enum). If False, only include jobs with standard QOS.
             Defaults to False.
         include_failed_cancelled_jobs (bool, optional): If True, include jobs with FAILED
@@ -67,7 +67,7 @@ def preprocess_mock_data(
             f"Partition != '{AdminPartitionEnum.BUILDING.value}'",
             f"QOS != '{QOSEnum.UPDATES.value}'",
         ]
-        if not include_custom_qos:
+        if not include_custom_qos_jobs:
             conditions_arr.append(f"QOS in {qos_values}")
         if not include_cpu_only_jobs:
             conditions_arr.append(f"Partition IN {gpu_partitions_str}")
@@ -76,7 +76,6 @@ def preprocess_mock_data(
             conditions_arr.append(f"Status != '{StatusEnum.CANCELLED.value}'")
 
         query = f"SELECT * FROM {table_name} WHERE {' AND '.join(conditions_arr)}"
-        print(f"Query: {query}")
         return mem_db.fetch_query(query=query)
     except Exception as e:
         raise Exception("Exception at helper_filter_irrelevant_records") from e

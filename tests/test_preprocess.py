@@ -124,7 +124,7 @@ def test_preprocess_data_include_failed_cancelled_job(mock_data_frame, mock_data
 
 def test_preprocess_data_include_custom_qos_values(mock_data_frame, mock_data_path, recwarn):
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_custom_qos_jobs=True)
-    ground_truth = preprocess_mock_data(mock_data_path, min_elapsed_seconds=600, include_custom_qos=True)
+    ground_truth = preprocess_mock_data(mock_data_path, min_elapsed_seconds=600, include_custom_qos_jobs=True)
     filtered_ground_truth = ground_truth[
         (ground_truth["Status"] != "CANCELLED") & (ground_truth["Status"] != "FAILED")
     ].copy()
@@ -151,7 +151,7 @@ def test_all_boolean_args_being_true(mock_data_frame, mock_data_path, recwarn):
         mock_data_path,
         min_elapsed_seconds=600,
         include_cpu_only_jobs=True,
-        include_custom_qos=True,
+        include_custom_qos_jobs=True,
         include_failed_cancelled_jobs=True,
     )
     expect_failed_status = len(ground_truth[(ground_truth["Status"] == StatusEnum.FAILED.value)])
