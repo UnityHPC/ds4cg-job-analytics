@@ -446,15 +446,17 @@ def preprocess_data(
         include_cpu_only_jobs (bool, optional): Whether to include jobs that do not use GPUs (CPU-only jobs).
         include_custom_qos_jobs (bool, optional): Whether to include entries with custom qos values or not.
             Default to False
-        apply_filter (bool, optional): Whether to apply filtering operations and column removal to the data. Defaults to True.
+        apply_filter (bool, optional): Whether to apply filtering operations and columns removal to the data.
+            Defaults to True.
 
 
     Returns:
         pd.DataFrame: The preprocessed dataframe
 
     """
-    # Drop unnecessary columns, ignoring errors in case any of them is not in the dataframe
+    data = input_df
     if apply_filter:
+        # Drop unnecessary columns, ignoring errors in case any of them is not in the dataframe
         data = input_df.drop(
             columns=[member.value for member in ExcludedColumnsEnum], axis=1, inplace=False, errors="ignore"
         )

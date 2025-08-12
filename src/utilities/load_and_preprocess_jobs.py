@@ -3,7 +3,14 @@ from pathlib import Path
 from src.preprocess.preprocess import preprocess_data
 from src.database import DatabaseConnection
 from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
-from src.config.enum_constants import QOSEnum, AdminPartitionEnum, AdminsAccountEnum, StatusEnum, PartitionTypeEnum
+from src.config.enum_constants import (
+    QOSEnum,
+    AdminPartitionEnum,
+    AdminsAccountEnum,
+    StatusEnum,
+    PartitionTypeEnum,
+    ExcludedColumnsEnum,
+)
 from src.config.remote_config import PartitionInfoFetcher
 from datetime import datetime, timedelta
 
@@ -54,6 +61,7 @@ def load_and_preprocess_jobs(
     try:
         db = DatabaseConnection(str(db_path))
         qos_values = "(" + ",".join(f"'{obj.value}'" for obj in QOSEnum) + ")"
+        excluded_columns = "(" + ", ".join(f"{obj.value}" for obj in ExcludedColumnsEnum) + ")"
 
         # get cpu partition list
         partition_info = PartitionInfoFetcher().get_info()
@@ -77,16 +85,9 @@ def load_and_preprocess_jobs(
             conditions_arr.append(f"Status != '{StatusEnum.FAILED.value}'")
             conditions_arr.append(f"Status != '{StatusEnum.CANCELLED.value}'")
 
-        query = f"SELECT * FROM {table_name} WHERE {' AND '.join(conditions_arr)}"
-
+        query = f"SELECT * EXCLUDE {excluded_columns} FROM {table_name} WHERE {' AND '.join(conditions_arr)}"
         jobs_df = db.fetch_query(query=query)
-        processed_data = preprocess_data(
-            jobs_df,
-            min_elapsed_seconds=min_elapsed_seconds,
-            include_failed_cancelled_jobs=include_failed_cancelled_jobs,
-            include_cpu_only_jobs=include_cpu_only_jobs,
-            include_custom_qos_jobs=include_custom_qos_jobs,
-        )
+        processed_data = preprocess_data(jobs_df, apply_filter=False)
         if sample_size is not None:
             processed_data = processed_data.sample(n=sample_size, random_state=random_state)
         return processed_data
@@ -140,7 +141,8 @@ def load_and_preprocess_jobs_custom_query(
             custom_query = f"SELECT * FROM {table_name}"
 
         jobs_df = db.fetch_query(custom_query)
-        # set appropriate argument to avoid filtering out any unexpected records user want
+
+        # Use permissive preprocessing settings to preserve all data from the custom query.
         processed_data = preprocess_data(
             jobs_df,
             min_elapsed_seconds=0,
