@@ -86,3 +86,39 @@ def load_preprocessed_jobs_dataframe_from_duckdb(
         return processed_data
     except Exception as e:
         raise RuntimeError(f"Failed to load jobs DataFrame: {e}") from e
+
+
+def load_preprocessed_jobs_dataframe_from_duckdb_custom_query(
+    db_path: str | Path,
+    table_name: str = "Jobs",
+    custom_query: str | None = None,
+    random_state: pd._typing.RandomState | None = None,
+    sample_size: int | None = None,
+) -> pd.DataFrame:
+    # check if the query contains condition of date_back in the form "StartTime > date"
+    def _contain_dates_back_condition(query: str) -> bool:
+        pattern = r"(?:WHERE)\s+[^;]*StartTime\s*>=?\s*[^;]+"
+        return bool(re.search(pattern, query, re.IGNORECASE))
+
+    if isinstance(db_path, Path):
+        db_path = db_path.resolve()
+    try:
+        db = DatabaseConnection(str(db_path))
+
+        if custom_query is None:
+            custom_query = f"SELECT * FROM {table_name}"
+
+        jobs_df = db.fetch_query(custom_query)
+        # set appropriate argument to avoid filtering out any unexpected records user want
+        processed_data = preprocess_data(
+            jobs_df,
+            min_elapsed_seconds=0,
+            include_failed_cancelled_jobs=True,
+            include_cpu_only_jobs=True,
+            include_custom_qos_jobs=True,
+        )
+        if sample_size is not None:
+            processed_data = processed_data.sample(n=sample_size, random_state=random_state)
+        return processed_data
+    except Exception as e:
+        raise RuntimeError(f"Failed to load jobs DataFrame: {e}") from e

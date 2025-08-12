@@ -8,7 +8,7 @@ from src.config.remote_config import PartitionInfoFetcher
 import pandas as pd
 
 
-def helper_filter_irrelevant_records(
+def preprocess_mock_data(
     db_path: str,
     table_name: str = "Jobs",
     min_elapsed_seconds: int = 0,
@@ -16,6 +16,40 @@ def helper_filter_irrelevant_records(
     include_custom_qos: bool = False,
     include_failed_cancelled_jobs: bool = False,
 ) -> pd.DataFrame:
+    """
+    Helper function to filter job records from database based on various criteria.
+
+    This function applies the same filtering logic as the preprocessing pipeline
+    to create a ground truth dataset for testing purposes. It filters out jobs
+    based on elapsed time, account type, partition type, QOS values, and status.
+
+    Args:
+        db_path (str): Path to the DuckDB database file.
+        table_name (str, optional): Name of the table to query. Defaults to "Jobs".
+        min_elapsed_seconds (int, optional): Minimum elapsed time in seconds to filter jobs.
+            Jobs with elapsed time below this threshold are excluded. Defaults to 0.
+        include_cpu_only_jobs (bool, optional): If True, include jobs that run on CPU-only
+            partitions. If False, only include jobs from GPU partitions. Defaults to False.
+        include_custom_qos (bool, optional): If True, include jobs with custom QOS values
+            (not in the standard QOS enum). If False, only include jobs with standard QOS.
+            Defaults to False.
+        include_failed_cancelled_jobs (bool, optional): If True, include jobs with FAILED
+            or CANCELLED status. If False, exclude these jobs. Defaults to False.
+
+    Returns:
+        pd.DataFrame: Filtered DataFrame containing job records that meet the specified criteria.
+
+    Raises:
+        Exception: If there's an error during database operations or query execution.
+
+    Note:
+        This function is used in tests to create expected results for comparison with
+        the actual pipeline output. It excludes jobs with:
+        - Root account
+        - Building partition
+        - Updates QOS
+        And applies additional filters based on the provided parameters.
+    """
     qos_values = "(" + ",".join(f"'{obj.value}'" for obj in QOSEnum) + ")"
     partition_info = PartitionInfoFetcher().get_info()
     gpu_partitions = [p["name"] for p in partition_info if p["type"] == PartitionTypeEnum.GPU.value]
@@ -47,7 +81,7 @@ def helper_filter_irrelevant_records(
         raise Exception("Exception at helper_filter_irrelevant_records") from e
 
 
-# fixture for returning path to temporary db
+# Get path to the temporary mock database file
 @pytest.fixture(scope="module")
 def mock_data_path():
     try:
@@ -59,7 +93,7 @@ def mock_data_path():
         shutil.rmtree(temp_db_dir)
 
 
-# fixture for returning mock_data_frame
+# load mock database as a Dataframe
 @pytest.fixture(scope="module")
 def mock_data_frame(mock_data_path):
     mem_db = None

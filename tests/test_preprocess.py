@@ -11,7 +11,7 @@ from src.config.enum_constants import (
 )
 from src.config.enum_constants import OptionalColumnsEnum, RequiredColumnsEnum
 from src.config.remote_config import PartitionInfoFetcher
-from .conftest import helper_filter_irrelevant_records
+from .conftest import preprocess_mock_data
 import pytest
 
 partition_info = PartitionInfoFetcher().get_info()
@@ -72,7 +72,7 @@ def test_preprocess_data_filter_min_esplaped_2(mock_data_frame, mock_data_path, 
         include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
-    ground_truth = helper_filter_irrelevant_records(
+    ground_truth = preprocess_mock_data(
         mock_data_path,
         min_elapsed_seconds=700,
         include_cpu_only_jobs=True,
@@ -101,9 +101,7 @@ def test_preprocess_data_include_cpu_job(mock_data_frame, mock_data_path, recwar
     Test that the preprocessed data includes CPU-only jobs when specified.
     """
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_cpu_only_jobs=True)
-    ground_truth = helper_filter_irrelevant_records(
-        mock_data_path, min_elapsed_seconds=600, include_cpu_only_jobs=True
-    )
+    ground_truth = preprocess_mock_data(mock_data_path, min_elapsed_seconds=600, include_cpu_only_jobs=True)
     expect_cpus_jobs = len(ground_truth[~ground_truth["Partition"].isin(gpu_partitions)])
     assert sum(~(data["Partition"].isin(gpu_partitions))) == expect_cpus_jobs
 
@@ -113,7 +111,7 @@ def test_preprocess_data_include_failed_cancelled_job(mock_data_frame, mock_data
     Test that the preprocessed data includes FAILED and CANCELLED jobs when specified.
     """
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_failed_cancelled_jobs=True)
-    ground_truth = helper_filter_irrelevant_records(
+    ground_truth = preprocess_mock_data(
         mock_data_path,
         min_elapsed_seconds=600,
         include_failed_cancelled_jobs=True,
@@ -126,7 +124,7 @@ def test_preprocess_data_include_failed_cancelled_job(mock_data_frame, mock_data
 
 def test_preprocess_data_include_custom_qos(mock_data_frame, mock_data_path, recwarn):
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_custom_qos_jobs=True)
-    ground_truth = helper_filter_irrelevant_records(mock_data_path, min_elapsed_seconds=600, include_custom_qos=True)
+    ground_truth = preprocess_mock_data(mock_data_path, min_elapsed_seconds=600, include_custom_qos=True)
     filtered_ground_truth = ground_truth[
         (ground_truth["Status"] != "CANCELLED") & (ground_truth["Status"] != "FAILED")
     ].copy()
@@ -149,7 +147,7 @@ def test_preprocess_data_include_all(mock_data_frame, mock_data_path, recwarn):
         include_cpu_only_jobs=True,
         include_custom_qos_jobs=True,
     )
-    ground_truth = helper_filter_irrelevant_records(
+    ground_truth = preprocess_mock_data(
         mock_data_path,
         min_elapsed_seconds=600,
         include_cpu_only_jobs=True,
@@ -182,7 +180,7 @@ def test_preprocess_data_fill_missing_interactive(mock_data_frame, mock_data_pat
         include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
-    ground_truth = helper_filter_irrelevant_records(
+    ground_truth = preprocess_mock_data(
         mock_data_path,
         min_elapsed_seconds=100,
         include_cpu_only_jobs=True,
@@ -204,7 +202,7 @@ def test_preprocess_data_fill_missing_array_id(mock_data_frame, mock_data_path, 
         include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
-    ground_truth = helper_filter_irrelevant_records(
+    ground_truth = preprocess_mock_data(
         mock_data_path,
         min_elapsed_seconds=100,
         include_cpu_only_jobs=True,
@@ -225,7 +223,7 @@ def test_preprocess_data_fill_missing_gpu_type(mock_data_frame, mock_data_path, 
         include_failed_cancelled_jobs=True,
     )
 
-    ground_truth = helper_filter_irrelevant_records(
+    ground_truth = preprocess_mock_data(
         mock_data_path,
         min_elapsed_seconds=100,
         include_cpu_only_jobs=True,
@@ -250,7 +248,7 @@ def test_preprocess_data_fill_missing_constraints(mock_data_frame, mock_data_pat
         include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
-    ground_truth = helper_filter_irrelevant_records(
+    ground_truth = preprocess_mock_data(
         mock_data_path,
         min_elapsed_seconds=100,
         include_cpu_only_jobs=True,
@@ -266,7 +264,7 @@ def test_category_interactive(mock_data_frame, mock_data_path, recwarn):
     Test that the preprocessed data has 'Interactive' as a categorical variable and check values contained within it.
     """
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
-    ground_truth = helper_filter_irrelevant_records(mock_data_path, min_elapsed_seconds=600)
+    ground_truth = preprocess_mock_data(mock_data_path, min_elapsed_seconds=600)
     expected = set(ground_truth["Interactive"].dropna().to_numpy()) | set([e.value for e in InteractiveEnum])
 
     assert data["Interactive"].dtype == "category"
@@ -278,7 +276,7 @@ def test_category_qos(mock_data_frame, mock_data_path, recwarn):
     Test that the preprocessed data has 'QOS' as a categorical variable and check values contained within it.
     """
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
-    ground_truth = helper_filter_irrelevant_records(mock_data_path, min_elapsed_seconds=600)
+    ground_truth = preprocess_mock_data(mock_data_path, min_elapsed_seconds=600)
     expected = set(ground_truth["QOS"].dropna().to_numpy()) | set([e.value for e in QOSEnum])
 
     assert data["QOS"].dtype == "category"
@@ -291,7 +289,7 @@ def test_category_exit_code(mock_data_frame, mock_data_path, recwarn):
     """
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
 
-    ground_truth = helper_filter_irrelevant_records(mock_data_path, min_elapsed_seconds=600)
+    ground_truth = preprocess_mock_data(mock_data_path, min_elapsed_seconds=600)
     expected = set(ground_truth["ExitCode"].dropna().to_numpy()) | set([e.value for e in ExitCodeEnum])
 
     assert data["ExitCode"].dtype == "category"
@@ -304,7 +302,7 @@ def test_category_partition(mock_data_frame, mock_data_path, recwarn):
     """
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
 
-    ground_truth = helper_filter_irrelevant_records(mock_data_path, min_elapsed_seconds=600)
+    ground_truth = preprocess_mock_data(mock_data_path, min_elapsed_seconds=600)
     expected = set(ground_truth["Partition"].dropna().to_numpy()) | set([e.value for e in AdminPartitionEnum])
 
     assert data["Partition"].dtype == "category"
@@ -317,7 +315,7 @@ def test_category_account(mock_data_frame, mock_data_path, recwarn):
     """
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
 
-    ground_truth = helper_filter_irrelevant_records(mock_data_path, min_elapsed_seconds=600)
+    ground_truth = preprocess_mock_data(mock_data_path, min_elapsed_seconds=600)
     expected = set(ground_truth["Account"].dropna().to_numpy()) | set([e.value for e in AdminsAccountEnum])
 
     assert data["Account"].dtype == "category"
@@ -334,7 +332,7 @@ def test_preprocess_timedelta_conversion(mock_data_frame, mock_data_path, recwar
         include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
-    ground_truth = helper_filter_irrelevant_records(
+    ground_truth = preprocess_mock_data(
         mock_data_path,
         min_elapsed_seconds=600,
         include_cpu_only_jobs=True,
