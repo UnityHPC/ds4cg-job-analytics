@@ -100,21 +100,6 @@ class ROCVisualizer(EfficiencyAnalysis):
         else:
             return f"{value:.1f}"
 
-    def _normalize_arr(self, arr: np.ndarray) -> np.ndarray:
-        """
-        Normalize an array. Intended for internal use only.
-
-        Args:
-            threshold_arr (np.ndarray): the array to normalize
-
-        Returns:
-            np.ndarray: the new normalized threshold array
-
-        """
-        min_val, max_val = arr[0], arr[-1]
-        res = (arr - min_val) / (max_val - min_val)
-        return res
-
     def _helper_filter_invalid_records(
         self,
         plot_data_frame: pd.DataFrame,
@@ -154,30 +139,41 @@ class ROCVisualizer(EfficiencyAnalysis):
         plot_type: ROCPlotTypes = ROCPlotTypes.JOB,
     ) -> tuple[pd.DataFrame, float, float | int, float]:
         """
-        Validate the inputs, filter invalid records, calculate sum of proportion metric and percentage of remain data.
+        Validate input parameters and filter invalid records for ROC plot generation.
+
+        This method performs comprehensive validation of ROC plot parameters, filters out records
+        with invalid threshold metric values (NaN or -inf), and calculates summary statistics.
 
         Args:
-            threshold_metric (JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum): The metric used for thresholds.
-            proportion_metric (ProportionMetricsEnum): The metric for calculating proportions.
-            threshold_step (float): Step size for thresholds.
-            min_threshold (float): Minimum threshold value.
-            max_threshold (float): Maximum threshold value.
-            plot_type (ROCPlotTypes): the type of ROC Plot
+            input_df (pd.DataFrame): The input DataFrame containing efficiency metrics data.
+            min_threshold (float): Minimum threshold value for the ROC curve. For efficiency
+                score metrics, this may be automatically adjusted to the data minimum.
+            max_threshold (float): Maximum threshold value for the ROC curve.
+            threshold_step (float): Step size between threshold values. Must be positive.
+            threshold_metric (JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum | PIEfficiencyMetricsEnum):
+                The efficiency metric to use for threshold calculations (x-axis).
+            proportion_metric (ProportionMetricsEnum): The metric for calculating proportions (y-axis).
+            plot_type (ROCPlotTypes, optional): Type of ROC plot being generated. Defaults to JOB.
 
         Returns:
-            pd.Dataframe: The filtered dataframe.
-            float: The percentage of filtered data over the whole dataset.
-            float | int: The sum of value of proportion metrics over the filtered data.
+            tuple[pd.DataFrame, float, float | int, float]: A tuple containing:
+                - Filtered DataFrame with invalid records removed
+                - Percentage of data remaining after filtering (0-100)
+                - Total value of the proportion metric in the filtered data
+                - Adjusted minimum threshold value (may differ from input if auto-adjusted)
 
         Raises:
-            KeyError: If the specified metrics are not found in the DataFrame.
-            ValueError: If the threshold step is not a positive number.
-            ValueError: If min_threshold is greater than max_threshold.
+            KeyError: If threshold_metric or proportion_metric columns are not found in the DataFrame.
+            ValueError: If threshold_step is not positive, min_threshold > max_threshold,
+                or threshold_metric and proportion_metric have the same value.
 
         Warnings:
-            UserWarning: if the filtered dataframe is empty.
-            UserWarning: if threshold_step is too small in comparison to the threshold range
-                defined by min_threshold and max_threshold.
+            UserWarning: Issued when the filtered DataFrame is empty or when threshold_step
+                is extremely small relative to the threshold range (may cause performance issues).
+
+        Note:
+            For efficiency score metrics (ALLOC_VRAM_EFFICIENCY_SCORE, VRAM_CONSTRAINT_EFFICIENCY_SCORE),
+            the min_threshold is automatically set to the minimum data value to handle negative scores.
         """
 
         # check if provided parameter is valid or not
@@ -301,16 +297,27 @@ class ROCVisualizer(EfficiencyAnalysis):
         threshold_metric: JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum | PIEfficiencyMetricsEnum,
     ) -> None:
         """
-        Clip the column values down to the given upper bound.
+        Conditionally clip threshold metric values to a specified upper bound.
+
+        This method modifies the DataFrame in-place by capping threshold metric values at the specified
+        upper bound.
 
         Args:
-            clip_threshold_metric (tuple): A tuple where the first element is a boolean indicating whether to
-                clip the threshold metrics, and the second element is the upper value to clip to.
-            plot_data_frame (pd.DataFrame): The DataFrame containing the data to plot.
-            threshold_metrics (JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum): The metric used for thresholds.
+            clip_threshold_metric (tuple[bool, float]): A 2-element tuple where:
+                - First element (bool): Whether to perform clipping
+                - Second element (float): Upper bound value for clipping
+            plot_data_frame (pd.DataFrame): The DataFrame containing the data to be modified.
+                The threshold metric column will be clipped in-place.
+            threshold_metric (JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum | PIEfficiencyMetricsEnum):
+                The efficiency metric whose values will be clipped.
+
+        Returns:
+            None: The DataFrame is modified in-place.
 
         Raises:
-            ValueError: If the clip_threshold_metric parameter is not a tuple containing a boolean and a float.
+            ValueError: If clip_threshold_metric is not a 2-element tuple containing a boolean
+                and a float, or if the tuple format is invalid.
+
         """
         if (
             len(clip_threshold_metric) != 2
@@ -337,21 +344,29 @@ class ROCVisualizer(EfficiencyAnalysis):
         plot_type: ROCPlotTypes = ROCPlotTypes.JOB,
     ) -> np.ndarray:
         """
-        Calculate the proportion of data that meet the alloc_vram_efficiency threshold for each threshold value.
-
-        For each given threshold, this function will calculate the proportion of data (in terms of the
-            specified metric) whose alloc_vram_efficiency is less than or equal to the threshold.
+        Calculate proportions of data meeting threshold criteria for ROC curve generation.
 
         Args:
-            plot_data_frame (pd.DataFrame): DataFrame containing the data to plot.
-            thresholds_arr (np.ndarray): List of predefined threshold values.
-            proportion_metric (ROCMetricsEnum): The metric to calculate proportions for.
-            threshold_metric (EfficiencyMetricsJobsEnum): The specific efficiency metric used as thresholds_arr.
-            plot_percentage (bool): Whether to return the proportion as percentage or as raw value. Defaults to True.
+            plot_data_frame (pd.DataFrame): DataFrame containing the efficiency metrics data.
+            thresholds_arr (np.ndarray): Array of threshold values to evaluate against.
+            proportion_metric (ProportionMetricsEnum): The metric to calculate proportions for
+                (e.g., JOBS, VRAM_HOURS, USERS, PI_GROUPS).
+            threshold_metric (JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum | PIEfficiencyMetricsEnum):
+                The efficiency metric used as the threshold criteria for filtering.
+            plot_percentage (bool, optional): Whether to return proportions as percentages (0-100)
+                or raw values. Defaults to True.
+            plot_type (ROCPlotTypes, optional): Type of ROC plot being generated, which determines
+                how proportion calculations are performed. Defaults to JOB.
 
         Returns:
-            np.ndarray: List of proportions corresponding to each threshold.
+            np.ndarray: Array of proportions corresponding to each threshold value. Length matches
+                thresholds_arr. Values are percentages if plot_percentage=True, otherwise raw counts/sums.
 
+        Note:
+            - For associated metrics (e.g., JOBS for JOB plot type), counts records directly
+            - For unique count metrics, counts distinct entities meeting the threshold
+            - For sum-based metrics, sums the metric values for records meeting the threshold
+            - Returns zeros array if total sum is zero to avoid division by zero
         """
 
         threshold_values = plot_data_frame[threshold_metric.value].to_numpy(dtype=float)
@@ -433,6 +448,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         Raises:
             ValueError: if dataframe jobs_with_efficiency_metrics is not calculated yet.
         """
+
         if self.jobs_with_efficiency_metrics is None:
             raise ValueError(
                 "Attribute jobs_with_efficiency_metrics is not calculated, "
