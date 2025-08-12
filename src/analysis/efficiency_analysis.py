@@ -4,14 +4,18 @@ Tools to analyze efficiency of Jobs based on their VRAM usage.
 The aim is to identify potential inefficiencies in GPU usage and notify users or PIs about these issues.
 """
 
-from typing import cast
+from typing import Generic, TypeVar, Annotated, cast
 import pandas as pd
 import numpy as np
 from pathlib import Path
 from src.preprocess.preprocess import preprocess_data
 from src.database import DatabaseConnection
 from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
-from src.config.enum_constants import FilterTypeEnum, MetricsDataFrameNameEnum
+from src.config.enum_constants import (
+    FilterTypeEnum,
+    MetricsDataFrameNameBase,
+)
+from pydantic import validate_call, AfterValidator, SkipValidation
 
 
 def load_preprocessed_jobs_dataframe_from_duckdb(
@@ -51,7 +55,32 @@ def load_preprocessed_jobs_dataframe_from_duckdb(
         raise RuntimeError(f"Failed to load jobs DataFrame: {e}") from e
 
 
-class EfficiencyAnalysis:
+# Generic type for metrics enums constrained to our abstract base Enum class
+MetricsDFNameEnumT = TypeVar("MetricsDFNameEnumT", bound=MetricsDataFrameNameBase)
+
+
+def _ensure_concrete_metrics_enum(
+    cls: type[MetricsDFNameEnumT],
+) -> type[MetricsDFNameEnumT]:
+    """Validate that the provided class is a concrete subclass of MetricsDataFrameNameBase.
+
+    Used by Pydantic to validate the enum argument to the constructor.
+
+    Raises:
+        TypeError: If the type is not a subclass of the base, or is the abstract base itself.
+
+    Returns:
+        type[MetricsDFNameEnumT]: The validated enum class.
+    """
+    # Ensure it's a subclass of our abstract base (defensive; helps type checkers and runtime safety)
+    if not isinstance(cls, type) or not issubclass(cls, MetricsDataFrameNameBase):
+        raise TypeError("metrics_df_name_enum must be a subclass of MetricsDataFrameNameBase")
+    if cls is MetricsDataFrameNameBase:
+        raise TypeError("metrics_df_name_enum must be a concrete Enum subclass, not the abstract base")
+    return cls
+
+
+class EfficiencyAnalysis(Generic[MetricsDFNameEnumT]):
     """
     Class to encapsulate the efficiency analysis of jobs based on various metrics.
 
@@ -60,15 +89,20 @@ class EfficiencyAnalysis:
     The metrics are generated in separate DataFrames for each category in MetricsDataFrameNameEnum.
     """
 
+    # Apply Pydantic runtime validation for constructor arguments
+    @validate_call(config={"arbitrary_types_allowed": True})
     def __init__(
         self,
-        jobs_df: pd.DataFrame,
+        jobs_df: Annotated[pd.DataFrame, SkipValidation()],
+        metrics_df_name_enum: Annotated[type[MetricsDFNameEnumT], AfterValidator(_ensure_concrete_metrics_enum)],
     ) -> None:
         """
         Initialize the EfficiencyAnalysis class.
 
         Args:
             jobs_df (pd.DataFrame): DataFrame containing job data.
+            metrics_df_name_enum (type[MetricsDFNameEnumT]): Enum class whose members'
+                .value names map to attributes on this instance.
 
         Raises:
             ValueError: If the jobs DataFrame is empty.
@@ -76,9 +110,10 @@ class EfficiencyAnalysis:
         if jobs_df.empty:
             raise ValueError("The jobs DataFrame is empty. Please provide a valid DataFrame with job data.")
         self.jobs_df = jobs_df
+        self.metrics_df_name_enum: type[MetricsDFNameEnumT] = metrics_df_name_enum
         # Initialize efficiency metric class attributes to None
-        for var in MetricsDataFrameNameEnum:
-            setattr(self, var.value, None)
+        for names in self.metrics_df_name_enum:
+            setattr(self, names.value, None)
         self.analysis_results: dict | None = None
 
     @staticmethod
@@ -523,7 +558,10 @@ class EfficiencyAnalysis:
         inefficient_users = inefficient_users.sort_values("vram_hours", ascending=False)
         return inefficient_users
 
-    def calculate_all_efficiency_metrics(self, filtered_jobs: pd.DataFrame) -> dict:
+    def calculate_all_efficiency_metrics(
+        self,
+        filtered_jobs: pd.DataFrame,
+    ) -> dict:
         """
         Calculate all efficiency metrics for jobs, users, and PI accounts.
 
@@ -543,7 +581,10 @@ class EfficiencyAnalysis:
             self.calculate_job_efficiency_metrics(filtered_jobs)
             self.calculate_user_efficiency_metrics()
             self.calculate_pi_account_efficiency_metrics()
-            return {var.value: getattr(self, var.value) for var in MetricsDataFrameNameEnum}
+            result = {}
+            for var in self.metrics_df_name_enum:
+                result[var.value] = getattr(self, var.value)
+            return result
 
         except (KeyError, ValueError, TypeError, AttributeError) as e:
             raise RuntimeError(f"Failed to calculate all efficiency metrics: {e}") from e
@@ -686,7 +727,7 @@ class EfficiencyAnalysis:
 
     def sort_and_filter_records_with_metrics(
         self,
-        metrics_df_name_enum: MetricsDataFrameNameEnum,
+        metrics_df_name_enum: MetricsDFNameEnumT,
         sorting_key: str,
         ascending: bool,
         filter_criteria: dict[str, int | float | dict | pd.api.typing.NAType],
@@ -711,7 +752,7 @@ class EfficiencyAnalysis:
             ValueError: If the sorting key is not valid or if ascending is not a boolean value
             ValueError: If the filter criteria are invalid
         """
-        if not isinstance(metrics_df_name_enum, MetricsDataFrameNameEnum):
+        if not isinstance(metrics_df_name_enum, self.metrics_df_name_enum):
             raise ValueError(
                 f"Invalid efficiency metric type: {metrics_df_name_enum}. "
                 f"Must be a member of MetricsDataFrameNameEnum."
@@ -749,7 +790,6 @@ class EfficiencyAnalysis:
         filtered_records = getattr(self, metrics_df_name_enum.value)[mask]
 
         # Sort by the specified key and order
-
         filtered_records = filtered_records.sort_values(sorting_key, ascending=ascending)
 
         return filtered_records

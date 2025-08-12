@@ -241,8 +241,8 @@ def _fill_missing(res: pd.DataFrame) -> None:
         )
     )
     res.loc[:, "GPUs"] = res["GPUs"].fillna(0)
-    res.loc[:, "NodeList"] = res["NodeList"].fillna("").apply(
-        lambda x: [] if isinstance(x, str) and x == "" else list(x)
+    res.loc[:, "NodeList"] = (
+        res["NodeList"].fillna("").apply(lambda x: [] if isinstance(x, str) and x == "" else list(x))
     )
 
 

@@ -2,15 +2,20 @@ from .efficiency_analysis import EfficiencyAnalysis
 import pandas as pd
 from src.config.remote_config import NodeInfoFetcher
 from src.warnings import NodeNotFoundWarning
-from src.config.enum_constants import RequiredHoardingAnalysisColumnsEnum, NodeInfoKeyEnum
+from src.config.enum_constants import (
+    RequiredHoardingAnalysisColumnsEnum,
+    NodeInfoKeyEnum,
+    ResourceHoardingDataFrameNameEnum,
+)
 import warnings
 
 
-class ResourceHoarding(EfficiencyAnalysis):
+class ResourceHoarding(EfficiencyAnalysis[ResourceHoardingDataFrameNameEnum]):
     """Analyze resource hoarding in jobs."""
 
     def __init__(self, jobs_df: pd.DataFrame) -> None:
-        super().__init__(jobs_df)
+        # Pass the subclass-specific enum to the base initializer
+        super().__init__(jobs_df, metrics_df_name_enum=ResourceHoardingDataFrameNameEnum)
 
     def _get_resource_totals_for_job(
         self, jobs_node_list: list[str], node_info: list[dict]
@@ -86,9 +91,7 @@ class ResourceHoarding(EfficiencyAnalysis):
             )
             total_available_cores_per_job = resource_totals_per_job.apply(
                 lambda d: d[NodeInfoKeyEnum.CORE_COUNT_PER_NODE]
-            ).astype(
-                pd.Int32Dtype()
-            )
+            ).astype(pd.Int32Dtype())
 
             # Extract node names from warning messages
             for warn in node_warnings:
@@ -113,7 +116,7 @@ class ResourceHoarding(EfficiencyAnalysis):
             NodeInfoKeyEnum.CORE_COUNT_PER_NODE: total_available_cores_per_job,
         }
 
-    def calculate_node_resource_hoarding(self, filtered_jobs: pd.DataFrame) -> pd.DataFrame:
+    def calculate_node_resource_hoarding_for_jobs(self, filtered_jobs: pd.DataFrame) -> pd.DataFrame:
         """Detect memory hoarding in each job
 
         Checks if the ratio of requested memory to the available memory in each node is larger than
@@ -129,13 +132,13 @@ class ResourceHoarding(EfficiencyAnalysis):
         Returns:
             pd.DataFrame: DataFrame with hoarding information for each job.
         """
-        memory_hoarding_jobs = self.calculate_job_efficiency_metrics(filtered_jobs)
+        resource_hoarding_jobs = self.calculate_job_efficiency_metrics(filtered_jobs)
 
         # check if cpu_mem_efficiency and used_cpu_mem_gib and allocated_cpu_mem_gib are present
         missing_columns = [
             key.value
             for key in RequiredHoardingAnalysisColumnsEnum.__members__.values()
-            if key.value not in memory_hoarding_jobs.columns
+            if key.value not in resource_hoarding_jobs.columns
         ]
         if len(missing_columns) > 0:
             raise ValueError(
@@ -143,42 +146,44 @@ class ResourceHoarding(EfficiencyAnalysis):
                 f"{', '.join(missing_columns)}. "
                 "CPU-related metrics are required for analysis."
             )
-        
-        total_node_resources_per_job = self._calculate_total_resources_of_nodes_per_job(memory_hoarding_jobs)
+
+        total_node_resources_per_job = self._calculate_total_resources_of_nodes_per_job(resource_hoarding_jobs)
 
         # Add memory hoarding metrics
-        memory_hoarding_jobs.loc[:, "total_ram_of_nodes_gib"] = total_node_resources_per_job[NodeInfoKeyEnum.RAM]
-        memory_hoarding_jobs.loc[:, "total_gpu_count_of_nodes"] = total_node_resources_per_job[
+        resource_hoarding_jobs.loc[:, "total_ram_of_nodes_gib"] = total_node_resources_per_job[NodeInfoKeyEnum.RAM]
+        resource_hoarding_jobs.loc[:, "total_gpu_count_of_nodes"] = total_node_resources_per_job[
             NodeInfoKeyEnum.GPU_COUNT
         ]
-        memory_hoarding_jobs.loc[:, "gpu_count_fraction"] = (
-            memory_hoarding_jobs.loc[:, "gpu_count"]
-            / memory_hoarding_jobs.loc[:, "total_gpu_count_of_nodes"]
+        resource_hoarding_jobs.loc[:, "gpu_count_fraction"] = (
+            resource_hoarding_jobs.loc[:, "gpu_count"] / resource_hoarding_jobs.loc[:, "total_gpu_count_of_nodes"]
         )
 
-        memory_hoarding_jobs.loc[:, "allocated_ram_fraction"] = (
-            memory_hoarding_jobs.loc[:, "allocated_cpu_mem_gib"]
-            / memory_hoarding_jobs.loc[:, "total_ram_of_nodes_gib"]
+        resource_hoarding_jobs.loc[:, "allocated_ram_fraction"] = (
+            resource_hoarding_jobs.loc[:, "allocated_cpu_mem_gib"]
+            / resource_hoarding_jobs.loc[:, "total_ram_of_nodes_gib"]
         )
 
-        memory_hoarding_jobs.loc[:, "ram_hoarding_fraction_diff"] = (
-            memory_hoarding_jobs.loc[:, "allocated_ram_fraction"]
-            - memory_hoarding_jobs.loc[:, "gpu_count_fraction"]
+        resource_hoarding_jobs.loc[:, "ram_hoarding_fraction_diff"] = (
+            resource_hoarding_jobs.loc[:, "allocated_ram_fraction"]
+            - resource_hoarding_jobs.loc[:, "gpu_count_fraction"]
         )
 
         # Add CPU core hoarding metrics
-        memory_hoarding_jobs.loc[:, "total_cores_of_nodes"] = (
-            total_node_resources_per_job[NodeInfoKeyEnum.CORE_COUNT_PER_NODE]
-        )
-        memory_hoarding_jobs.loc[:, "allocated_cores_fraction"] = (
-            memory_hoarding_jobs.loc[:, "cpu_core_count"]
-            / memory_hoarding_jobs.loc[:, "total_cores_of_nodes"]
-        )
-
-        memory_hoarding_jobs.loc[:, "core_hoarding_fraction_diff"] = (
-            memory_hoarding_jobs.loc[:, "allocated_cores_fraction"]
-            - memory_hoarding_jobs.loc[:, "gpu_count_fraction"]
+        resource_hoarding_jobs.loc[:, "total_cores_of_nodes"] = total_node_resources_per_job[
+            NodeInfoKeyEnum.CORE_COUNT_PER_NODE
+        ]
+        resource_hoarding_jobs.loc[:, "allocated_cores_fraction"] = (
+            resource_hoarding_jobs.loc[:, "cpu_core_count"] / resource_hoarding_jobs.loc[:, "total_cores_of_nodes"]
         )
 
-        self.jobs_with_efficiency_metrics = memory_hoarding_jobs
-        return self.jobs_with_efficiency_metrics
+        resource_hoarding_jobs.loc[:, "core_hoarding_fraction_diff"] = (
+            resource_hoarding_jobs.loc[:, "allocated_cores_fraction"]
+            - resource_hoarding_jobs.loc[:, "gpu_count_fraction"]
+        )
+
+        self.jobs_with_resource_hoarding_metrics = resource_hoarding_jobs
+        return self.jobs_with_resource_hoarding_metrics
+
+    # TODO(Arda): Implement user-level resource hoarding analysis
+    # def calculate_node_resource_hoarding_for_users(self):
+    #     """Calculate resource hoarding for users based on jobs with resource hoarding metrics."""
