@@ -18,7 +18,7 @@ partition_info = PartitionInfoFetcher().get_info()
 gpu_partitions = [p["name"] for p in partition_info if p["type"] == PartitionTypeEnum.GPU.value]
 
 
-def test_preprocess_data_filtred_columns(mock_data_frame, recwarn):
+def test_preprocess_data_filtred_columns(mock_data_frame):
     """
     Test that the preprocessed data does not contain irrelevant columns.
     """
@@ -29,7 +29,7 @@ def test_preprocess_data_filtred_columns(mock_data_frame, recwarn):
     assert "Preempted" not in data.columns
 
 
-def test_preprocess_data_filtered_gpu(mock_data_frame, recwarn):
+def test_preprocess_data_filtered_gpu(mock_data_frame):
     """
     Test that the preprocessed data does not contain null GPUType and GPUs.
     """
@@ -40,7 +40,7 @@ def test_preprocess_data_filtered_gpu(mock_data_frame, recwarn):
     assert not any(is_gpu_null)
 
 
-def test_preprocess_data_filtered_status(mock_data_frame, recwarn):
+def test_preprocess_data_filtered_status(mock_data_frame):
     """
     Test that the preprocessed data does not contain FAILED or CANCELLED jobs.
     """
@@ -62,7 +62,7 @@ def test_preprocess_data_filtered_min_elapsed(mock_data_frame):
     assert not any(elapsed_below_threshold)
 
 
-def test_preprocess_data_filter_min_esplaped_2(mock_data_frame, mock_data_path, recwarn):
+def test_preprocess_data_filter_min_esplaped_2(mock_data_frame, mock_data_path):
     """
     Test that the preprocessed data contains only jobs with elapsed time below the threshold (700 seconds).
     """
@@ -83,7 +83,7 @@ def test_preprocess_data_filter_min_esplaped_2(mock_data_frame, mock_data_path, 
     )
 
 
-def test_preprocess_data_filtered_root_account(mock_data_frame, recwarn):
+def test_preprocess_data_filtered_root_account(mock_data_frame):
     """
     Test that the preprocessed data does not contain jobs with root account, partition building, or qos updates.
     """
@@ -96,7 +96,7 @@ def test_preprocess_data_filtered_root_account(mock_data_frame, recwarn):
     assert not any(partition_building)
 
 
-def test_preprocess_data_include_cpu_job(mock_data_frame, mock_data_path, recwarn):
+def test_preprocess_data_include_cpu_job(mock_data_frame, mock_data_path):
     """
     Test that the preprocessed data includes CPU-only jobs when specified.
     """
@@ -106,7 +106,7 @@ def test_preprocess_data_include_cpu_job(mock_data_frame, mock_data_path, recwar
     assert sum(~(data["Partition"].isin(gpu_partitions))) == expect_cpus_jobs
 
 
-def test_preprocess_data_include_failed_cancelled_job(mock_data_frame, mock_data_path, recwarn):
+def test_preprocess_data_include_failed_cancelled_job(mock_data_frame, mock_data_path):
     """
     Test that the preprocessed data includes FAILED and CANCELLED jobs when specified.
     """
@@ -122,7 +122,7 @@ def test_preprocess_data_include_failed_cancelled_job(mock_data_frame, mock_data
     assert sum(x == StatusEnum.CANCELLED.value for x in data["Status"]) == expect_cancelled_status
 
 
-def test_preprocess_data_include_custom_qos_values(mock_data_frame, mock_data_path, recwarn):
+def test_preprocess_data_include_custom_qos_values(mock_data_frame, mock_data_path):
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_custom_qos_jobs=True)
     ground_truth = preprocess_mock_data(mock_data_path, min_elapsed_seconds=600, include_custom_qos_jobs=True)
     filtered_ground_truth = ground_truth[
@@ -136,7 +136,7 @@ def test_preprocess_data_include_custom_qos_values(mock_data_frame, mock_data_pa
         assert id in expect_ids
 
 
-def test_all_boolean_args_being_true(mock_data_frame, mock_data_path, recwarn):
+def test_all_boolean_args_being_true(mock_data_frame, mock_data_path):
     """
     Test that the preprocessed data includes all jobs when CPU-only, FAILED/CANCELLED, custom QOS jobs are specified.
     """
@@ -170,7 +170,7 @@ def test_all_boolean_args_being_true(mock_data_frame, mock_data_path, recwarn):
     assert sum(x == StatusEnum.COMPLETED.value for x in data["Status"]) == expect_completed_status
 
 
-def test_preprocess_data_fill_missing_interactive(mock_data_frame, mock_data_path, recwarn):
+def test_preprocess_data_fill_missing_interactive(mock_data_frame, mock_data_path):
     """
     Test that the preprocessed data fills missing interactive job types with 'non-interactive' correctly.
     """
@@ -192,7 +192,7 @@ def test_preprocess_data_fill_missing_interactive(mock_data_frame, mock_data_pat
     assert sum(x == InteractiveEnum.NON_INTERACTIVE.value for x in data["Interactive"]) == expect_non_interactive
 
 
-def test_preprocess_data_fill_missing_array_id(mock_data_frame, mock_data_path, recwarn):
+def test_preprocess_data_fill_missing_array_id(mock_data_frame, mock_data_path):
     """
     Test that the preprocessed data fills missing ArrayID with -1 correctly.
     """
@@ -212,7 +212,7 @@ def test_preprocess_data_fill_missing_array_id(mock_data_frame, mock_data_path, 
     assert sum(x == -1 for x in data["ArrayID"]) == expect_array_id_null
 
 
-def test_preprocess_data_fill_missing_gpu_type(mock_data_frame, mock_data_path, recwarn):
+def test_preprocess_data_fill_missing_gpu_type(mock_data_frame, mock_data_path):
     """
     Test that the preprocessed data fills missing GPUType with 'cpu' correctly.
     """
@@ -238,7 +238,7 @@ def test_preprocess_data_fill_missing_gpu_type(mock_data_frame, mock_data_path, 
     )
 
 
-def test_preprocess_data_fill_missing_constraints(mock_data_frame, mock_data_path, recwarn):
+def test_preprocess_data_fill_missing_constraints(mock_data_frame, mock_data_path):
     """
     Test that the preprocessed data fills missing Constraints with empty numpy array correctly.
     """
@@ -259,7 +259,7 @@ def test_preprocess_data_fill_missing_constraints(mock_data_frame, mock_data_pat
     assert sum(len(x) == 0 for x in data["Constraints"]) == expect_constraints_null
 
 
-def test_category_interactive(mock_data_frame, mock_data_path, recwarn):
+def test_category_interactive(mock_data_frame, mock_data_path):
     """
     Test that the preprocessed data has 'Interactive' as a categorical variable and check values contained within it.
     """
@@ -271,7 +271,7 @@ def test_category_interactive(mock_data_frame, mock_data_path, recwarn):
     assert expected.issubset(set(data["Interactive"].cat.categories))
 
 
-def test_category_qos(mock_data_frame, mock_data_path, recwarn):
+def test_category_qos(mock_data_frame, mock_data_path):
     """
     Test that the preprocessed data has 'QOS' as a categorical variable and check values contained within it.
     """
@@ -283,7 +283,7 @@ def test_category_qos(mock_data_frame, mock_data_path, recwarn):
     assert expected.issubset(set(data["QOS"].cat.categories))
 
 
-def test_category_exit_code(mock_data_frame, mock_data_path, recwarn):
+def test_category_exit_code(mock_data_frame, mock_data_path):
     """
     Test that the preprocessed data has 'ExitCode' as a categorical variable and check values contained within it.
     """
@@ -296,7 +296,7 @@ def test_category_exit_code(mock_data_frame, mock_data_path, recwarn):
     assert expected.issubset(set(data["ExitCode"].cat.categories))
 
 
-def test_category_partition(mock_data_frame, mock_data_path, recwarn):
+def test_category_partition(mock_data_frame, mock_data_path):
     """
     Test that the preprocessed data has 'Partition' as a categorical variable and check values contained within it.
     """
@@ -309,7 +309,7 @@ def test_category_partition(mock_data_frame, mock_data_path, recwarn):
     assert expected.issubset(set(data["Partition"].cat.categories))
 
 
-def test_category_account(mock_data_frame, mock_data_path, recwarn):
+def test_category_account(mock_data_frame, mock_data_path):
     """
     Test that the preprocessed data has 'Account' as a categorical variable and check values contained within it.
     """
@@ -322,7 +322,7 @@ def test_category_account(mock_data_frame, mock_data_path, recwarn):
     assert expected.issubset(set(data["Account"].cat.categories))
 
 
-def test_preprocess_timedelta_conversion(mock_data_frame, mock_data_path, recwarn):
+def test_preprocess_timedelta_conversion(mock_data_frame, mock_data_path):
     """
     Test that the preprocessed data converts elapsed time to timedelta.
     """
@@ -347,7 +347,7 @@ def test_preprocess_timedelta_conversion(mock_data_frame, mock_data_path, recwar
         assert timedelta.total_seconds() / 60 == ground_truth_time_limit[i]
 
 
-def test_preprocess_gpu_type(mock_data_frame, mock_data_path, recwarn):
+def test_preprocess_gpu_type(mock_data_frame):
     """
     Test that the GPUType column is correctly filled and transformed during preprocessing.
     """
@@ -362,35 +362,36 @@ def test_preprocess_gpu_type(mock_data_frame, mock_data_path, recwarn):
     assert all(isinstance(row, list) for row in data["GPUType"] if not pd.isna(row))
 
 
-def test_preprocess_missing_required_columns(mock_data_frame, recwarn):
+@pytest.mark.parametrize("missing_col", [col.value for col in RequiredColumnsEnum])
+def test_preprocess_missing_required_columns(mock_data_frame, missing_col):
     """
     Test handling the dataframe when missing one of the ENFORCE_COLUMNS in constants.py.
 
     Expect to raise KeyError for any of these columns if they are missing in the dataframe.
     """
-    required_column_list = [e.value for e in RequiredColumnsEnum]
-    for col in required_column_list:
-        cur_df = mock_data_frame.drop(col, axis=1, inplace=False)
-        with pytest.raises(KeyError, match=f"Column {col} does not exist in dataframe."):
-            _res = preprocess_data(cur_df)
+    cur_df = mock_data_frame.drop(missing_col, axis=1, inplace=False)
+    with pytest.raises(KeyError, match=f"Column {missing_col} does not exist in dataframe."):
+        _res = preprocess_data(cur_df)
 
 
-def test_preprocess_missing_optional_columns(mock_data_frame, recwarn):
+@pytest.mark.parametrize("missing_col", [col.value for col in OptionalColumnsEnum])
+def test_preprocess_missing_optional_columns(mock_data_frame, recwarn, missing_col):
     """
     Test handling the dataframe when missing one of the columns.
 
     These columns are not in ENFORCE_COLUMNS so only warnings are expected to be raised.
     """
-    optional_columns_list = [e.value for e in OptionalColumnsEnum]
-    for col in optional_columns_list:
-        cur_df = mock_data_frame.drop(col, axis=1, inplace=False)
+    cur_df = mock_data_frame.drop(missing_col, axis=1, inplace=False)
 
-        expect_warning_msg = (
-            f"Column '{col}' is missing from the dataframe. "
-            "This may impact filtering operations and downstream processing."
-        )
-        with pytest.warns(UserWarning, match=expect_warning_msg):
-            _res = preprocess_data(cur_df)
+    expect_warning_msg = (
+        f"Column '{missing_col}' is missing from the dataframe. "
+        "This may impact filtering operations and downstream processing."
+    )
+    _res = preprocess_data(cur_df)
+
+    # Check that a warning was raised with the expected message
+    assert len(recwarn) == 1
+    assert str(recwarn[0].message) == expect_warning_msg
 
 
 def test_preprocess_empty_dataframe_warning(mock_data_frame, recwarn):

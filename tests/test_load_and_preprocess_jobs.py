@@ -82,78 +82,6 @@ def test_filter_date_back_include_all(mock_data_path):
         assert id in expect_job_ids
 
 
-def test_custom_query(mock_data_frame, mock_data_path, recwarn):
-    """
-    Test if function fetches expected records when using custom sql query.
-
-    Warnings are ignored since test_optional_column_warnings and test_missing_required_columns_error_raised
-        covers warning for columns missing.
-    """
-    query = (
-        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage, CPUMemUsage, Elapsed "
-        "FROM Jobs WHERE Status != 'CANCELLED' AND Status !='FAILED' "
-        "AND ArrayID is not NULL AND Interactive is not NULL"
-    )
-    res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)
-    ground_truth_jobs = mock_data_frame[
-        (mock_data_frame["Status"] != "CANCELLED")
-        & (mock_data_frame["Status"] != "FAILED")
-        & (mock_data_frame["ArrayID"].notna())
-        & (mock_data_frame["Interactive"].notna())
-    ].copy()
-    assert len(res) == len(ground_truth_jobs)
-    expect_ids = ground_truth_jobs["JobID"].to_list()
-    for id in res["JobID"]:
-        assert id in expect_ids
-
-
-@pytest.mark.parametrize("days_back", [90, 150])
-def test_custom_query_days_back(mock_data_frame, mock_data_path, recwarn, days_back):
-    """
-    Test custom query with dates_back condition.
-
-    Expect the result will be filtered by dates_back condition in the query.
-
-    Warnings are ignored since test_optional_column_warnings and test_missing_required_columns_error_raised
-        covers test warning for columns missing.
-    """
-    cutoff = datetime.now() - timedelta(days=days_back)
-    query = (
-        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage, CPUMemUsage, Elapsed "
-        "FROM Jobs WHERE Status != 'CANCELLED' AND Status !='FAILED' AND ArrayID is not NULL "
-        f"AND Interactive is not NULL AND StartTime >= '{cutoff}'"
-    )
-    res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)
-
-    ground_truth_jobs = mock_data_frame[
-        (mock_data_frame["Status"] != "CANCELLED")
-        & (mock_data_frame["Status"] != "FAILED")
-        & (mock_data_frame["ArrayID"].notna())
-        & (mock_data_frame["Interactive"].notna())
-        & (mock_data_frame["StartTime"] >= cutoff)
-    ].copy()
-    expect_ids = ground_truth_jobs["JobID"].to_list()
-
-    assert len(res) == len(ground_truth_jobs)
-    for id in res["JobID"]:
-        assert id in expect_ids
-
-
-def test_empty_dataframe_warning(mock_data_path, recwarn):
-    """
-    Test handling the dataframe loads from database when the result is empty.
-
-    Expect a UserWarning to be raised with the appropriate message.
-    """
-    # Query that returns no rows
-    query = "SELECT * FROM Jobs WHERE 1=0"
-    res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)
-    assert res.empty
-    # Check that the warning is about empty dataframe
-    assert len(recwarn) == 1
-    assert str(recwarn[0].message) == "Dataframe results from database and filtering is empty."
-
-
 @pytest.mark.parametrize("missing_col", [col.value for col in RequiredColumnsEnum])
 def test_missing_required_columns_error_raised(mock_data_path, missing_col):
     """
@@ -197,4 +125,76 @@ def test_optional_column_warnings(mock_data_path, recwarn, missing_col):
 
     # Check that a warning was raised with the expected message
     assert len(recwarn) > 0
-    assert str(recwarn[-1].message) == expect_warning_msg
+    assert str(recwarn[0].message) == expect_warning_msg
+
+
+def test_custom_query(mock_data_frame, mock_data_path, recwarn):
+    """
+    Test if function fetches expected records when using custom sql query.
+
+    Warnings are ignored since test_optional_column_warnings and test_missing_required_columns_error_raised
+        covers warning for optional columns missing.
+    """
+    query = (
+        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage, CPUMemUsage, Elapsed "
+        "FROM Jobs WHERE Status != 'CANCELLED' AND Status !='FAILED' "
+        "AND ArrayID is not NULL AND Interactive is not NULL"
+    )
+    res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)
+    ground_truth_jobs = mock_data_frame[
+        (mock_data_frame["Status"] != "CANCELLED")
+        & (mock_data_frame["Status"] != "FAILED")
+        & (mock_data_frame["ArrayID"].notna())
+        & (mock_data_frame["Interactive"].notna())
+    ].copy()
+    assert len(res) == len(ground_truth_jobs)
+    expect_ids = ground_truth_jobs["JobID"].to_list()
+    for id in res["JobID"]:
+        assert id in expect_ids
+
+
+@pytest.mark.parametrize("days_back", [90, 150])
+def test_custom_query_days_back(mock_data_frame, mock_data_path, recwarn, days_back):
+    """
+    Test custom query with dates_back condition.
+
+    Expect the result will be filtered by dates_back condition in the query.
+
+    Warnings are ignored since test_optional_column_warnings and test_missing_required_columns_error_raised
+        covers test warning for optional columns missing.
+    """
+    cutoff = datetime.now() - timedelta(days=days_back)
+    query = (
+        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage, CPUMemUsage, Elapsed "
+        "FROM Jobs WHERE Status != 'CANCELLED' AND Status !='FAILED' AND ArrayID is not NULL "
+        f"AND Interactive is not NULL AND StartTime >= '{cutoff}'"
+    )
+    res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)
+
+    ground_truth_jobs = mock_data_frame[
+        (mock_data_frame["Status"] != "CANCELLED")
+        & (mock_data_frame["Status"] != "FAILED")
+        & (mock_data_frame["ArrayID"].notna())
+        & (mock_data_frame["Interactive"].notna())
+        & (mock_data_frame["StartTime"] >= cutoff)
+    ].copy()
+    expect_ids = ground_truth_jobs["JobID"].to_list()
+
+    assert len(res) == len(ground_truth_jobs)
+    for id in res["JobID"]:
+        assert id in expect_ids
+
+
+def test_empty_dataframe_warning(mock_data_path, recwarn):
+    """
+    Test handling the dataframe loads from database when the result is empty.
+
+    Expect a UserWarning to be raised with the appropriate message.
+    """
+    # Query that returns no rows
+    query = "SELECT * FROM Jobs WHERE 1=0"
+    res = load_and_preprocessed_jobs_custom_query(db_path=mock_data_path, custom_query=query)
+    assert res.empty
+    # Check that the warning is about empty dataframe
+    assert len(recwarn) == 1
+    assert str(recwarn[0].message) == "Dataframe results from database and filtering is empty."
