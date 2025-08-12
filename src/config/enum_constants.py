@@ -240,11 +240,15 @@ class ResourceHoardingDataFrameNameEnum(MetricsDataFrameNameBase):
         JOBS: DataFrame name for jobs with resource hoarding metrics.
         USERS: DataFrame name for users with resource hoarding metrics.
         PI_GROUPS: DataFrame name for PI accounts/groups with resource hoarding metrics.
+        JOBS_WITH_RESOURCE_HOARDING_METRICS: DataFrame name for jobs with resource hoarding metrics.
+        USERS_WITH_RESOURCE_HOARDING_METRICS: DataFrame name for users with resource hoarding metrics.
+        PI_GROUPS_WITH_RESOURCE_HOARDING_METRICS: DataFrame name for PI accounts/groups with resource hoarding metrics.
     """
 
-    JOBS = "jobs_with_efficiency_metrics"
-    USERS = "users_with_efficiency_metrics"
-    PI_GROUPS = "pi_accounts_with_efficiency_metrics"
+    # Reuse canonical values to avoid duplicate string literals
+    JOBS = MetricsDataFrameNameEnum.JOBS.value
+    USERS = MetricsDataFrameNameEnum.USERS.value
+    PI_GROUPS = MetricsDataFrameNameEnum.PI_GROUPS.value
     JOBS_WITH_RESOURCE_HOARDING_METRICS = "jobs_with_resource_hoarding_metrics"
     USERS_WITH_RESOURCE_HOARDING_METRICS = "users_with_resource_hoarding_metrics"
     PI_GROUPS_WITH_RESOURCE_HOARDING_METRICS = "pi_accounts_with_resource_hoarding_metrics"
