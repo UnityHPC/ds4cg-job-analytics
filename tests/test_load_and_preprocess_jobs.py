@@ -199,11 +199,11 @@ def test_custom_query_days_back_2(mock_data_frame, mock_data_path, recwarn):
 #     assert str(recwarn[0].message) == "Dataframe results from database and filtering is empty."
 
 
-def test_required_columns_raised(mock_data_path, recwarn):
+def test_missing_required_columns_error_raised(mock_data_path, recwarn):
     """
-    Test handling the dataframe loads from database when missing one of the ENFORCE_COLUMNS in constants.py
+    Test enforcement of errorss when the database is missing a required column.
 
-    Expect to raise RuntimeError for any of these columns if they are missing in the dataframe
+    Expect to raise RuntimeError for any of these columns if they are missing in the dataframe.
     """
     required_col = {e.value for e in RequiredColumnsEnum}
     for col in required_col:

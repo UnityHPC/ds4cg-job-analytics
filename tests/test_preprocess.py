@@ -122,7 +122,7 @@ def test_preprocess_data_include_failed_cancelled_job(mock_data_frame, mock_data
     assert sum(x == StatusEnum.CANCELLED.value for x in data["Status"]) == expect_cancelled_status
 
 
-def test_preprocess_data_include_custom_qos(mock_data_frame, mock_data_path, recwarn):
+def test_preprocess_data_include_custom_qos_values(mock_data_frame, mock_data_path, recwarn):
     data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_custom_qos_jobs=True)
     ground_truth = preprocess_mock_data(mock_data_path, min_elapsed_seconds=600, include_custom_qos=True)
     filtered_ground_truth = ground_truth[
@@ -136,7 +136,7 @@ def test_preprocess_data_include_custom_qos(mock_data_frame, mock_data_path, rec
         assert id in expect_ids
 
 
-def test_preprocess_data_include_all(mock_data_frame, mock_data_path, recwarn):
+def test_all_boolean_args_being_true(mock_data_frame, mock_data_path, recwarn):
     """
     Test that the preprocessed data includes all jobs when CPU-only, FAILED/CANCELLED, custom QOS jobs are specified.
     """
@@ -362,7 +362,7 @@ def test_preprocess_gpu_type(mock_data_frame, mock_data_path, recwarn):
     assert all(isinstance(row, list) for row in data["GPUType"] if not pd.isna(row))
 
 
-def test_preprocess_key_errors_raised(mock_data_frame, recwarn):
+def test_preprocess_missing_required_columns(mock_data_frame, recwarn):
     """
     Test handling the dataframe when missing one of the ENFORCE_COLUMNS in constants.py
 
@@ -375,7 +375,7 @@ def test_preprocess_key_errors_raised(mock_data_frame, recwarn):
             _res = preprocess_data(cur_df)
 
 
-def test_preprocess_warning_raised(mock_data_frame, recwarn):
+def test_preprocess_missing_optional_columns(mock_data_frame, recwarn):
     """
     Test handling the dataframe when missing one of the columns
 
