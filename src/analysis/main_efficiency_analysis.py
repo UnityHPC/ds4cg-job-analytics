@@ -17,7 +17,6 @@ from src.config.enum_constants import (
     JobEfficiencyMetricsEnum,
     UserEfficiencyMetricsEnum,
     PIEfficiencyMetricsEnum,
-    ProportionMetricsEnum,
 )
 
 
@@ -395,7 +394,7 @@ class EfficiencyAnalysis:
             .reset_index()
         )
 
-        # change names of aggregated columns to predefined metrics/ proportions enum
+        # rename to use enum values
         users_w_efficiency_metrics = users_w_efficiency_metrics.rename(
             columns={
                 "job_count": UserEfficiencyMetricsEnum.JOBS.value,
@@ -490,7 +489,9 @@ class EfficiencyAnalysis:
         if alloc_vram_efficiency_filter is not None:
             try:
                 mask &= EfficiencyAnalysis.apply_numeric_filter(
-                    self.users_with_efficiency_metrics["expected_value_alloc_vram_efficiency"],
+                    self.users_with_efficiency_metrics[
+                        UserEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY.value
+                    ],
                     alloc_vram_efficiency_filter,
                     {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY},
                     filter_name="expected_value_alloc_vram_efficiency",
@@ -498,13 +499,15 @@ class EfficiencyAnalysis:
             except ValueError as e:
                 raise ValueError("Invalid filter for expected_value_alloc_vram_efficiency.") from e
 
-        col = self.users_with_efficiency_metrics["job_count"]
+        col = self.users_with_efficiency_metrics[UserEfficiencyMetricsEnum.JOBS.value]
         mask &= col.ge(min_jobs)
 
         inefficient_users = self.users_with_efficiency_metrics[mask]
 
         # Sort by the metric ascending (lower is worse)
-        inefficient_users = inefficient_users.sort_values("expected_value_alloc_vram_efficiency", ascending=True)
+        inefficient_users = inefficient_users.sort_values(
+            UserEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY.value, ascending=True
+        )
         return inefficient_users
 
     def find_inefficient_users_by_vram_hours(
@@ -540,7 +543,7 @@ class EfficiencyAnalysis:
         if vram_hours_filter is not None:
             try:
                 mask &= EfficiencyAnalysis.apply_numeric_filter(
-                    self.users_with_efficiency_metrics["vram_hours"],
+                    self.users_with_efficiency_metrics[UserEfficiencyMetricsEnum.VRAM_HOURS.value],
                     vram_hours_filter,
                     {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY},
                     filter_name="vram_hours_filter",
@@ -548,13 +551,13 @@ class EfficiencyAnalysis:
             except ValueError as e:
                 raise ValueError("Invalid filter for vram_hours.") from e
 
-        col = self.users_with_efficiency_metrics["job_count"]
+        col = self.users_with_efficiency_metrics[UserEfficiencyMetricsEnum.JOBS.value]
         mask &= col.ge(min_jobs)
 
         inefficient_users = self.users_with_efficiency_metrics[mask]
 
         # Sort by the metric descending (higher is worse)
-        inefficient_users = inefficient_users.sort_values("vram_hours", ascending=False)
+        inefficient_users = inefficient_users.sort_values(UserEfficiencyMetricsEnum.VRAM_HOURS.value, ascending=False)
         return inefficient_users
 
     def calculate_all_efficiency_metrics(self, filtered_jobs: pd.DataFrame) -> dict:
@@ -602,28 +605,54 @@ class EfficiencyAnalysis:
         pi_efficiency_metrics = (
             self.users_with_efficiency_metrics.groupby("pi_account", observed=True)
             .agg(
-                job_count=("job_count", "sum"),
-                pi_acc_job_hours=("user_job_hours", "sum"),
+                job_count=(UserEfficiencyMetricsEnum.JOBS.value, "sum"),
+                pi_acc_job_hours=(UserEfficiencyMetricsEnum.JOB_HOURS.value, "sum"),
                 user_count=("User", "nunique"),
-                pi_acc_vram_hours=("vram_hours", "sum"),
-                avg_alloc_vram_efficiency_score=("avg_alloc_vram_efficiency_score", "mean"),
-                avg_vram_constraint_efficiency_score=("avg_vram_constraint_efficiency_score", "mean"),
+                pi_acc_vram_hours=(UserEfficiencyMetricsEnum.VRAM_HOURS.value, "sum"),
+                avg_alloc_vram_efficiency_score=(
+                    UserEfficiencyMetricsEnum.AVG_ALLOC_VRAM_EFFICIENCY_SCORE.value,
+                    "mean",
+                ),
+                avg_vram_constraint_efficiency_score=(
+                    UserEfficiencyMetricsEnum.AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE.value,
+                    "mean",
+                ),
             )
             .reset_index()
         )
 
+        # rename to use enums value
+        pi_efficiency_metrics = pi_efficiency_metrics.rename(
+            columns={
+                "job_count": PIEfficiencyMetricsEnum.JOBS.value,
+                "pi_acc_job_hours": PIEfficiencyMetricsEnum.JOB_HOURS.value,
+                "user_count": PIEfficiencyMetricsEnum.USERS.value,
+                "pi_acc_vram_hours": PIEfficiencyMetricsEnum.VRAM_HOURS.value,
+                "avg_alloc_vram_efficiency_score": PIEfficiencyMetricsEnum.AVG_ALLOC_VRAM_EFFICIENCY_SCORE.value,
+                "avg_vram_constraint_efficiency_score": (
+                    PIEfficiencyMetricsEnum.AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE.value
+                ),
+            }
+        )
+
+        # declare user columns that would be used throughout the calculation
+        user_vram_hours_col = UserEfficiencyMetricsEnum.VRAM_HOURS.value
+        user_exepected_alloc_eff_col = UserEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY.value
+        user_expected_vram_eff_col = UserEfficiencyMetricsEnum.EXPECTED_VALUE_VRAM_CONSTRAINTS_EFFICIENCY.value
+        user_expected_gpu_count_col = UserEfficiencyMetricsEnum.EXPECTED_VALUE_GPU_COUNT.value
+
         # Compute pi_acc_vram_hours once and reuse for both metrics
         pi_acc_vram_hours = self.users_with_efficiency_metrics.groupby("pi_account", observed=True)[
-            "vram_hours"
+            user_vram_hours_col
         ].transform("sum")
 
         self.users_with_efficiency_metrics.loc[:, "weighted_ev_alloc_vram_efficiency"] = (
-            self.users_with_efficiency_metrics["expected_value_alloc_vram_efficiency"]
-            * self.users_with_efficiency_metrics["vram_hours"]
+            self.users_with_efficiency_metrics[user_exepected_alloc_eff_col]
+            * self.users_with_efficiency_metrics[user_vram_hours_col]
             / pi_acc_vram_hours
         )
 
-        pi_efficiency_metrics.loc[:, "expected_value_alloc_vram_efficiency"] = (
+        pi_efficiency_metrics.loc[:, PIEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY.value] = (
             self.users_with_efficiency_metrics.groupby("pi_account", observed=True)[
                 "weighted_ev_alloc_vram_efficiency"
             ]
@@ -632,12 +661,12 @@ class EfficiencyAnalysis:
         )
 
         self.users_with_efficiency_metrics.loc[:, "weighted_ev_vram_constraint_efficiency"] = (
-            self.users_with_efficiency_metrics["expected_value_vram_constraint_efficiency"]
-            * self.users_with_efficiency_metrics["vram_hours"]
+            self.users_with_efficiency_metrics[user_expected_vram_eff_col]
+            * self.users_with_efficiency_metrics[user_vram_hours_col]
             / pi_acc_vram_hours
         )
 
-        pi_efficiency_metrics.loc[:, "expected_value_vram_constraint_efficiency"] = (
+        pi_efficiency_metrics.loc[:, PIEfficiencyMetricsEnum.EXPECTED_VALUE_VRAM_CONSTRAINTS_EFFICIENCY.value] = (
             self.users_with_efficiency_metrics.groupby("pi_account", observed=True)[
                 "weighted_ev_vram_constraint_efficiency"
             ]
@@ -646,11 +675,11 @@ class EfficiencyAnalysis:
         )
 
         self.users_with_efficiency_metrics.loc[:, "weighted_ev_gpu_count"] = (
-            self.users_with_efficiency_metrics["expected_value_gpu_count"]
-            * self.users_with_efficiency_metrics["vram_hours"]
+            self.users_with_efficiency_metrics[user_expected_gpu_count_col]
+            * self.users_with_efficiency_metrics[user_vram_hours_col]
             / pi_acc_vram_hours
         )
-        pi_efficiency_metrics.loc[:, "expected_value_gpu_count"] = (
+        pi_efficiency_metrics.loc[:, PIEfficiencyMetricsEnum.EXPECTED_VALUE_GPU_COUNT.value] = (
             self.users_with_efficiency_metrics.groupby("pi_account", observed=True)["weighted_ev_gpu_count"]
             .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
             .to_numpy()
@@ -701,7 +730,7 @@ class EfficiencyAnalysis:
         if vram_hours_filter is not None:
             try:
                 mask &= EfficiencyAnalysis.apply_numeric_filter(
-                    self.pi_accounts_with_efficiency_metrics["pi_acc_vram_hours"],
+                    self.pi_accounts_with_efficiency_metrics[PIEfficiencyMetricsEnum.VRAM_HOURS.value],
                     vram_hours_filter,
                     {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY},
                     filter_name="pi_acc_vram_hours_filter",
@@ -709,13 +738,15 @@ class EfficiencyAnalysis:
             except ValueError as e:
                 raise ValueError("Invalid filter for pi_acc_vram_hours.") from e
 
-        col = self.pi_accounts_with_efficiency_metrics["job_count"]
+        col = self.pi_accounts_with_efficiency_metrics[PIEfficiencyMetricsEnum.JOBS.value]
         mask &= col.ge(min_jobs)
 
         inefficient_pi_accounts = self.pi_accounts_with_efficiency_metrics[mask]
 
         # Sort by the metric descending (higher is worse)
-        inefficient_pi_accounts = inefficient_pi_accounts.sort_values("pi_acc_vram_hours", ascending=False)
+        inefficient_pi_accounts = inefficient_pi_accounts.sort_values(
+            PIEfficiencyMetricsEnum.VRAM_HOURS.value, ascending=False
+        )
         return inefficient_pi_accounts
 
     def sort_and_filter_records_with_metrics(
