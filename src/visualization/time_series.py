@@ -618,6 +618,10 @@ class TimeSeriesVisualizer(DataVisualizer[TimeSeriesVisualizationKwargsModel]):
             df = df[df[vram_metric] > 0]
             df = df[df[efficiency_metric].notna() & df[vram_metric].notna()]
 
+            if df.empty:
+                print("No data available after filtering zero or NaN values.")
+                return
+
         fig, ax = plt.subplots(figsize=(12, 8))
 
         users = df["User"].unique().tolist()
