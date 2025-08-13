@@ -454,7 +454,7 @@ def preprocess_data(
         pd.DataFrame: The preprocessed dataframe
 
     """
-    data = input_df
+    data = input_df.copy()
     if apply_filter:
         # Drop unnecessary columns, ignoring errors in case any of them is not in the dataframe
         data = input_df.drop(
