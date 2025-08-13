@@ -336,4 +336,3 @@ class EfficiencyCategoryEnum(Enum):
             return cls.GOOD_LABEL.value
         else:
             return cls.EXCELLENT_LABEL.value
-

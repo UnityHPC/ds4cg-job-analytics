@@ -514,7 +514,7 @@ else:
 
 # Check if we have job metrics data for ROC analysis
 all_users_job_metrics = data.get('all_users_job_metrics', None)
-user_jobs_df = pd.DataFrame(data['user_jobs'])
+user_jobs_df = pd.DataFrame(user_jobs)  # Use the already loaded user_jobs instead of data['user_jobs']
 
 if all_users_job_metrics is not None and len(all_users_job_metrics) > 100:
     print("### ROC Analysis: VRAM Efficiency Performance")
@@ -537,13 +537,12 @@ else:
 ```
 
 
-## Advanced ROC Analysis (Multiple Users Comparison)
-
 ```{python}
 #| echo: false
-#| fig-cap: "Advanced ROC: Your Performance vs Other Users"
-#| fig-width: 14
-#| fig-height: 8
+#| output: asis
+#| fig-cap: "Your Performance vs Other Users"
+#| fig-width: 8
+#| fig-height: 5
 
 # Advanced ROC analysis using the actual ROCVisualizer class
 all_users_job_metrics = data.get('all_users_job_metrics', None)
@@ -555,9 +554,9 @@ if all_users_job_metrics is not None and len(all_users_job_metrics) > 100 and le
         import pandas as pd
         import numpy as np
         from src.analysis.roc_plot import ROCVisualizer
-        from src.config.enum_constants import ProportionMetricsEnum, JobEfficiencyMetricsEnum
+        from src.config.enum_constants import ProportionMetricsEnum, JobEfficiencyMetricsEnum, EfficiencyCategoryEnum
         
-        print("### Advanced ROC Analysis: Your Performance vs Other Users")
+        print("### Your Performance vs Other Users")
         print()
         
         # Convert job metrics to DataFrame - this already has efficiency calculations
@@ -571,28 +570,58 @@ if all_users_job_metrics is not None and len(all_users_job_metrics) > 100 and le
             print(f"**Error**: Missing required columns: {missing_cols}")
             print("ROC analysis requires job data with calculated efficiency metrics.")
         else:
-            print(f"**Total jobs with metrics**: {len(all_jobs_df):,}")
             print(f"**Your jobs**: {len(user_jobs_df)}")
+            print()
             
             # Get unique users for comparison
             all_users = all_jobs_df['User'].unique()
             other_users = [u for u in all_users if u != user_id]
             
             if len(other_users) >= 5:
-                # Sample users for comparison to avoid overcrowding the plot
-                comparison_users = other_users[:20] if len(other_users) > 20 else other_users
-                plot_users = [user_id] + comparison_users
+                # Create a true aggregate for "All Other Users" by calculating percentiles
+                # This gives us a single representative curve for all other users combined
+                other_users_jobs = all_jobs_df[all_jobs_df['User'] != user_id].copy()
                 
-                print(f"**Comparing against**: {len(comparison_users)} other users")
+                # Calculate efficiency percentiles across all other users' jobs
+                efficiency_values = other_users_jobs['alloc_vram_efficiency'].values
+                
+                # Create synthetic aggregate data points representing the distribution
+                # We'll create data points at different efficiency levels to represent the aggregate
+                percentiles = np.arange(0, 101, 5)  # 0%, 5%, 10%, ..., 100%
+                efficiency_percentiles = np.percentile(efficiency_values, percentiles)
+                
+                # Create aggregate data representing "All Other Users" performance distribution
+                n_synthetic_jobs = 100  # Number of synthetic jobs to represent the aggregate
+                synthetic_efficiencies = np.interp(
+                    np.linspace(0, 100, n_synthetic_jobs), 
+                    percentiles, 
+                    efficiency_percentiles
+                )
+                
+                # Create aggregate dataset
+                aggregate_data = pd.DataFrame({
+                    'User': ['All Other Users'] * n_synthetic_jobs,
+                    'alloc_vram_efficiency': synthetic_efficiencies
+                })
+                
+                # Combine user data with true aggregate representation
+                comparison_data = pd.concat([
+                    all_jobs_df[all_jobs_df['User'] == user_id][['User', 'alloc_vram_efficiency']],  # User's jobs
+                    aggregate_data  # Aggregate representation of all other users
+                ], ignore_index=True)
+                
+                print(f"**Comparing against**: Aggregate of all other users ({len(other_users)} users)")
                 print()
                 
-                # Initialize ROC analyzer with the jobs data (already has metrics calculated)
-                roc_instance = ROCVisualizer(jobs_df=all_jobs_df)
+                # Initialize ROC analyzer with the comparison data
+                roc_instance = ROCVisualizer(jobs_df=comparison_data)
                 
-                # Create the ROC plot
-                print("**Creating ROC comparison plot...**")
+                # Since the data already has calculated efficiency metrics, set it manually
+                roc_instance.jobs_with_efficiency_metrics = comparison_data
+                
+                # Create the ROC plot with just 2 lines: user vs all others
                 fig, axes = roc_instance.multiple_line_roc_plot(
-                    plot_object_list=plot_users,
+                    plot_object_list=[user_id, 'All Other Users'],
                     object_column_type=ProportionMetricsEnum.USERS,
                     threshold_metric=JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY,
                     proportion_metric=ProportionMetricsEnum.JOBS,
@@ -608,35 +637,82 @@ if all_users_job_metrics is not None and len(all_users_job_metrics) > 100 and le
                 # Performance insights
                 if 'alloc_vram_efficiency' in user_jobs_df.columns:
                     user_efficiency = user_jobs_df['alloc_vram_efficiency'] * 100
-                    system_efficiency = all_jobs_df['alloc_vram_efficiency'] * 100
                     other_users_efficiency = all_jobs_df[all_jobs_df['User'] != user_id]['alloc_vram_efficiency'] * 100
                     
                     print(f"\n**Performance Analysis:**")
                     print()
                     print(f"- **Your average efficiency**: {user_efficiency.mean():.1f}%")
-                    print(f"- **System average efficiency**: {system_efficiency.mean():.1f}%")
                     print(f"- **Other users average**: {other_users_efficiency.mean():.1f}%")
                     
                     # Performance comparison
                     if user_efficiency.mean() > other_users_efficiency.mean():
-                        performance = "🟢 **Above Average** - You're performing better than other users!"
+                        performance = "🟢 Above Average - You're performing better than other users!"
                     elif user_efficiency.mean() > other_users_efficiency.mean() * 0.9:
-                        performance = "🟡 **Near Average** - You're close to other users' performance."
+                        performance = "🟡 Near Average - You're close to other users' performance."
                     else:
-                        performance = "🔴 **Below Average** - There's room for improvement."
+                        performance = "🔴 Below Average - There's room for improvement."
                     
                     print(f"- **Performance**: {performance}")
                     
-                    # Efficiency distribution
-                    low_eff = sum(user_efficiency < 30)
-                    high_eff = sum(user_efficiency >= 70)
+                    # Calculate percentile ranking
+                    user_avg_efficiency = user_efficiency.mean() / 100  # Convert back to 0-1 scale
+                    other_users_efficiencies = other_users_efficiency / 100  # Convert to 0-1 scale
+                    
+                    # Calculate what percentile the user is in
+                    percentile_rank = (other_users_efficiencies < user_avg_efficiency).mean() * 100
+                    
+                    print(f"- **Your percentile rank**: {percentile_rank:.1f}th percentile")
+                    
+                    # Add interpretation of percentile
+                    if percentile_rank >= 90:
+                        percentile_msg = "🏆 **Top 10%** - Excellent performance!"
+                    elif percentile_rank >= 75:
+                        percentile_msg = "🥇 **Top 25%** - Very good performance"
+                    elif percentile_rank >= 50:
+                        percentile_msg = "📊 **Above median** - Better than half of users"
+                    elif percentile_rank >= 25:
+                        percentile_msg = "📉 **Below median** - Room for improvement"
+                    else:
+                        percentile_msg = "🎯 **Bottom 25%** - Significant optimization needed"
+                    
+                    print(f"- **Ranking**: {percentile_msg}")
+                    
+                    # Show efficiency quartiles for context
+                    q25 = np.percentile(other_users_efficiencies * 100, 25)
+                    q50 = np.percentile(other_users_efficiencies * 100, 50)
+                    q75 = np.percentile(other_users_efficiencies * 100, 75)
+                    
+                    print()
+                    # print(f"**System Efficiency Quartiles:**")
+                    # print(f"- **25th percentile**: {q25:.1f}% (bottom quartile)")
+                    # print(f"- **50th percentile (median)**: {q50:.1f}% (middle)")
+                    # print(f"- **75th percentile**: {q75:.1f}% (top quartile)")
+                    # print(f"- **Your efficiency**: {user_efficiency.mean():.1f}%")
+                    
+                    # Efficiency distribution using enum constants
+                    very_low_threshold = EfficiencyCategoryEnum.VERY_LOW_THRESHOLD.value * 100  # 10%
+                    low_threshold = EfficiencyCategoryEnum.LOW_THRESHOLD.value * 100  # 30%
+                    good_threshold = EfficiencyCategoryEnum.GOOD_THRESHOLD.value * 100  # 70%
+                    
+                    very_low_eff = sum(user_efficiency < very_low_threshold)
+                    low_eff = sum((user_efficiency >= very_low_threshold) & (user_efficiency < low_threshold))
+                    medium_eff = sum((user_efficiency >= low_threshold) & (user_efficiency < good_threshold))
+                    high_eff = sum(user_efficiency >= good_threshold)
+                    
                     print()
                     print(f"**Your Efficiency Distribution:**")
-                    print(f"- **Low efficiency jobs** (< 30%): {low_eff} ({(low_eff/len(user_efficiency)*100):.1f}%)")
-                    print(f"- **High efficiency jobs** (≥ 70%): {high_eff} ({(high_eff/len(user_efficiency)*100):.1f}%)")
+                    print()
+                    print(f"- **Very low efficiency jobs** (< {very_low_threshold:.0f}%): {very_low_eff} ({(very_low_eff/len(user_efficiency)*100):.1f}%)")
+                    print()
+                    print(f"- **Low efficiency jobs** ({very_low_threshold:.0f}%-{low_threshold:.0f}%): {low_eff} ({(low_eff/len(user_efficiency)*100):.1f}%)")
+                    print()
+                    print(f"- **Medium efficiency jobs** ({low_threshold:.0f}%-{good_threshold:.0f}%): {medium_eff} ({(medium_eff/len(user_efficiency)*100):.1f}%)")
+                    print()
+                    print(f"- **High efficiency jobs** (≥ {good_threshold:.0f}%): {high_eff} ({(high_eff/len(user_efficiency)*100):.1f}%)")
                     
                     print()
                     print("**ROC Curve Interpretation:**")
+                    print()
                     print("- Each line shows how a user's jobs perform across efficiency thresholds")
                     print("- Your line (should be highlighted) shows your efficiency distribution")
                     print("- Lines higher and to the left indicate better efficiency performance")
@@ -751,35 +827,39 @@ else:
     print("No comparison data available.")
 ```
 
-### Key Performance Metrics
+### Time Usage Metrics
 
 ```{python}
 #| echo: false
-#| fig-cap: "Key Performance Metrics Comparison"
+#| fig-cap: "Time Usage Metrics Comparison"
 #| fig-width: 12
 #| fig-height: 6
 
 if len(comparison_stats_df) > 0:
-    # Select only the most important comparison metrics (avoid scale issues)
-    # Focus on efficiency, usage ratios, and normalized metrics
-    important_metrics = comparison_stats_df[
+    # Focus only on time-related metrics, excluding VRAM efficiency since it's already shown above
+    time_metrics = comparison_stats_df[
         comparison_stats_df['Category'].str.contains(
-            'efficiency|ratio|percentage|utilization|average.*memory.*per|time.*usage', 
+            'time.*usage|time.*efficiency|ratio|utilization|average.*memory.*per', 
             case=False, na=False
         )
     ]
     
-    # Remove pure memory amounts (GiB) which cause scale issues
-    important_metrics = important_metrics[
-        ~important_metrics['Category'].str.contains('Total.*Memory|GPU.*Memory.*GiB|GB', case=False, na=False)
+    # Exclude VRAM efficiency metrics since they're already displayed in the previous section
+    time_metrics = time_metrics[
+        ~time_metrics['Category'].str.contains('VRAM.*efficiency|efficiency.*VRAM|alloc.*vram.*efficiency', case=False, na=False)
     ]
     
-    if len(important_metrics) > 0:
+    # Remove pure memory amounts (GiB) which cause scale issues
+    time_metrics = time_metrics[
+        ~time_metrics['Category'].str.contains('Total.*Memory|GPU.*Memory.*GiB|GB', case=False, na=False)
+    ]
+    
+    if len(time_metrics) > 0:
         fig, ax = plt.subplots(figsize=(12, 6))
         
-        categories = important_metrics['Category']
-        your_values = important_metrics['Your_Value']
-        avg_values = important_metrics['Average_Value']
+        categories = time_metrics['Category']
+        your_values = time_metrics['Your_Value']
+        avg_values = time_metrics['Average_Value']
         
         x = np.arange(len(categories))
         width = 0.35
@@ -792,9 +872,9 @@ if len(comparison_stats_df) > 0:
         bars2 = ax.bar(x + width/2, avg_values, width, label='Average Performance', 
                       color=colors[1], alpha=0.8, edgecolor='white', linewidth=1)
         
-        ax.set_xlabel('Performance Metrics', fontweight='bold')
+        ax.set_xlabel('Time Usage Metrics', fontweight='bold')
         ax.set_ylabel('Percentage (%)', fontweight='bold')
-        ax.set_title('Key Performance Indicators Comparison', fontweight='bold', fontsize=14)
+        ax.set_title('Time Usage Performance Comparison', fontweight='bold', fontsize=14)
         ax.set_xticks(x)
         
         # Set y-axis limits for percentage scale (0-100% with some padding above)
@@ -833,7 +913,7 @@ if len(comparison_stats_df) > 0:
         plt.tight_layout()
         plt.show()
     else:
-        print("No key performance metrics available for comparison.")
+        print("No time usage metrics available for comparison.")
 else:
     print("No comparison data available.")
 ```

@@ -10,7 +10,6 @@ those of other users, designed to be efficient by:
 
 import pandas as pd
 import numpy as np
-from typing import List, Optional
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -30,7 +29,7 @@ from src.config.remote_config import PartitionInfoFetcher
 
 def load_jobs_df(
     db_path: str | Path | None = None,
-    db_connection: Optional[DatabaseConnection] = None,
+    db_connection: DatabaseConnection | None = None,
     table_name: str = "Jobs",
     dates_back: int | None = None,
     include_failed_cancelled_jobs: bool = False,
@@ -39,7 +38,7 @@ def load_jobs_df(
     min_elapsed_seconds: int = DEFAULT_MIN_ELAPSED_SECONDS,
     random_state: pd._typing.RandomState | None = None,
     sample_size: int | None = None,
-    user_filter: Optional[str] = None,
+    user_filter: str | None = None,
 ) -> pd.DataFrame:
     """
     Load jobs DataFrame from a DuckDB database with standard filtering and preprocess it.
@@ -131,6 +130,7 @@ class UserComparison:
     def __init__(self, db_connection: DatabaseConnection):
         """
         Initialize the UserComparison with a database connection.
+
         Loads and preprocesses all job data once at initialization.
 
         Args:
@@ -147,7 +147,7 @@ class UserComparison:
                 db_connection=self.db,
                 include_cpu_only_jobs=False,
                 include_failed_cancelled_jobs=False,
-                min_elapsed_seconds=0
+                min_elapsed_seconds=0,
             )
 
             # If we have data, calculate efficiency metrics once for all jobs
@@ -160,7 +160,9 @@ class UserComparison:
                     gpu_mem_usage_filter=None,
                 )
                 self._cached_all_users_metrics = analyzer.calculate_job_efficiency_metrics(filtered_jobs)
-                print(f"Loaded and processed {len(self._cached_all_users_metrics)} job records for efficiency analysis")
+                print(
+                    f"Loaded and processed {len(self._cached_all_users_metrics)} job records for efficiency analysis"
+                )
             else:
                 print("No job data found in database")
         except Exception as e:
@@ -169,7 +171,7 @@ class UserComparison:
             self._all_jobs_data = None
             self._cached_all_users_metrics = None
 
-    def _get_essential_job_data(self, exclude_user: Optional[str] = None) -> pd.DataFrame:
+    def _get_essential_job_data(self, exclude_user: str | None = None) -> pd.DataFrame:
         """
         Get only essential job data fields needed for efficiency metrics.
 
@@ -195,9 +197,7 @@ class UserComparison:
 
         return self.db.fetch_query(efficiency_query)
 
-    def calculate_efficiency_metrics(self,
-                                    jobs_df: pd.DataFrame,
-                                    gpu_count_min: int = 1) -> pd.DataFrame:
+    def calculate_efficiency_metrics(self, jobs_df: pd.DataFrame, gpu_count_min: int = 1) -> pd.DataFrame:
         """
         Calculate efficiency metrics for the given jobs DataFrame.
 
@@ -210,10 +210,7 @@ class UserComparison:
         """
         # Preprocess the data
         processed_jobs = preprocess_data(
-            jobs_df,
-            min_elapsed_seconds=0,
-            include_failed_cancelled_jobs=False,
-            include_cpu_only_jobs=False
+            jobs_df, min_elapsed_seconds=0, include_failed_cancelled_jobs=False, include_cpu_only_jobs=False
         )
 
         # Initialize efficiency analyzer
@@ -245,12 +242,9 @@ class UserComparison:
         # Check if we already have the cached metrics
         if self._cached_all_users_metrics is not None:
             # Filter the existing processed data for this user
-            user_metrics = self._cached_all_users_metrics[
-                self._cached_all_users_metrics['User'] == user_id
-            ]
+            user_metrics = self._cached_all_users_metrics[self._cached_all_users_metrics["User"] == user_id]
 
             if len(user_metrics) > 0:
-                print(f"Retrieved {len(user_metrics)} jobs for user {user_id} from cached data")
                 return user_metrics
 
         # Fall back to direct query if no cached data or user not found
@@ -260,7 +254,7 @@ class UserComparison:
                 include_cpu_only_jobs=False,
                 include_failed_cancelled_jobs=False,
                 min_elapsed_seconds=0,
-                user_filter=user_id
+                user_filter=user_id,
             )
 
             if len(user_jobs) == 0:
@@ -284,7 +278,6 @@ class UserComparison:
             print(f"Error getting user metrics: {e}")
             return pd.DataFrame()
 
-
     def get_other_users_metrics(self, exclude_user: str) -> pd.DataFrame:
         """
         Get aggregated metrics for all users except the specified one.
@@ -303,7 +296,7 @@ class UserComparison:
                     db_connection=self.db,  # Use existing connection
                     include_cpu_only_jobs=False,
                     include_failed_cancelled_jobs=False,
-                    min_elapsed_seconds=0
+                    min_elapsed_seconds=0,
                 )
 
                 # Calculate efficiency metrics for all jobs
@@ -324,17 +317,12 @@ class UserComparison:
                 self._cached_all_users_metrics = self.calculate_efficiency_metrics(all_jobs)
 
         # Filter out the excluded user from cached data
-        other_users_metrics = self._cached_all_users_metrics[
-            self._cached_all_users_metrics['User'] != exclude_user
-        ]
+        other_users_metrics = self._cached_all_users_metrics[self._cached_all_users_metrics["User"] != exclude_user]
 
         return other_users_metrics
 
     def get_user_comparison_statistics(
-        self,
-        user_id: str,
-        user_jobs: Optional[pd.DataFrame] = None,
-        metrics: Optional[List[str]] = None
+        self, user_id: str, user_jobs: pd.DataFrame | None = None, metrics: list[str] | None = None
     ) -> pd.DataFrame:
         """
         Calculate comparison statistics between the specified user and all other users.
@@ -351,12 +339,12 @@ class UserComparison:
         """
         if metrics is None:
             metrics = [
-                ('alloc_vram_efficiency', 'VRAM Efficiency (%)'),
-                ('time_usage_efficiency', 'Time Usage (%)'),
-                ('used_vram_gib', 'Total GPU Memory (GiB)'),
-                ('allocated_vram', 'Allocated VRAM (GiB)'),
-                ('requested_vram', 'Requested VRAM (GiB)'),
-                ('job_hours', 'GPU Hours')
+                ("alloc_vram_efficiency", "VRAM Efficiency (%)"),
+                ("time_usage_efficiency", "Time Usage (%)"),
+                ("used_vram_gib", "Total GPU Memory (GiB)"),
+                ("allocated_vram", "Allocated VRAM (GiB)"),
+                ("requested_vram", "Requested VRAM (GiB)"),
+                ("job_hours", "GPU Hours"),
             ]
 
         # Get user metrics if not provided
@@ -375,15 +363,14 @@ class UserComparison:
         # Calculate user-level aggregated metrics
         user_metrics = {}
         for metric_name, _ in metrics:
-            if metric_name == 'alloc_vram_efficiency':
+            if metric_name == "alloc_vram_efficiency":
                 user_metrics[metric_name] = user_jobs[metric_name].mean() * 100  # Convert to percentage
-            elif metric_name == 'time_usage_efficiency':
+            elif metric_name == "time_usage_efficiency":
                 # Calculate time usage efficiency - this is Elapsed/TimeLimit as a percentage
                 user_metrics[metric_name] = (
-                    user_jobs['Elapsed'].dt.total_seconds() /
-                    user_jobs['TimeLimit'].dt.total_seconds()
+                    user_jobs["Elapsed"].dt.total_seconds() / user_jobs["TimeLimit"].dt.total_seconds()
                 ).mean() * 100
-            elif metric_name in ['allocated_vram', 'requested_vram']:
+            elif metric_name in ["allocated_vram", "requested_vram"]:
                 # For VRAM metrics, we want the average per job
                 user_metrics[metric_name] = user_jobs[metric_name].mean()
             else:
@@ -393,35 +380,32 @@ class UserComparison:
         # Calculate aggregates for other users
         other_users_metrics = {}
         for metric_name, _ in metrics:
-            if metric_name == 'alloc_vram_efficiency':
+            if metric_name == "alloc_vram_efficiency":
                 other_users_metrics[metric_name] = other_users[metric_name].mean() * 100  # Convert to percentage
-            elif metric_name == 'time_usage_efficiency':
+            elif metric_name == "time_usage_efficiency":
                 # Calculate time usage efficiency for other users
                 other_users_metrics[metric_name] = (
-                    other_users['Elapsed'].dt.total_seconds() /
-                    other_users['TimeLimit'].dt.total_seconds()
+                    other_users["Elapsed"].dt.total_seconds() / other_users["TimeLimit"].dt.total_seconds()
                 ).mean() * 100
-            elif metric_name in ['allocated_vram', 'requested_vram']:
+            elif metric_name in ["allocated_vram", "requested_vram"]:
                 # For VRAM metrics, we want the average per job
                 other_users_metrics[metric_name] = other_users[metric_name].mean()
             else:
                 # For other metrics like used_vram_gib, calculate the average per user
-                user_sums = other_users.groupby('User')[metric_name].sum()
+                user_sums = other_users.groupby("User")[metric_name].sum()
                 other_users_metrics[metric_name] = user_sums.mean()
 
         # Create comparison DataFrame
         comparison_stats = pd.DataFrame({
-            'Category': [display_name for _, display_name in metrics],
-            'Your_Value': [user_metrics[metric_name] for metric_name, _ in metrics],
-            'Average_Value': [other_users_metrics[metric_name] for metric_name, _ in metrics],
+            "Category": [display_name for _, display_name in metrics],
+            "Your_Value": [user_metrics[metric_name] for metric_name, _ in metrics],
+            "Average_Value": [other_users_metrics[metric_name] for metric_name, _ in metrics],
         })
 
         return comparison_stats
 
     def _create_fallback_comparison(
-        self,
-        user_jobs: Optional[pd.DataFrame] = None,
-        metrics: Optional[List[str]] = None
+        self, user_jobs: pd.DataFrame | None = None, metrics: list[str] | None = None
     ) -> pd.DataFrame:
         """
         Create fallback comparison statistics when database query fails.
@@ -435,12 +419,12 @@ class UserComparison:
         """
         if metrics is None:
             metrics = [
-                ('alloc_vram_efficiency', 'VRAM Efficiency (%)'),
-                ('time_usage_efficiency', 'Time Usage (%)'),
-                ('used_vram_gib', 'Total GPU Memory (GiB)'),
-                ('allocated_vram', 'Allocated VRAM (GiB)'),
-                ('requested_vram', 'Requested VRAM (GiB)'),
-                ('job_hours', 'GPU Hours')
+                ("alloc_vram_efficiency", "VRAM Efficiency (%)"),
+                ("time_usage_efficiency", "Time Usage (%)"),
+                ("used_vram_gib", "Total GPU Memory (GiB)"),
+                ("allocated_vram", "Allocated VRAM (GiB)"),
+                ("requested_vram", "Requested VRAM (GiB)"),
+                ("job_hours", "GPU Hours"),
             ]
 
         # Calculate user metrics if user_jobs is available
@@ -449,12 +433,19 @@ class UserComparison:
 
         if user_jobs is not None and not user_jobs.empty:
             for metric_name, _ in metrics:
-                if metric_name == 'alloc_vram_efficiency' and 'alloc_vram_efficiency' in user_jobs.columns:
-                    user_values.append(user_jobs['alloc_vram_efficiency'].mean() * 100)
-                elif metric_name == 'time_usage_efficiency' and 'Elapsed' in user_jobs.columns and 'TimeLimit' in user_jobs.columns:
-                    user_values.append((user_jobs['Elapsed'].dt.total_seconds() / user_jobs['TimeLimit'].dt.total_seconds()).mean() * 100)
+                if metric_name == "alloc_vram_efficiency" and "alloc_vram_efficiency" in user_jobs.columns:
+                    user_values.append(user_jobs["alloc_vram_efficiency"].mean() * 100)
+                elif (
+                    metric_name == "time_usage_efficiency"
+                    and "Elapsed" in user_jobs.columns
+                    and "TimeLimit" in user_jobs.columns
+                ):
+                    user_values.append(
+                        (user_jobs["Elapsed"].dt.total_seconds() / user_jobs["TimeLimit"].dt.total_seconds()).mean()
+                        * 100
+                    )
                 elif metric_name in user_jobs.columns:
-                    if metric_name in ['allocated_vram', 'requested_vram']:
+                    if metric_name in ["allocated_vram", "requested_vram"]:
                         user_values.append(user_jobs[metric_name].mean())
                     else:
                         user_values.append(user_jobs[metric_name].sum())
@@ -465,9 +456,9 @@ class UserComparison:
 
         # Create comparison stats with placeholder values
         comparison_stats = pd.DataFrame({
-            'Category': [display_name for _, display_name in metrics],
-            'Your_Value': user_values,
-            'Average_Value': placeholder_values[:len(metrics)],
+            "Category": [display_name for _, display_name in metrics],
+            "Your_Value": user_values,
+            "Average_Value": placeholder_values[: len(metrics)],
         })
 
         return comparison_stats
