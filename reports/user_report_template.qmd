@@ -104,11 +104,16 @@ display(HTML(title_html))
 
 ---
 
+print()
+
 ### Performance Summary
 
 ```{python}
 #| echo: false
 #| output: asis
+
+print("### Performance Summary")
+print()
 
 if len(summary_stats_df) > 0:
     # Extract key metrics from summary_stats_df for narrative
@@ -225,9 +230,6 @@ else:
 </div>
 
 ---
-
-<details>
-<summary><h2 style="display: inline-block; margin: 0;">📊 Additional Analysis & Plots</h2></summary>
 
 ## A100 GPU Analysis
 
@@ -514,7 +516,7 @@ else:
 
 # Check if we have job metrics data for ROC analysis
 all_users_job_metrics = data.get('all_users_job_metrics', None)
-user_jobs_df = pd.DataFrame(user_jobs)  # Use the already loaded user_jobs instead of data['user_jobs']
+user_jobs_df = pd.DataFrame(data['user_jobs'])
 
 if all_users_job_metrics is not None and len(all_users_job_metrics) > 100:
     print("### ROC Analysis: VRAM Efficiency Performance")
@@ -537,10 +539,12 @@ else:
 ```
 
 
+## Advanced ROC Analysis (Multiple Users Comparison)
+
 ```{python}
 #| echo: false
 #| output: asis
-#| fig-cap: "Your Performance vs Other Users"
+#| fig-cap: "Advanced ROC: Your Performance vs Other Users"
 #| fig-width: 8
 #| fig-height: 5
 
@@ -556,7 +560,7 @@ if all_users_job_metrics is not None and len(all_users_job_metrics) > 100 and le
         from src.analysis.roc_plot import ROCVisualizer
         from src.config.enum_constants import ProportionMetricsEnum, JobEfficiencyMetricsEnum, EfficiencyCategoryEnum
         
-        print("### Your Performance vs Other Users")
+        print("### Advanced ROC Analysis: Your Performance vs Other Users")
         print()
         
         # Convert job metrics to DataFrame - this already has efficiency calculations
@@ -683,11 +687,11 @@ if all_users_job_metrics is not None and len(all_users_job_metrics) > 100 and le
                     q75 = np.percentile(other_users_efficiencies * 100, 75)
                     
                     print()
-                    # print(f"**System Efficiency Quartiles:**")
-                    # print(f"- **25th percentile**: {q25:.1f}% (bottom quartile)")
-                    # print(f"- **50th percentile (median)**: {q50:.1f}% (middle)")
-                    # print(f"- **75th percentile**: {q75:.1f}% (top quartile)")
-                    # print(f"- **Your efficiency**: {user_efficiency.mean():.1f}%")
+                    print(f"**System Efficiency Quartiles:**")
+                    print(f"- **25th percentile**: {q25:.1f}% (bottom quartile)")
+                    print(f"- **50th percentile (median)**: {q50:.1f}% (middle)")
+                    print(f"- **75th percentile**: {q75:.1f}% (top quartile)")
+                    print(f"- **Your efficiency**: {user_efficiency.mean():.1f}%")
                     
                     # Efficiency distribution using enum constants
                     very_low_threshold = EfficiencyCategoryEnum.VERY_LOW_THRESHOLD.value * 100  # 10%
@@ -701,7 +705,6 @@ if all_users_job_metrics is not None and len(all_users_job_metrics) > 100 and le
                     
                     print()
                     print(f"**Your Efficiency Distribution:**")
-                    print()
                     print(f"- **Very low efficiency jobs** (< {very_low_threshold:.0f}%): {very_low_eff} ({(very_low_eff/len(user_efficiency)*100):.1f}%)")
                     print()
                     print(f"- **Low efficiency jobs** ({very_low_threshold:.0f}%-{low_threshold:.0f}%): {low_eff} ({(low_eff/len(user_efficiency)*100):.1f}%)")
