@@ -27,7 +27,7 @@ def _helper_filter_irrelevant_records(
     Args:
         input_df (pd.DataFrame): Input dataframe to filter. Note that the Elapsed field should be in unit seconds.
         min_elapsed_seconds (int): Minimum elapsed time in seconds.
-        include_cpu_only_jobs (bool, optional): Whether to include jobs that do not use GPUs (CPU-only jobs).
+        include_cpu_only_jobs (bool): Whether to include jobs that do not use GPUs (CPU-only jobs). Default is False.
 
     Returns:
         pd.DataFrame: Filtered dataframe.
@@ -377,8 +377,8 @@ def test_preprocess_timedelta_conversion(mock_data_frame):
     time_limit = data["TimeLimit"]
 
     assert time_limit.dtype == "timedelta64[ns]"
-    assert time_limit[0].total_seconds() == ground_truth["TimeLimit"][0]
-    assert time_limit[max_len - 1].total_seconds() == ground_truth["TimeLimit"][max_len - 1]
+    assert time_limit[0].total_seconds() / 60 == ground_truth["TimeLimit"][0] 
+    assert time_limit[max_len - 1].total_seconds() / 60 == ground_truth["TimeLimit"][max_len - 1]
 
 
 def test_preprocess_gpu_type(mock_data_frame):
@@ -391,7 +391,6 @@ def test_preprocess_gpu_type(mock_data_frame):
         include_cpu_only_jobs=True,
     )
 
-    # Check that GPUType is filled with 'cpu' for CPU-only jobs
     assert all(row == ["cpu"] for row in data.loc[data["GPUType"].isna(), "GPUType"])
 
     # Check that numpy arrays in GPUType are converted to lists
