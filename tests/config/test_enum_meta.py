@@ -21,6 +21,7 @@ def test_valid_subclass_creation_passes():
 
 def test_missing_required_members_raises():
     with pytest.raises(TypeError, match="must define members"):
+
         class MissingMembersEnum(MetricsDataFrameNameBase):
             USERS = "users_with_efficiency_metrics"
             PI_GROUPS = "pi_accounts_with_efficiency_metrics"
@@ -28,6 +29,7 @@ def test_missing_required_members_raises():
 
 def test_wrong_value_for_required_member_raises():
     with pytest.raises(TypeError, match=r"JOBS must equal 'jobs_with_efficiency_metrics'"):
+
         class WrongValueEnum(MetricsDataFrameNameBase):
             JOBS = "wrong_value"
             USERS = "users_with_efficiency_metrics"

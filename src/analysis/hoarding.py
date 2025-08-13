@@ -186,7 +186,7 @@ class ResourceHoarding(EfficiencyAnalysis[ResourceHoardingDataFrameNameEnum]):
 
     def calculate_node_resource_hoarding_for_users(self, filtered_jobs: pd.DataFrame) -> pd.DataFrame:
         """Calculate resource hoarding for users based on jobs with resource hoarding metrics.
-        
+
         Args:
             filtered_jobs (pd.DataFrame): DataFrame containing jobs to analyze.
 
@@ -199,7 +199,7 @@ class ResourceHoarding(EfficiencyAnalysis[ResourceHoardingDataFrameNameEnum]):
                 "Jobs DataFrame with resource hoarding metrics was not available. "
                 "Calculated it using the filtered_jobs DataFrame."
             )
-        
+
         if self.users_with_efficiency_metrics is None:
             self.calculate_user_efficiency_metrics()
             print(
@@ -220,8 +220,9 @@ class ResourceHoarding(EfficiencyAnalysis[ResourceHoardingDataFrameNameEnum]):
         )
 
         users_w_resource_hoarding_metrics.loc[:, "expected_value_ram_hoarding_fraction_diff"] = (
-            self.jobs_with_resource_hoarding_metrics
-            .groupby("User", observed=True)["weighted_ram_hoarding_fraction_diff"]
+            self.jobs_with_resource_hoarding_metrics.groupby("User", observed=True)[
+                "weighted_ram_hoarding_fraction_diff"
+            ]
             .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
             .to_numpy()
         )
@@ -233,8 +234,9 @@ class ResourceHoarding(EfficiencyAnalysis[ResourceHoardingDataFrameNameEnum]):
         )
 
         users_w_resource_hoarding_metrics.loc[:, "expected_value_core_hoarding_fraction_diff"] = (
-            self.jobs_with_resource_hoarding_metrics
-            .groupby("User", observed=True)["weighted_core_hoarding_fraction_diff"]
+            self.jobs_with_resource_hoarding_metrics.groupby("User", observed=True)[
+                "weighted_core_hoarding_fraction_diff"
+            ]
             .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
             .to_numpy()
         )
