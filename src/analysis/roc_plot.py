@@ -159,8 +159,9 @@ class ROCVisualizer(EfficiencyAnalysis):
                 or threshold_metric and proportion_metric have the same value.
 
         Warnings:
-            UserWarning: Issued when the filtered DataFrame is empty or when threshold_step
-                is extremely small relative to the threshold range (may cause performance issues).
+            UserWarning: Issued when the filtered DataFrame is empty
+            UserWarning: threshold_step is extremely small relative to the threshold range
+                (may cause performance issues).
 
         Note:
             For efficiency score metrics (ALLOC_VRAM_EFFICIENCY_SCORE, VRAM_CONSTRAINT_EFFICIENCY_SCORE),
@@ -198,7 +199,6 @@ class ROCVisualizer(EfficiencyAnalysis):
         plot_data: pd.DataFrame = self._helper_filter_invalid_records(input_df, threshold_metric)
         if plot_data.empty:
             warnings.warn("No data available for the specified threshold metric.", stacklevel=2, category=UserWarning)
-
         # calculate number of filtered records and provide information
         filtered_out_records = len(input_df) - len(plot_data)
         if filtered_out_records:
@@ -209,7 +209,7 @@ class ROCVisualizer(EfficiencyAnalysis):
 
         # check if threshold step is not too small in comparison to the range
         distance = max_threshold - min_threshold
-        if distance and threshold_step / distance <= 10 ** (-6):
+        if distance and (threshold_step / distance <= 10 ** (-6)):
             # raise warning if threshold_step is too small in comparison to min_threshold
             warnings.warn(
                 (
@@ -546,7 +546,10 @@ class ROCVisualizer(EfficiencyAnalysis):
         axe.plot(thresholds_arr, proportions_data)
         axe.legend()
         y_max = proportions_data.max()
-        axe.set_ylim(bottom=0, top=y_max * 1.1)
+        y_min = proportions_data.min()
+        y_range = y_max - y_min
+        padding = max(y_range * 0.05, 1.0)  # 5% of range or minimum 1 unit
+        axe.set_ylim(top=y_max + padding)
 
         self._generate_num_marker(axe, thresholds_arr, proportions_data, num_markers)
 
