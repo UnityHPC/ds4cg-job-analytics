@@ -1,23 +1,14 @@
 """
-TODO (Tan): consider writing tests for validate_input function
-
 Actions item:
-- Need to check if proportion metric = USER, PI_GROUP works corectly when we look at plot for users/ group of users
+
 - refactor roc_plot to use less arguments, consider printing out statistics info of thresholds
 - Maybe put own threshold metrics into a single dictionary parameter and validate_and_filter will modify min_threshold
 - Multiple line plot, but with proportion metrics as User for PI_Group.
-- When plotting PI_Group, also consider how many pi_group have only 1 unique users.
-- When done, create a class visualization in visualization folder.
-- Add lines like visualization class that includes annotation for how many is filtered out
 
 - Issue: some new metric of user (user_job_hours, user_vram_hours) will be also on both x-axis and y-axis
  -> Need to add a bunch more to ProportionMetrics Enum, maybe best if we let it as jobs and vram_hours
     -> discuss with Arda
 
- Vram_hours
-Log_scores, vram_constraints_efficiency (for partition which has vram_constraints), for partition without constraints
-    other metrics as log_score and allloc_vram_efficiency
-General User plot
 
 """
 
@@ -332,8 +323,6 @@ class ROCVisualizer(EfficiencyAnalysis):
         if to_clip:
             plot_data_frame[threshold_metric.value] = plot_data_frame[threshold_metric.value].clip(upper=upper_bound)
 
-    # TODO (Tan): add another function to give ROC plot (jobs) by user for Ayush to generate reports.
-
     def _roc_calculate_proportion(
         self,
         plot_data_frame: pd.DataFrame,
@@ -404,6 +393,120 @@ class ROCVisualizer(EfficiencyAnalysis):
                     proportions.append(proportion)
         return np.array(proportions, dtype=float)
 
+    def plot_roc(
+        self,
+        plot_type: ROCPlotTypes,
+        title: str | None = None,
+        threshold_metric: JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum | PIEfficiencyMetricsEnum | None = None,
+        min_threshold: float = 0.0,
+        max_threshold: float = 100.0,
+        threshold_step: float = 1.0,
+        proportion_metric: ProportionMetricsEnum | None = None,
+        plot_percentage: bool = True,
+        num_markers: int = 10,
+        clip_threshold_metric: tuple[bool, float] = (False, 0.0),
+    ) -> tuple[Figure, list[Axes]]:
+        # Configuration mappings for different plot types
+        data_source_map = {
+            ROCPlotTypes.JOB: self.jobs_with_efficiency_metrics,
+            ROCPlotTypes.USER: self.users_with_efficiency_metrics,
+            ROCPlotTypes.PI_GROUP: self.pi_accounts_with_efficiency_metrics,
+        }
+
+        default_threshold_metrics: dict[
+            ROCPlotTypes, JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum | PIEfficiencyMetricsEnum
+        ] = {
+            ROCPlotTypes.JOB: JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY,
+            ROCPlotTypes.USER: UserEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY,
+            ROCPlotTypes.PI_GROUP: PIEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY,
+        }
+
+        default_proportion_metrics: dict[ROCPlotTypes, ProportionMetricsEnum] = {
+            ROCPlotTypes.JOB: ProportionMetricsEnum.JOBS,
+            ROCPlotTypes.USER: ProportionMetricsEnum.JOBS,
+            ROCPlotTypes.PI_GROUP: ProportionMetricsEnum.JOBS,
+        }
+
+        attribute_names = {
+            ROCPlotTypes.JOB: "jobs_with_efficiency_metrics",
+            ROCPlotTypes.USER: "users_with_efficiency_metrics",
+            ROCPlotTypes.PI_GROUP: "pi_accounts_with_efficiency_metrics",
+        }
+
+        plot_type_labels = {
+            ROCPlotTypes.JOB: "Jobs",
+            ROCPlotTypes.USER: "Users",
+            ROCPlotTypes.PI_GROUP: "PI Group",
+        }
+
+        dataset_descriptions = {
+            ROCPlotTypes.JOB: "dataset",
+            ROCPlotTypes.USER: "aggregated User dataset",
+            ROCPlotTypes.PI_GROUP: "aggregated PI Group dataset",
+        }
+
+        # Get data source and validate
+        data = data_source_map[plot_type]
+        if data is None:
+            raise ValueError(
+                f"Attribute {attribute_names[plot_type]} is not calculated, "
+                "use calculate_all_efficiency_metrics() to calculate the dataframe before plotting."
+            )
+
+        # Set defaults if not provided
+        if threshold_metric is None:
+            threshold_metric = default_threshold_metrics[plot_type]
+        if proportion_metric is None:
+            proportion_metric = default_proportion_metrics[plot_type]
+
+        plot_data, remain_percentage, total_raw_value, min_threshold = self._validate_and_filter_inputs(
+            data,
+            min_threshold,
+            max_threshold,
+            threshold_step,
+            threshold_metric,
+            proportion_metric,
+            plot_type=plot_type,
+        )
+
+        # Clip threshold metrics to defined value
+        self._clip_upper_threshold_metric(clip_threshold_metric, plot_data, threshold_metric)
+
+        # Calculate thresholds
+        thresholds_arr: np.ndarray = np.arange(min_threshold, max_threshold + threshold_step, threshold_step)
+        fig, axe = plt.subplots(1, 1, figsize=(16, 7))
+        axe_list = [axe]
+
+        # Calculate proportion for each threshold
+        proportions_data = self._roc_calculate_proportion(
+            plot_data, thresholds_arr, proportion_metric, threshold_metric, plot_percentage, plot_type=plot_type
+        )
+
+        # Generate title if not provided
+        if title is None:
+            title = (
+                f"ROC plot ({plot_type_labels[plot_type]}) for {'proportion' if plot_percentage else 'amounts'} of "
+                f"{proportion_metric.value} by threshold {threshold_metric.value}"
+            )
+        title += (
+            f"\n Total {proportion_metric.value}: {self._format_number_for_display(total_raw_value)} "
+            f"(in {self._format_number_for_display(remain_percentage)}% of {dataset_descriptions[plot_type]})"
+        )
+
+        # Set up plot
+        y_label = f"{'Percentage' if plot_percentage else 'Count'} of {proportion_metric.value} below threshold"
+        axe.set_title(title)
+        axe.set_ylabel(y_label)
+        axe.set_xlabel(f"Threshold values ({threshold_metric.value})")
+        axe.plot(thresholds_arr, proportions_data)
+        axe.legend()
+        y_max = proportions_data.max()
+        axe.set_ylim(bottom=0, top=y_max * 1.1)
+
+        self._generate_num_marker(axe, thresholds_arr, proportions_data, num_markers)
+
+        return fig, axe_list
+
     def plot_roc_jobs(
         self,
         title: str | None = None,
@@ -417,18 +520,9 @@ class ROCVisualizer(EfficiencyAnalysis):
         clip_threshold_metric: tuple[bool, float] = (False, 0.0),
     ) -> tuple[Figure, list[Axes]]:
         """
-        Plot the ROC curve based on the specified threshold and proportion metrics.
+        Plot the ROC curve for jobs based on the specified threshold and proportion metrics.
 
-        Before plotting, this will filter out entries whose threshold_metric is NaN.
-
-        In case where threshold_metric is ALLOC_VRAM_EFFICIENCY_SCORE:
-            - Filter out entries where the threshold_metric is -inf.
-            - If min_threshold is not provided or is 0, set min_threshold to the minimum value of the threshold_metric.
-
-        If plot by percentage, percentage will be based on the filtered data, not the original data.
-
-        If clip_threshold_metrics is True, then threshold will be clipped as following:
-
+        This is a convenience wrapper around the unified plot_roc method for jobs.
 
         Args:
             title (str or None): Title of the plot. Defaults to None.
@@ -438,67 +532,122 @@ class ROCVisualizer(EfficiencyAnalysis):
             threshold_metric (JobEfficiencyMetricsEnum): Metric used for thresholds. Defaults to ALLOC_VRAM_EFFICIENCY.
             proportion_metric (ProportionMetricsEnum): Metric for calculating proportions. Defaults to JOBS.
             plot_percentage (bool): Whether to plot the proportion as a percentage or as raw counts. Defaults to True.
-            clip_metrics (tuple[bool, int]): A tuple where the first element is a boolean indicating whether to
-                clip the threshold metrics, and the second element is the upper value to clip to.
-                Defaults to (False, 0).
+            num_markers (int): Number of markers to display on the plot. Defaults to 10.
+            clip_threshold_metric (tuple[bool, float]): A tuple where the first element is a boolean
+                indicating whether to clip the threshold metrics, and the second element is the upper
+                value to clip to. Defaults to (False, 0.0).
 
         Returns:
             tuple[Figure, list[Axes]]: A tuple containing the figure, list of axes.
-
-        Raises:
-            ValueError: if dataframe jobs_with_efficiency_metrics is not calculated yet.
         """
-
-        if self.jobs_with_efficiency_metrics is None:
-            raise ValueError(
-                "Attribute jobs_with_efficiency_metrics is not calculated, "
-                "use calculate_all_efficiency_metrics() to calculate the dataframe before plotting."
-            )
-        data = self.jobs_with_efficiency_metrics
-
-        plot_data, remain_percentage, total_raw_value, min_threshold = self._validate_and_filter_inputs(
-            data,
-            min_threshold,
-            max_threshold,
-            threshold_step,
-            threshold_metric,
-            proportion_metric,
+        return self.plot_roc(
+            plot_type=ROCPlotTypes.JOB,
+            title=title,
+            min_threshold=min_threshold,
+            max_threshold=max_threshold,
+            threshold_step=threshold_step,
+            threshold_metric=threshold_metric,
+            proportion_metric=proportion_metric,
+            plot_percentage=plot_percentage,
+            num_markers=num_markers,
+            clip_threshold_metric=clip_threshold_metric,
         )
 
-        # clip threshold_metrics to defined value
-        self._clip_upper_threshold_metric(clip_threshold_metric, plot_data, threshold_metric)
+    def plot_roc_users(
+        self,
+        title: str | None = None,
+        min_threshold: float = 0.0,
+        max_threshold: float = 100.0,
+        threshold_step: float = 1.0,
+        threshold_metric: UserEfficiencyMetricsEnum = UserEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY,
+        proportion_metric: ProportionMetricsEnum = ProportionMetricsEnum.JOBS,
+        plot_percentage: bool = True,
+        num_markers: int = 10,
+        clip_threshold_metric: tuple[bool, float] = (False, 0.0),
+    ) -> tuple[Figure, list[Axes]]:
+        """
+        Plot the ROC curve for users based on the specified threshold and proportion metrics.
 
-        # calculate threshold
-        thresholds_arr: np.ndarray = np.arange(min_threshold, max_threshold + threshold_step, threshold_step)
-        fig, axe = plt.subplots(1, 1, figsize=(16, 7))
-        axe_list = [axe]
-        # calculate proportion for each threshold
-        proportions_data = self._roc_calculate_proportion(
-            plot_data, thresholds_arr, proportion_metric, threshold_metric, plot_percentage, plot_type=ROCPlotTypes.JOB
+        This is a convenience wrapper around the unified plot_roc method for users.
+
+        Args:
+            title (str or None): Title of the plot. Defaults to None.
+            min_threshold (float): Minimum threshold value. Defaults to 0.0.
+            max_threshold (float): Maximum threshold value. Defaults to 100.0.
+            threshold_step (float): Step size for thresholds. Defaults to 1.0.
+            threshold_metric (UserEfficiencyMetricsEnum): Metric used for thresholds.
+                Defaults to EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY.
+            proportion_metric (ProportionMetricsEnum): Metric for calculating proportions. Defaults to JOBS.
+            plot_percentage (bool): Whether to plot the proportion as a percentage or as raw counts.
+                Defaults to True.
+            num_markers (int): Number of markers to display on the plot. Defaults to 10.
+            clip_threshold_metric (tuple[bool, float]): A tuple where the first element is a boolean
+                indicating whether to clip the threshold metrics, and the second element is the upper
+                value to clip to. Defaults to (False, 0.0).
+
+        Returns:
+            tuple[Figure, list[Axes]]: A tuple containing the figure and list of axes.
+        """
+        return self.plot_roc(
+            plot_type=ROCPlotTypes.USER,
+            title=title,
+            min_threshold=min_threshold,
+            max_threshold=max_threshold,
+            threshold_step=threshold_step,
+            threshold_metric=threshold_metric,
+            proportion_metric=proportion_metric,
+            plot_percentage=plot_percentage,
+            num_markers=num_markers,
+            clip_threshold_metric=clip_threshold_metric,
         )
 
-        if title is None:
-            title = (
-                f"ROC plot (Jobs) for {'proportion' if plot_percentage else 'amounts'} of "
-                f"{proportion_metric.value} by threshold {threshold_metric.value}"
-            )
-        title += (
-            f"\n Total {proportion_metric.value}: {self._format_number_for_display(total_raw_value)} "
-            f"(in {self._format_number_for_display(remain_percentage)}% of dataset)"
+    def plot_roc_pi_groups(
+        self,
+        title: str | None = None,
+        min_threshold: float = 0.0,
+        max_threshold: float = 100.0,
+        threshold_step: float = 1.0,
+        threshold_metric: PIEfficiencyMetricsEnum = PIEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY,
+        proportion_metric: ProportionMetricsEnum = ProportionMetricsEnum.JOBS,
+        plot_percentage: bool = True,
+        num_markers: int = 10,
+        clip_threshold_metric: tuple[bool, float] = (False, 0.0),
+    ) -> tuple[Figure, list[Axes]]:
+        """
+        Plot the ROC curve for PI groups based on the specified threshold and proportion metrics.
+
+        This is a convenience wrapper around the unified plot_roc method for PI groups.
+
+        Args:
+            title (str or None): Title of the plot. Defaults to None.
+            min_threshold (float): Minimum threshold value. Defaults to 0.0.
+            max_threshold (float): Maximum threshold value. Defaults to 100.0.
+            threshold_step (float): Step size for thresholds. Defaults to 1.0.
+            threshold_metric (PIEfficiencyMetricsEnum): Metric used for thresholds.
+                Defaults to EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY.
+            proportion_metric (ProportionMetricsEnum): Metric for calculating proportions. Defaults to JOBS.
+            plot_percentage (bool): Whether to plot the proportion as a percentage or as raw counts.
+                Defaults to True.
+            num_markers (int): Number of markers to display on the plot. Defaults to 10.
+            clip_threshold_metric (tuple[bool, float]): A tuple where the first element is a boolean
+                indicating whether to clip the threshold metrics, and the second element is the upper
+                value to clip to. Defaults to (False, 0.0).
+
+        Returns:
+            tuple[Figure, list[Axes]]: A tuple containing the figure and list of axes.
+        """
+        return self.plot_roc(
+            plot_type=ROCPlotTypes.PI_GROUP,
+            title=title,
+            min_threshold=min_threshold,
+            max_threshold=max_threshold,
+            threshold_step=threshold_step,
+            threshold_metric=threshold_metric,
+            proportion_metric=proportion_metric,
+            plot_percentage=plot_percentage,
+            num_markers=num_markers,
+            clip_threshold_metric=clip_threshold_metric,
         )
-
-        y_label = f"{'Percentage' if plot_percentage else 'Count'} of {proportion_metric.value} below threshold"
-        axe.set_title(title)
-        axe.set_ylabel(y_label)
-        axe.set_xlabel(f"Threshold values ({threshold_metric.value})")
-        axe.plot(thresholds_arr, proportions_data)
-        axe.legend()
-        y_max = proportions_data.max()
-        axe.set_ylim(bottom=0, top=y_max * 1.1)
-
-        self._generate_num_marker(axe, thresholds_arr, proportions_data, num_markers)
-
-        return fig, axe_list
 
     def multiple_line_roc_plot(
         self,
@@ -531,18 +680,19 @@ class ROCVisualizer(EfficiencyAnalysis):
 
 
         Args:
-            plot_object_list (list[str]): List
-                of users/pi_group that we want to plot.
-            dataframe (pd.DataFrame or None): The data to plot. If None, uses the instance's job_metrics dataframe.
+            plot_object_list (list[str]): List of users/pi_group that we want to plot.
+            object_column_type (Literal): The type of objects to plot (USERS or PI_GROUPS).
             title (str or None): Title of the plot. Defaults to None.
             min_threshold (float): Minimum threshold value. Defaults to 0.0.
             max_threshold (float): Maximum threshold value. Defaults to 100.0.
             threshold_step (float): Step size for thresholds. Defaults to 1.0.
             threshold_metric (JobEfficiencyMetricsEnum): Metric used for thresholds. Defaults to ALLOC_VRAM_EFFICIENCY.
+            proportion_metric (Literal): The proportion metric to use (JOB_HOURS, JOBS, or VRAM_HOURS).
+                Defaults to JOBS.
             plot_percentage (bool): Whether to plot the proportion as a percentage or as raw counts. Defaults to True.
-            clip_metric (tuple[bool, int]): A tuple where the first element is a boolean indicating whether to
-                clip the threshold metrics, and the second element is the upper value to clip to.
-                Defaults to (False, 0).
+            clip_threshold_metric (tuple[bool, float]): A tuple where the first element is a boolean
+                indicating whether to clip the threshold metrics, and the second element is the upper
+                value to clip to. Defaults to (False, 0.0).
 
         Returns:
             tuple[Figure, list[Axes]]: A tuple containing the figure, list of axes.
@@ -597,141 +747,3 @@ class ROCVisualizer(EfficiencyAnalysis):
         axe.set_xlabel(f"Threshold values ({threshold_metric.value})")
         axe.legend()
         return fig, [axe]
-
-    def plot_roc_users(
-        self,
-        title: str | None = None,
-        min_threshold: float = 0.0,
-        max_threshold: float = 100.0,
-        threshold_step: float = 1.0,
-        threshold_metric: UserEfficiencyMetricsEnum = UserEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY,
-        proportion_metric: ProportionMetricsEnum = ProportionMetricsEnum.JOBS,
-        plot_percentage: bool = True,
-        num_markers: int = 10,
-        clip_threshold_metric: tuple[bool, float] = (False, 0.0),
-    ) -> tuple[Figure, list[Axes]]:
-        if self.users_with_efficiency_metrics is None:
-            raise ValueError(
-                "Attribute users_with_efficiency_metrics is not calculated, "
-                "use calculate_all_efficiency_metrics() to calculate the dataframe before plotting."
-            )
-
-        data = self.users_with_efficiency_metrics
-
-        plot_data, remain_percentage, total_raw_value, min_threshold = self._validate_and_filter_inputs(
-            data,
-            min_threshold,
-            max_threshold,
-            threshold_step,
-            threshold_metric,
-            proportion_metric,
-            plot_type=ROCPlotTypes.USER,
-        )
-
-        # clip threshold_metrics to defined value
-        self._clip_upper_threshold_metric(clip_threshold_metric, plot_data, threshold_metric)
-
-        # calculate threshold
-        thresholds_arr: np.ndarray = np.arange(min_threshold, max_threshold + threshold_step, threshold_step)
-        fig, axe = plt.subplots(1, 1, figsize=(16, 7))
-        axe_list = [axe]
-        # calculate proportion for each threshold
-        proportions_data = self._roc_calculate_proportion(
-            plot_data,
-            thresholds_arr,
-            proportion_metric,
-            threshold_metric,
-            plot_percentage,
-            plot_type=ROCPlotTypes.USER,
-        )
-
-        if title is None:
-            title = (
-                f"ROC plot (Users) for {'proportion' if plot_percentage else 'amounts'} of "
-                f"{proportion_metric.value} by threshold {threshold_metric.value}"
-            )
-        title += (
-            f"\n Total {proportion_metric.value}: {self._format_number_for_display(total_raw_value)} "
-            f"(in {self._format_number_for_display(remain_percentage)}% of aggregated User dataset)"
-        )
-
-        y_label = f"{'Percentage' if plot_percentage else 'Count'} of {proportion_metric.value} below threshold"
-        axe.set_title(title)
-        axe.set_ylabel(y_label)
-        axe.set_xlabel(f"Threshold values ({threshold_metric.value})")
-        axe.plot(thresholds_arr, proportions_data)
-        y_max = proportions_data.max()
-        axe.set_ylim(bottom=0, top=y_max * 1.1)
-
-        self._generate_num_marker(axe, thresholds_arr, proportions_data, num_markers)
-
-        return fig, axe_list
-
-    def plot_roc_pi_groups(
-        self,
-        title: str | None = None,
-        min_threshold: float = 0.0,
-        max_threshold: float = 100.0,
-        threshold_step: float = 1.0,
-        threshold_metric: PIEfficiencyMetricsEnum = PIEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY,
-        proportion_metric: ProportionMetricsEnum = ProportionMetricsEnum.JOBS,
-        plot_percentage: bool = True,
-        num_markers: int = 10,
-        clip_threshold_metric: tuple[bool, float] = (False, 0.0),
-    ) -> tuple[Figure, list[Axes]]:
-        if self.pi_accounts_with_efficiency_metrics is None:
-            raise ValueError(
-                "Attribute pi_accounts_with_efficiency_metrics is not calculated, "
-                "use calculate_all_efficiency_metrics() to calculate the dataframe before plotting."
-            )
-
-        data = self.pi_accounts_with_efficiency_metrics
-
-        plot_data, remain_percentage, total_raw_value, min_threshold = self._validate_and_filter_inputs(
-            data,
-            min_threshold,
-            max_threshold,
-            threshold_step,
-            threshold_metric,
-            proportion_metric,
-            plot_type=ROCPlotTypes.PI_GROUP,
-        )
-
-        # clip threshold_metrics to defined value
-        self._clip_upper_threshold_metric(clip_threshold_metric, plot_data, threshold_metric)
-
-        # calculate threshold
-        thresholds_arr: np.ndarray = np.arange(min_threshold, max_threshold + threshold_step, threshold_step)
-        fig, axe = plt.subplots(1, 1, figsize=(16, 7))
-        axe_list = [axe]
-        # calculate proportion for each threshold
-        proportions_data = self._roc_calculate_proportion(
-            plot_data,
-            thresholds_arr,
-            proportion_metric,
-            threshold_metric,
-            plot_percentage,
-            plot_type=ROCPlotTypes.PI_GROUP,
-        )
-
-        if title is None:
-            title = (
-                f"ROC plot (PI GRoup) for {'proportion' if plot_percentage else 'amounts'} of "
-                f"{proportion_metric.value} by threshold {threshold_metric.value}"
-            )
-        title += (
-            f"\n Total {proportion_metric.value}: {self._format_number_for_display(total_raw_value)} "
-            f"(in {self._format_number_for_display(remain_percentage)}% of aggregated PI Group dataset)"
-        )
-
-        y_label = f"{'Percentage' if plot_percentage else 'Count'} of {proportion_metric.value} below threshold"
-        axe.set_title(title)
-        axe.set_ylabel(y_label)
-        axe.set_xlabel(f"Threshold values ({threshold_metric.value})")
-        axe.plot(thresholds_arr, proportions_data)
-        y_max = proportions_data.max()
-        axe.set_ylim(bottom=0, top=y_max * 1.1)
-
-        self._generate_num_marker(axe, thresholds_arr, proportions_data, num_markers)
-
-        return fig, axe_list
