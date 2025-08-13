@@ -237,9 +237,9 @@ class ResourceHoardingDataFrameNameEnum(MetricsDataFrameNameBase):
     An enumeration representing the names of DataFrames containing resource hoarding metrics.
 
     Attributes:
-        JOBS: DataFrame name for jobs with resource hoarding metrics.
-        USERS: DataFrame name for users with resource hoarding metrics.
-        PI_GROUPS: DataFrame name for PI accounts/groups with resource hoarding metrics.
+        JOBS: DataFrame name for jobs with efficiency metrics.
+        USERS: DataFrame name for users with efficiency metrics.
+        PI_GROUPS: DataFrame name for PI accounts/groups with efficiency metrics.
         JOBS_WITH_RESOURCE_HOARDING_METRICS: DataFrame name for jobs with resource hoarding metrics.
         USERS_WITH_RESOURCE_HOARDING_METRICS: DataFrame name for users with resource hoarding metrics.
         PI_GROUPS_WITH_RESOURCE_HOARDING_METRICS: DataFrame name for PI accounts/groups with resource hoarding metrics.

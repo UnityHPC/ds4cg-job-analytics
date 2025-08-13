@@ -184,6 +184,64 @@ class ResourceHoarding(EfficiencyAnalysis[ResourceHoardingDataFrameNameEnum]):
         self.jobs_with_resource_hoarding_metrics = resource_hoarding_jobs
         return self.jobs_with_resource_hoarding_metrics
 
-    # TODO(Arda): Implement user-level resource hoarding analysis
-    # def calculate_node_resource_hoarding_for_users(self):
-    #     """Calculate resource hoarding for users based on jobs with resource hoarding metrics."""
+    def calculate_node_resource_hoarding_for_users(self, filtered_jobs: pd.DataFrame) -> pd.DataFrame:
+        """Calculate resource hoarding for users based on jobs with resource hoarding metrics.
+        
+        Args:
+            filtered_jobs (pd.DataFrame): DataFrame containing jobs to analyze.
+
+        Returns:
+            pd.DataFrame: DataFrame with user-level resource hoarding metrics.
+        """
+        if self.jobs_with_resource_hoarding_metrics is None:
+            self.calculate_node_resource_hoarding_for_jobs(filtered_jobs)
+            print(
+                "Jobs DataFrame with resource hoarding metrics was not available. "
+                "Calculated it using the filtered_jobs DataFrame."
+            )
+        
+        if self.users_with_efficiency_metrics is None:
+            self.calculate_user_efficiency_metrics()
+            print(
+                "Users DataFrame with efficiency metrics was not available. "
+                "Calculated it using the filtered_jobs DataFrame."
+            )
+
+        user_vram_hours_per_job = self.jobs_with_resource_hoarding_metrics.groupby("User", observed=True)[
+            "vram_hours"
+        ].transform("sum")
+
+        users_w_resource_hoarding_metrics = self.users_with_efficiency_metrics.copy()
+
+        self.jobs_with_resource_hoarding_metrics.loc[:, "weighted_ram_hoarding_fraction_diff"] = (
+            self.jobs_with_resource_hoarding_metrics["ram_hoarding_fraction_diff"]
+            * self.jobs_with_resource_hoarding_metrics["vram_hours"]
+            / user_vram_hours_per_job
+        )
+
+        users_w_resource_hoarding_metrics.loc[:, "expected_value_ram_hoarding_fraction_diff"] = (
+            self.jobs_with_resource_hoarding_metrics
+            .groupby("User", observed=True)["weighted_ram_hoarding_fraction_diff"]
+            .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
+            .to_numpy()
+        )
+
+        self.jobs_with_resource_hoarding_metrics.loc[:, "weighted_core_hoarding_fraction_diff"] = (
+            self.jobs_with_resource_hoarding_metrics["core_hoarding_fraction_diff"]
+            * self.jobs_with_resource_hoarding_metrics["vram_hours"]
+            / user_vram_hours_per_job
+        )
+
+        users_w_resource_hoarding_metrics.loc[:, "expected_value_core_hoarding_fraction_diff"] = (
+            self.jobs_with_resource_hoarding_metrics
+            .groupby("User", observed=True)["weighted_core_hoarding_fraction_diff"]
+            .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
+            .to_numpy()
+        )
+
+        self.jobs_with_resource_hoarding_metrics = self.jobs_with_resource_hoarding_metrics.drop(
+            columns=["weighted_ram_hoarding_fraction_diff", "weighted_core_hoarding_fraction_diff"]
+        )
+
+        self.users_with_resource_hoarding_metrics = users_w_resource_hoarding_metrics
+        return self.users_with_resource_hoarding_metrics

@@ -131,6 +131,20 @@ class EfficiencyAnalysis(Generic[MetricsDFNameEnumT]):
         return pd.api.types.is_integer_dtype(type(val)) or pd.api.types.is_float_dtype(type(val))
 
     @staticmethod
+    def avg_non_inf(x: pd.Series) -> float | pd.api.typing.NAType:
+        """
+        Helper function to calculate the average of a Series, ignoring -np.inf values.
+
+        Args:
+            x (pd.Series): Series to calculate the average from.
+
+        Returns:
+            float: Average of the Series, ignoring -np.inf values. Returns pd.NA if no valid values.
+        """
+        valid = x[x != -np.inf]
+        return valid.mean() if not valid.empty else pd.NA
+
+    @staticmethod
     def apply_numeric_filter(
         col: pd.Series,
         filter: int | float | list | set | tuple | dict | pd.api.typing.NAType,
@@ -383,27 +397,17 @@ class EfficiencyAnalysis(Generic[MetricsDFNameEnumT]):
             "vram_hours"
         ].transform("sum")
 
-        def avg_non_inf(x: pd.Series) -> float | pd.api.typing.NAType:
-            """
-            Helper function to calculate the average of a Series, ignoring -np.inf values.
-
-            Args:
-                x (pd.Series): Series to calculate the average from.
-
-            Returns:
-                float: Average of the Series, ignoring -np.inf values. Returns pd.NA if no valid values.
-            """
-            valid = x[x != -np.inf]
-            return valid.mean() if not valid.empty else pd.NA
-
         users_w_efficiency_metrics = (
             self.jobs_with_efficiency_metrics.groupby("User", observed=True)
             .agg(
                 job_count=("JobID", "count"),
                 user_job_hours=("job_hours", "sum"),
                 pi_account=("Account", "first"),
-                avg_alloc_vram_efficiency_score=("alloc_vram_efficiency_score", avg_non_inf),
-                avg_vram_constraint_efficiency_score=("vram_constraint_efficiency_score", avg_non_inf),
+                avg_alloc_vram_efficiency_score=("alloc_vram_efficiency_score", EfficiencyAnalysis.avg_non_inf),
+                avg_vram_constraint_efficiency_score=(
+                    "vram_constraint_efficiency_score",
+                    EfficiencyAnalysis.avg_non_inf,
+                ),
             )
             .reset_index()
         )
