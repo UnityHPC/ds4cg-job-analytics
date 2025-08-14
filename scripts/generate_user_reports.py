@@ -415,7 +415,7 @@ def generate_user_report(
                 ('requested_vram', 'Requested VRAM'),
                 ('job_hours', 'GPU Hours')
             ]
-            
+
             comparison_stats = user_comparison.get_user_comparison_statistics(
                 user_id,
                 user_jobs=user_jobs,
@@ -723,7 +723,7 @@ def generate_all_reports(
     # Initialize database connection and UserComparison (this loads all data once)
     db = DatabaseConnection(db_path)
     user_comparison = UserComparison(db)
-    
+
     # Get all cached job data from UserComparison
     jobs_df, _ = load_cached_data(user_comparison)
 
@@ -741,14 +741,14 @@ def generate_all_reports(
     report_paths = []
     for _, user_row in inefficient_users.iterrows():
         user_id = user_row["User"]
-        
+
         # Get user-specific data efficiently from UserComparison
         user_jobs = user_comparison.get_user_metrics(user_id)
-        
+
         if len(user_jobs) == 0:
             print(f"      ❌ No jobs found for {user_id}")
             continue
-            
+
         report_path = generate_user_report(
             user_id=user_id,
             user_data=user_row,
