@@ -23,10 +23,9 @@ theme:
 plugins:
   - search
   - mkdocs-jupyter:
-      execute: false
+      execute: true
       include_source: true
       allow_errors: false
-      notebook_dir: notebooks
       ignore_h1_titles: true
   - mkdocstrings:
         handlers:
@@ -48,6 +47,12 @@ plugins:
 markdown_extensions:
   - attr_list
   - md_in_html
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
 
 # Suppress warnings for external links to notebooks
 validation:
@@ -61,10 +66,10 @@ nav:
   - Data and Efficiency Metrics: 'data-and-metrics.md'
   - Demo: 'demo.md'
   - Notebooks:
-    - Basic Visualization: 'notebooks/Basic Visualization.ipynb'
-    - Efficiency Analysis: 'notebooks/Efficiency Analysis.ipynb'
+    - Basic Visualization: '../notebooks/Basic Visualization.ipynb'
+    - Efficiency Analysis: '../notebooks/Efficiency Analysis.ipynb'
 #    - Clustering Analysis: 'notebooks/clustering_analysis.ipynb'
-    - Frequency Analysis: 'notebooks/Frequency Analysis.ipynb'
+    - Frequency Analysis: '../notebooks/Frequency Analysis.ipynb'
   - Technical Documentation:
     - Data Processing: 'preprocess.md'
     - Analysis:

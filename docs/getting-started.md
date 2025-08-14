@@ -70,7 +70,7 @@ from src.preprocess.preprocess import preprocess_data
 # Preprocess raw job data
 processed_df = preprocess_data(
     gpu_df,
-    min_elapsed_seconds=60,
+    min_elapsed_seconds=600,
     include_failed_cancelled_jobs=False,
     include_cpu_only_jobs=True
 )

@@ -80,7 +80,7 @@ This project is part of the Data Science for the Common Good (DS4CG) program. Fo
 
 ## Project Maintainers
 
-- **Project Lead**: Benjamin Pachev
+- **Project Lead**: Christopher Odoom
 - **Contributors**: DS4CG Summer 2025 Internship Team
 
 ## Additional Resources
