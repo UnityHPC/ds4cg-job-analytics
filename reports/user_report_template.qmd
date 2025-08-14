@@ -165,7 +165,7 @@ else:
 <div style="margin: 15px 0; padding: 15px; background-color: #e9f7ef; border-radius: 6px; border-left: 4px solid #27ae60;">
 <h5 style="color: #2c3e50; margin-bottom: 8px;">📈 Efficiency Metrics Explained</h5>
 
-<p><strong>VRAM Efficiency</strong>: Measures how effectively your job uses the allocated GPU memory. It's calculated as the ratio of <em>maximum memory used</em> to <em>total memory allocated</em>. Higher values (closer to 1.0) indicate more efficient resource utilization.</p>
+<p><strong>VRAM Efficiency</strong>: Measures how effectively your job uses the allocated GPU memory. It's calculated as the ratio of <em>memory used</em> to <em>total memory allocated</em>. Higher values (closer to 1.0) indicate more efficient resource utilization.</p>
 
 <p><strong>VRAM Hours</strong>: This metric represents the product of job duration (in hours) and allocated VRAM (in GiB), giving you a measure of total GPU memory consumption over time. Lower VRAM hours for the same workload indicate more efficient resource usage.</p>
 
