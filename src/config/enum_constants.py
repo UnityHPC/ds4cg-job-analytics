@@ -166,5 +166,7 @@ class ErrorTypeEnum(Enum):
         UNKNOWN_GPU_TYPE: Represents errors related to unknown GPU types specified in constraints.
     """
 
-    MALFORMED_CONSTRAINT = "malformed_constraint"
-    UNKNOWN_GPU_TYPE = "unknown_gpu_type"
+    MALFORMED_CONSTRAINT = "Malformed Constraint"
+    UNKNOWN_GPU_TYPE = "Unknown GPU Type"
+    NO_VALID_NODES = "No Valid Nodes"
+    GPU_TYPE_NULL = "GPU Type is Null"

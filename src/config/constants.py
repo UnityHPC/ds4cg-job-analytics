@@ -52,7 +52,6 @@ PARTITION_TO_GPU_MAP = {
     "cbio-gpu": "a100-80g",
     "power9-gpu": "v100",
     "power9-gpu-preempt": "v100",
-    "ials-gpu": "2080_ti",
     "ece-gpu": "a100-40g",
     "lan": "a40",
     "astroth-gpu": "2080",
