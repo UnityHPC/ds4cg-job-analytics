@@ -107,6 +107,11 @@ addopts = [
 ]
 pythonpath = "."
 testpaths = ["tests"]
+env = [
+    # Set the environment variable to indicate that tests are running
+    "RUN_ENV=TEST"
+]
+
 
 [tool.mkdocs]
 # MkDocs configuration options in the YAML file (mkdocs.yml) can be embedded here in pyproject.toml instead

@@ -1,0 +1,2 @@
+from .remote_config import PartitionInfoFetcher as PartitionInfoFetcher
+from .remote_config import NodeInfoFetcher as NodeInfoFetcher

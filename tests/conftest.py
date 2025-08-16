@@ -10,7 +10,7 @@ from .mock_data.convert_csv_to_db import convert_csv_to_db
 
 
 @pytest.fixture(scope="module")
-def mock_data_frame(request: pytest.FixtureRequest) -> Generator[pd.DataFrame, None, None]:
+def mock_data_frame(request: pytest.FixtureRequest) -> Generator[pd.DataFrame]:
     temp_db_dir = tempfile.mkdtemp()
     mem_db = None
     try:
@@ -25,5 +25,4 @@ def mock_data_frame(request: pytest.FixtureRequest) -> Generator[pd.DataFrame, N
     finally:
         if mem_db is not None:
             mem_db.disconnect()
-            del mem_db
         shutil.rmtree(temp_db_dir)

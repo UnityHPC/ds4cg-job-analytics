@@ -4,42 +4,53 @@ Tools to analyze efficiency of Jobs based on their VRAM usage.
 The aim is to identify potential inefficiencies in GPU usage and notify users or PIs about these issues.
 """
 
-import pandas as pd
-import numpy as np
 from pathlib import Path
-from src.preprocess.preprocess import preprocess_data
-from src.database import DatabaseConnection
+from typing import cast
+
+import numpy as np
+import pandas as pd
+
 from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
-from src.config.enum_constants import FilterTypeEnum
+from src.config.enum_constants import FilterTypeEnum, MetricsDataFrameNameEnum
+from src.database import DatabaseConnection
+from src.preprocess.preprocess import preprocess_data
 
 
-def load_jobs_dataframe_from_duckdb(
+def load_preprocessed_jobs_dataframe_from_duckdb(
     db_path: str | Path,
     table_name: str = "Jobs",
     sample_size: int | None = None,
     random_state: pd._typing.RandomState | None = None,
 ) -> pd.DataFrame:
     """
-    Connect to the DuckDB database and return the relevant table as a pandas DataFrame.
+    Load jobs DataFrame from a DuckDB database and preprocess it.
 
     Args:
         db_path (str or Path): Path to the DuckDB database.
         table_name (str, optional): Table name to query. Defaults to 'Jobs'.
+        sample_size (int, optional): Number of rows to sample from the DataFrame. Defaults to None (no sampling).
+        random_state (pd._typing.RandomState, optional): Random state for reproducibility. Defaults to None.
 
     Returns:
         pd.DataFrame: DataFrame containing the table data.
+
+    Raises:
+        RuntimeError: If the jobs DataFrame cannot be loaded from the database.
     """
     if isinstance(db_path, Path):
         db_path = db_path.resolve()
-    db = DatabaseConnection(str(db_path))
+    try:
+        db = DatabaseConnection(str(db_path))
 
-    jobs_df = db.fetch_all_jobs(table_name=table_name)
-    processed_data = preprocess_data(
-        jobs_df, min_elapsed_seconds=0, include_failed_cancelled_jobs=False, include_cpu_only_jobs=False
-    )
-    if sample_size is not None:
-        processed_data = processed_data.sample(n=sample_size, random_state=random_state)
-    return processed_data
+        jobs_df = db.fetch_all_jobs(table_name=table_name)
+        processed_data = preprocess_data(
+            jobs_df, min_elapsed_seconds=0, include_failed_cancelled_jobs=False, include_cpu_only_jobs=False
+        )
+        if sample_size is not None:
+            processed_data = processed_data.sample(n=sample_size, random_state=random_state)
+        return processed_data
+    except Exception as e:
+        raise RuntimeError(f"Failed to load jobs DataFrame: {e}") from e
 
 
 class EfficiencyAnalysis:
@@ -47,42 +58,30 @@ class EfficiencyAnalysis:
     Class to encapsulate the efficiency analysis of jobs based on various metrics.
 
     It provides methods to load data, analyze workload efficiency, and evaluate CPU-GPU usage patterns.
-    """
 
-    # Store the variable names as a class-level constant for maintainability
-    _efficiency_metric_vars = [
-        "jobs_with_efficiency_metrics",
-        "users_with_efficiency_metrics",
-        "pi_accounts_with_efficiency_metrics",
-    ]
+    The metrics are generated in separate DataFrames for each category in MetricsDataFrameNameEnum.
+    """
 
     def __init__(
         self,
-        db_path: str | Path,
-        table_name: str = "Jobs",
-        sample_size: int | None = None,
-        random_state: pd._typing.RandomState | None = None,
+        jobs_df: pd.DataFrame,
     ) -> None:
         """
         Initialize the EfficiencyAnalysis class.
 
         Args:
-            db_path (str or Path): Path to the DuckDB database.
-            table_name (str, optional): Table name to query. Defaults to 'Jobs'.
-            sample_size (int, optional): Number of rows to sample from the DataFrame. Defaults to None.
-            random_state (pd._typing.RandomState, optional): Random state for reproducibility. Defaults to None.
+            jobs_df (pd.DataFrame): DataFrame containing job data.
 
         Raises:
-            RuntimeError: If the jobs DataFrame cannot be loaded from the database.
+            ValueError: If the jobs DataFrame is empty.
         """
-        try:
-            self.jobs_df = load_jobs_dataframe_from_duckdb(db_path, table_name, sample_size, random_state)
-            # Initialize efficiency metric class attributes to None
-            for var in self._efficiency_metric_vars:
-                setattr(self, var, None)
-            self.analysis_results: dict | None = None
-        except Exception as e:
-            raise RuntimeError(f"Failed to load jobs DataFrame: {e}") from e
+        if jobs_df.empty:
+            raise ValueError("The jobs DataFrame is empty. Please provide a valid DataFrame with job data.")
+        self.jobs_df = jobs_df
+        # Initialize efficiency metric class attributes to None
+        for var in MetricsDataFrameNameEnum:
+            setattr(self, var.value, None)
+        self.analysis_results: dict | None = None
 
     @staticmethod
     def is_numeric_type(val: object) -> bool:
@@ -124,7 +123,10 @@ class EfficiencyAnalysis:
         if filter is not None:
             if filter is pd.NA or (isinstance(filter, float) and np.isnan(filter)):
                 if FilterTypeEnum.PD_NA not in permissible_filter_types:
-                    raise ValueError(f"{filter_name} cannot be pd.NA or <NA>.")
+                    raise ValueError(
+                        f"{filter_name} cannot be pd.NA or <NA>. "
+                        f"Permissible filter types are {permissible_filter_types}."
+                    )
                 mask &= col.isna()
             elif isinstance(filter, list | set | tuple):
                 # Check if the filter is a list, set, or tuple and if all values are numeric
@@ -154,14 +156,15 @@ class EfficiencyAnalysis:
                 if "max" in filter:
                     mask &= col.le(filter["max"]) if inclusive else col.lt(filter["max"])
             else:
-                # Only allow numeric types
-                if EfficiencyAnalysis.is_numeric_type(filter):
-                    if isinstance(filter, np.number):
-                        # Convert numpy number to native Python type
-                        filter = filter.item()
-                        mask &= col.eq(filter)
+                if FilterTypeEnum.NUMERIC_SCALAR not in permissible_filter_types:
+                    raise ValueError(f"{filter_name} cannot be a numeric scalar.")
                 else:
-                    raise ValueError("Filter must be a numeric value if not one of the other types.")
+                    # Only allow numeric types
+                    if EfficiencyAnalysis.is_numeric_type(filter):
+                        numeric_filter = cast(float | int, filter)
+                        mask &= col.eq(numeric_filter)
+                    else:
+                        raise ValueError(f"{filter_name} must be a numeric type.")
         return mask
 
     def filter_jobs_for_analysis(
@@ -225,7 +228,7 @@ class EfficiencyAnalysis:
                 mask &= EfficiencyAnalysis.apply_numeric_filter(
                     self.jobs_df["GPUMemUsage"],
                     gpu_mem_usage_filter,
-                    {FilterTypeEnum.SCALAR, FilterTypeEnum.DICTIONARY},
+                    {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY},
                     "gpu_mem_usage_filter",
                 )
             except ValueError as e:
@@ -284,30 +287,43 @@ class EfficiencyAnalysis:
         filtered_jobs.loc[:, "job_hours"] = (
             filtered_jobs["Elapsed"].dt.total_seconds() * filtered_jobs["gpu_count"] / 3600
         )
+        filtered_jobs.loc[:, "vram_hours"] = filtered_jobs["allocated_vram"] * filtered_jobs["job_hours"]
         filtered_jobs.loc[:, "used_vram_gib"] = filtered_jobs["GPUMemUsage"] / (2**30)
+        # Compute alloc_vram_efficiency, a float in the range [0, 1].
         filtered_jobs.loc[:, "alloc_vram_efficiency"] = (
             filtered_jobs["used_vram_gib"] / filtered_jobs["allocated_vram"]
         )
-        # TODO (Arda): Clip alloc_vram_efficiency to 1
 
-        # Compute vram_constraint_efficiency, a nullable float. Set to NA if vram_constraint is NA
+        # Compute vram_constraint_efficiency, a nullable float in the range [0, 1]. Set to NA if vram_constraint is NA
         filtered_jobs.loc[:, "vram_constraint_efficiency"] = (
             filtered_jobs["used_vram_gib"] / filtered_jobs["vram_constraint"]
         )
-        # TODO (Arda): Decide if it should clip vram_constraint_efficiency to 1
 
         # Calculate job allocated VRAM efficiency score
-        # This is a log-transformed score that penalizes low efficiency and longer job_hours
-        # TODO (Arda): Update the implementation of alloc_vram_efficiency_score
-        # Set the score to -inf where alloc_vram_efficiency is zero to avoid divide by zero/log of zero
+        # This is a log-transformed score that penalizes low efficiency and longer vram_hours
         alloc_vram_eff = filtered_jobs["alloc_vram_efficiency"]
-        filtered_jobs["alloc_vram_efficiency_score"] = (
-            np.log(alloc_vram_eff.where(alloc_vram_eff > 0)) * filtered_jobs["job_hours"]
+        filtered_jobs.loc[:, "alloc_vram_efficiency_score"] = (
+            np.log(alloc_vram_eff.where(alloc_vram_eff > 0)) * filtered_jobs["vram_hours"]
         ).where(alloc_vram_eff > 0, -np.inf)
 
+        # Calculate vram_constraint_efficiency score
+        vram_constraint_eff = filtered_jobs["vram_constraint_efficiency"]
+        # Avoid log(0) and propagate pd.NA: if NA, score is NA; if 0, score is -np.inf
+        score = pd.Series(pd.NA, index=filtered_jobs.index, dtype=pd.Float64Dtype())
+        mask_valid = vram_constraint_eff.notna() & (vram_constraint_eff > 0)
+        mask_zero = vram_constraint_eff.notna() & (vram_constraint_eff == 0)
+        score[mask_valid] = np.log(vram_constraint_eff[mask_valid]) * filtered_jobs.loc[mask_valid, "vram_hours"]
+        score[mask_zero] = -np.inf
+        filtered_jobs.loc[:, "vram_constraint_efficiency_score"] = score
+
         # Add CPU memory metrics if available
-        if "CPUMemUsage" in self.jobs_df.columns:
-            filtered_jobs.loc[:, "used_cpu_gib"] = filtered_jobs["CPUMemUsage"] / (2**30)
+        if "CPUMemUsage" in self.jobs_df.columns and "Memory" in self.jobs_df.columns:
+            filtered_jobs.loc[:, "used_cpu_mem_gib"] = filtered_jobs["CPUMemUsage"] / (2**30)
+            filtered_jobs.loc[:, "allocated_cpu_mem_gib"] = filtered_jobs["Memory"] / (2**10)  # Memory is in MiB
+            filtered_jobs.loc[:, "cpu_mem_efficiency"] = (
+                filtered_jobs["used_cpu_mem_gib"] / filtered_jobs["allocated_cpu_mem_gib"]
+            )
+            filtered_jobs = filtered_jobs.drop(columns=["CPUMemUsage", "Memory"])
 
         self.jobs_with_efficiency_metrics = filtered_jobs
         return self.jobs_with_efficiency_metrics
@@ -326,39 +342,69 @@ class EfficiencyAnalysis:
                 "Calculated it using the input jobs DataFrame."
             )
 
-        # Compute user_job_hours_per_job once and reuse for both metrics
-        user_job_hours_per_job = self.jobs_with_efficiency_metrics.groupby("User", observed=True)[
-            "job_hours"
+        # Compute user_vram_hours_per_job once and reuse for both metrics
+        user_vram_hours_per_job = self.jobs_with_efficiency_metrics.groupby("User", observed=True)[
+            "vram_hours"
         ].transform("sum")
 
+        def avg_non_inf(x: pd.Series) -> float | pd.api.typing.NAType:
+            """
+            Helper function to calculate the average of a Series, ignoring -np.inf values.
+
+            Args:
+                x (pd.Series): Series to calculate the average from.
+
+            Returns:
+                float: Average of the Series, ignoring -np.inf values. Returns pd.NA if no valid values.
+            """
+            valid = x[x != -np.inf]
+            return valid.mean() if not valid.empty else pd.NA
+
         users_w_efficiency_metrics = (
-            self.jobs_with_efficiency_metrics.groupby("User", observed=False)
+            self.jobs_with_efficiency_metrics.groupby("User", observed=True)
             .agg(
                 job_count=("JobID", "count"),
                 user_job_hours=("job_hours", "sum"),
                 pi_account=("Account", "first"),
+                avg_alloc_vram_efficiency_score=("alloc_vram_efficiency_score", avg_non_inf),
+                avg_vram_constraint_efficiency_score=("vram_constraint_efficiency_score", avg_non_inf),
             )
             .reset_index()
         )
 
         self.jobs_with_efficiency_metrics.loc[:, "weighted_alloc_vram_efficiency"] = (
             self.jobs_with_efficiency_metrics["alloc_vram_efficiency"]
-            * self.jobs_with_efficiency_metrics["job_hours"]
-            / user_job_hours_per_job
+            * self.jobs_with_efficiency_metrics["vram_hours"]
+            / user_vram_hours_per_job
         )
+
         users_w_efficiency_metrics.loc[:, "expected_value_alloc_vram_efficiency"] = (
             self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_alloc_vram_efficiency"]
-            .sum()
+            .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
+            .to_numpy()
+        )
+
+        self.jobs_with_efficiency_metrics.loc[:, "weighted_vram_constraint_efficiency"] = (
+            self.jobs_with_efficiency_metrics["vram_constraint_efficiency"]
+            * self.jobs_with_efficiency_metrics["vram_hours"]
+            / user_vram_hours_per_job
+        ).astype(pd.Float64Dtype())
+
+        users_w_efficiency_metrics.loc[:, "expected_value_vram_constraint_efficiency"] = (
+            self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_vram_constraint_efficiency"]
+            .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
             .to_numpy()
         )
 
         self.jobs_with_efficiency_metrics.loc[:, "weighted_gpu_count"] = (
             self.jobs_with_efficiency_metrics["gpu_count"]
-            * self.jobs_with_efficiency_metrics["job_hours"]
-            / user_job_hours_per_job
+            * self.jobs_with_efficiency_metrics["vram_hours"]
+            / user_vram_hours_per_job
         )
         users_w_efficiency_metrics.loc[:, "expected_value_gpu_count"] = (
-            self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_gpu_count"].sum().to_numpy()
+            self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_gpu_count"]
+            .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
+            .to_numpy()
         )
 
         # Calculate metric representing the total amount of GPU memory resources a user has been allocated over time.
@@ -366,12 +412,12 @@ class EfficiencyAnalysis:
         users_w_efficiency_metrics.loc[:, "vram_hours"] = (
             (self.jobs_with_efficiency_metrics["allocated_vram"] * self.jobs_with_efficiency_metrics["job_hours"])
             .groupby(self.jobs_with_efficiency_metrics["User"], observed=True)
-            .sum()
+            .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
             .to_numpy()
         )
 
         self.jobs_with_efficiency_metrics = self.jobs_with_efficiency_metrics.drop(
-            columns=["weighted_alloc_vram_efficiency", "weighted_gpu_count"]
+            columns=["weighted_alloc_vram_efficiency", "weighted_vram_constraint_efficiency", "weighted_gpu_count"]
         )
 
         self.users_with_efficiency_metrics = users_w_efficiency_metrics
@@ -391,6 +437,9 @@ class EfficiencyAnalysis:
 
         Returns:
             pd.DataFrame: DataFrame with users and their average VRAM efficiency
+
+        Raises:
+            ValueError: If the filter for expected_value_alloc_vram_efficiency is invalid.
         """
         if self.users_with_efficiency_metrics is None:
             self.calculate_user_efficiency_metrics()
@@ -408,7 +457,7 @@ class EfficiencyAnalysis:
                 mask &= EfficiencyAnalysis.apply_numeric_filter(
                     self.users_with_efficiency_metrics["expected_value_alloc_vram_efficiency"],
                     alloc_vram_efficiency_filter,
-                    {FilterTypeEnum.SCALAR, FilterTypeEnum.DICTIONARY},
+                    {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY},
                     filter_name="expected_value_alloc_vram_efficiency",
                 )
             except ValueError as e:
@@ -458,7 +507,7 @@ class EfficiencyAnalysis:
                 mask &= EfficiencyAnalysis.apply_numeric_filter(
                     self.users_with_efficiency_metrics["vram_hours"],
                     vram_hours_filter,
-                    {FilterTypeEnum.SCALAR, FilterTypeEnum.DICTIONARY},
+                    {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY},
                     filter_name="vram_hours_filter",
                 )
             except ValueError as e:
@@ -487,13 +536,13 @@ class EfficiencyAnalysis:
             dict: A dictionary containing DataFrames with efficiency metrics for jobs, users, and PI accounts.
 
         Raises:
-            ValueError: If any of the calculations fail.
+            RuntimeError: If any of the calculations fail.
         """
         try:
             self.calculate_job_efficiency_metrics(filtered_jobs)
             self.calculate_user_efficiency_metrics()
             self.calculate_pi_account_efficiency_metrics()
-            return {var: getattr(self, var) for var in self._efficiency_metric_vars}
+            return {var.value: getattr(self, var.value) for var in MetricsDataFrameNameEnum}
 
         except (KeyError, ValueError, TypeError, AttributeError) as e:
             raise RuntimeError(f"Failed to calculate all efficiency metrics: {e}") from e
@@ -522,6 +571,8 @@ class EfficiencyAnalysis:
                 pi_acc_job_hours=("user_job_hours", "sum"),
                 user_count=("User", "nunique"),
                 pi_acc_vram_hours=("vram_hours", "sum"),
+                avg_alloc_vram_efficiency_score=("avg_alloc_vram_efficiency_score", "mean"),
+                avg_vram_constraint_efficiency_score=("avg_vram_constraint_efficiency_score", "mean"),
             )
             .reset_index()
         )
@@ -541,7 +592,21 @@ class EfficiencyAnalysis:
             self.users_with_efficiency_metrics.groupby("pi_account", observed=True)[
                 "weighted_ev_alloc_vram_efficiency"
             ]
-            .sum()
+            .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
+            .to_numpy()
+        )
+
+        self.users_with_efficiency_metrics.loc[:, "weighted_ev_vram_constraint_efficiency"] = (
+            self.users_with_efficiency_metrics["expected_value_vram_constraint_efficiency"]
+            * self.users_with_efficiency_metrics["vram_hours"]
+            / pi_acc_vram_hours
+        )
+
+        pi_efficiency_metrics.loc[:, "expected_value_vram_constraint_efficiency"] = (
+            self.users_with_efficiency_metrics.groupby("pi_account", observed=True)[
+                "weighted_ev_vram_constraint_efficiency"
+            ]
+            .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
             .to_numpy()
         )
 
@@ -552,12 +617,16 @@ class EfficiencyAnalysis:
         )
         pi_efficiency_metrics.loc[:, "expected_value_gpu_count"] = (
             self.users_with_efficiency_metrics.groupby("pi_account", observed=True)["weighted_ev_gpu_count"]
-            .sum()
+            .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
             .to_numpy()
         )
 
         self.users_with_efficiency_metrics = self.users_with_efficiency_metrics.drop(
-            columns=["weighted_ev_alloc_vram_efficiency", "weighted_ev_gpu_count"]
+            columns=[
+                "weighted_ev_alloc_vram_efficiency",
+                "weighted_ev_vram_constraint_efficiency",
+                "weighted_ev_gpu_count",
+            ]
         )
 
         self.pi_accounts_with_efficiency_metrics = pi_efficiency_metrics
@@ -599,7 +668,7 @@ class EfficiencyAnalysis:
                 mask &= EfficiencyAnalysis.apply_numeric_filter(
                     self.pi_accounts_with_efficiency_metrics["pi_acc_vram_hours"],
                     vram_hours_filter,
-                    {FilterTypeEnum.SCALAR, FilterTypeEnum.DICTIONARY},
+                    {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY},
                     filter_name="pi_acc_vram_hours_filter",
                 )
             except ValueError as e:
@@ -613,3 +682,73 @@ class EfficiencyAnalysis:
         # Sort by the metric descending (higher is worse)
         inefficient_pi_accounts = inefficient_pi_accounts.sort_values("pi_acc_vram_hours", ascending=False)
         return inefficient_pi_accounts
+
+    def sort_and_filter_records_with_metrics(
+        self,
+        metrics_df_name_enum: MetricsDataFrameNameEnum,
+        sorting_key: str,
+        ascending: bool,
+        filter_criteria: dict[str, int | float | dict | pd.api.typing.NAType],
+    ) -> pd.DataFrame:
+        """
+        Sort and filter records based on specified criteria.
+
+        Args:
+            metrics_df_name_enum (MetricsDataFrameNameEnum): The type of metrics DataFrame to use.
+            sorting_key (str): Column name to sort the results by
+            ascending (bool): Whether to sort in ascending order
+            filter_criteria (dict[str, int | float | dict | pd.NA]): Dictionary of filter criteria to apply.
+                Each key is a column name, and the value is the filter to apply to that column. The filter can be:
+                    - int | float: select rows where the column value equals the filter value
+                    - dict with 'min'/'max' and required 'inclusive' (bool): select rows in the range
+                    - pd.NA: select rows where the column value is pd.NA
+
+        Returns:
+            pd.DataFrame: DataFrame with the filtered records sorted by the specified key and their order
+
+        Raises:
+            ValueError: If the sorting key is not valid or if ascending is not a boolean value
+            ValueError: If the filter criteria are invalid
+        """
+        if not isinstance(metrics_df_name_enum, MetricsDataFrameNameEnum):
+            raise ValueError(
+                f"Invalid efficiency metric type: {metrics_df_name_enum}. "
+                f"Must be a member of MetricsDataFrameNameEnum."
+            )
+        metrics_df = getattr(self, metrics_df_name_enum.value)
+
+        if metrics_df is None:
+            print(
+                f"The {metrics_df_name_enum.value} DataFrame is not available. "
+                "Calculating it by running all metrics calculations:"
+            )
+            self.calculate_all_efficiency_metrics(self.jobs_df)
+
+        if sorting_key not in getattr(self, metrics_df_name_enum.value).columns:
+            raise ValueError(f"Sorting key '{sorting_key}' is not a valid column in the DataFrame.")
+        if not isinstance(ascending, bool):
+            raise ValueError("ascending must be a boolean value.")
+
+        mask = pd.Series(
+            [True] * len(getattr(self, metrics_df_name_enum.value)),
+            index=getattr(self, metrics_df_name_enum.value).index,
+        )
+
+        for column, filter in filter_criteria.items():
+            try:
+                mask &= EfficiencyAnalysis.apply_numeric_filter(
+                    getattr(self, metrics_df_name_enum.value)[column],
+                    filter,
+                    {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY, FilterTypeEnum.PD_NA},
+                    filter_name=f"{column}_filter",
+                )
+            except ValueError as e:
+                raise ValueError(f"Invalid filter for {column}.") from e
+
+        filtered_records = getattr(self, metrics_df_name_enum.value)[mask]
+
+        # Sort by the specified key and order
+
+        filtered_records = filtered_records.sort_values(sorting_key, ascending=ascending)
+
+        return filtered_records

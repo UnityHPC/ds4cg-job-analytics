@@ -92,7 +92,6 @@ def temp_file_db() -> Generator[DatabaseConnection, None, None]:
     finally:
         if mem_db is not None:
             mem_db.disconnect()
-            del mem_db
         shutil.rmtree(temp_db_dir)
 
 
