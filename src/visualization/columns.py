@@ -5,22 +5,24 @@ Provides a function to visualize and summarize each column of a DataFrame, inclu
 plots and statistics for numeric and categorical columns.
 """
 
-import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.container import BarContainer
-import seaborn as sns
-from pathlib import Path
-import numpy as np
+import re
+import textwrap
 from collections import Counter
+from pathlib import Path
+from typing import Any
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from matplotlib.container import BarContainer
 from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Patch
-from ..config.constants import VRAM_CATEGORIES
-import textwrap
-import re
-from typing import Any
 from pydantic import ValidationError
-from .visualization import DataVisualizer
+
 from .models import ColumnVisualizationKwargsModel
+from .visualization import DataVisualizer
+from ..config.constants import VRAM_CATEGORIES
 
 
 class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
@@ -70,11 +72,6 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             None
         """
         col_data = jobs_df[col]
-        # Determine unit for conversion
-        if col == "Elapsed" and not pd.api.types.is_timedelta64_dtype(col_data):
-            col_data = pd.to_timedelta(col_data, unit="seconds", errors="coerce")
-        elif col == "TimeLimit" and not pd.api.types.is_timedelta64_dtype(col_data):
-            col_data = pd.to_timedelta(col_data, unit="minutes", errors="coerce")
 
         # Convert to minutes for plotting
         timelimit_minutes = col_data.dropna().dt.total_seconds() / 60
