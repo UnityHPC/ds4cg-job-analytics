@@ -1,8 +1,10 @@
+import ast
+
 import duckdb
 import pandas as pd
 
 
-def convert_csv_to_db(path_to_csv: str, path_to_db: str):
+def convert_csv_to_db(path_to_csv: str, path_to_db: str, new_format: bool = False) -> None:
     """
     Function to convert csv to duckDB database, following the schema provided by Unity.
 
@@ -11,6 +13,7 @@ def convert_csv_to_db(path_to_csv: str, path_to_db: str):
     Args:
         path_to_csv (str): Path to the CSV file containing job data.
         path_to_db (str): Path to the DuckDB database file where the data will be stored.
+        new_format (bool): Flag indicating whether the new format is used.
 
     Returns:
         None: The function creates a DuckDB database and populates it with data from the CSV
@@ -22,15 +25,32 @@ def convert_csv_to_db(path_to_csv: str, path_to_db: str):
 
         # Convert some columns in csv to correct data types as specified in the Unity schema
         for col in ["SubmitTime", "StartTime", "EndTime"]:
-            df_mock[col] = pd.to_datetime(df_mock[col], format="%m/%d/%y %H:%M")
+            df_mock[col] = pd.to_datetime(df_mock[col], format="%Y-%m-%d %H:%M")
             df_mock[col] = df_mock[col].astype("datetime64[ns]")
 
         for col in ["GPUMemUsage", "GPUComputeUsage", "CPUMemUsage", "CPUComputeUsage"]:
             df_mock[col] = pd.to_numeric(df_mock[col], errors="coerce")
             df_mock[col] = df_mock[col].astype("float64")
 
+        def parse_gpu_type(x: str) -> dict | None:
+            if pd.isna(x) or x.strip() == "":
+                return None
+            try:
+                parsed = ast.literal_eval(x)
+                if isinstance(parsed, dict) and len(parsed) > 0:
+                    return parsed
+                else:
+                    return None
+            except Exception:
+                return None
+
+        if new_format:
+            df_mock["GPUType"] = df_mock["GPUType"].apply(parse_gpu_type)
+        # Create the database schema based on the format
+        gpu_type_column_type = "MAP(VARCHAR, INTEGER)" if new_format else "VARCHAR[]"
+
         conn.execute(
-            """
+            f"""
             CREATE TABLE Jobs (
                 UUID VARCHAR,
                 JobID INTEGER,
@@ -56,13 +76,14 @@ def convert_csv_to_db(path_to_csv: str, path_to_db: str):
                 CPUs SMALLINT,
                 Memory INTEGER,
                 GPUs SMALLINT,
-                GPUType VARCHAR[],
+                GPUType {gpu_type_column_type},
                 GPUMemUsage FLOAT,
                 GPUComputeUsage FLOAT,
                 CPUMemUsage FLOAT,
                 CPUComputeUsage FLOAT
             );"""
         )
+
         conn.register("df_view", df_mock)
         conn.execute("INSERT INTO Jobs SELECT * FROM df_view")
     except Exception as e:

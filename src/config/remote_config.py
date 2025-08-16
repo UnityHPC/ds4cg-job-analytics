@@ -8,7 +8,7 @@ from pathlib import Path
 class RemoteConfigFetcher(ABC):
     """Abstract class to fetch and parse partition information from a remote JSON file."""
 
-    session = CachedSession('fetch_cache', expire_after=60)  # Cache for 60 seconds
+    session = CachedSession("fetch_cache", expire_after=60)  # Cache for 60 seconds
 
     @property
     @abstractmethod
@@ -30,10 +30,10 @@ class RemoteConfigFetcher(ABC):
 
     def _validate_info(self, info: list[dict]) -> bool:
         """Validate that the fetched information is a list of dictionaries.
-        
+
         Args:
             info (list[dict]): The fetched information to validate.
-            
+
         Raises:
                 ValueError: If the fetched data is not in the expected format.
 
@@ -93,8 +93,7 @@ class RemoteConfigFetcher(ABC):
             return local_info
         except FileNotFoundError as e:
             raise FileNotFoundError(
-                f"{self.local_path.name} not found locally at {self.local_path}. "
-                "Please ensure the file exists."
+                f"{self.local_path.name} not found locally at {self.local_path}. Please ensure the file exists."
             ) from e
 
 
@@ -115,7 +114,7 @@ class PartitionInfoFetcher(RemoteConfigFetcher):
     def info_name(self) -> str:
         """Type of information being fetched."""
         return "partition"
-    
+
     def _validate_info(self, info: list[dict]) -> bool:
         """Validate the fetched partition information.
 
@@ -124,10 +123,10 @@ class PartitionInfoFetcher(RemoteConfigFetcher):
 
         Args:
             info (list[dict]): The fetched partition information to validate.
-        
+
         Raises:
             ValueError: If the fetched data does not contain the expected keys.
-            
+
         Returns:
             bool: True if the data is valid, False otherwise."""
 

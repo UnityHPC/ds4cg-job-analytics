@@ -1,21 +1,24 @@
-from src.preprocess import preprocess_data
 import pandas as pd
+import pytest
+from pandas.api.typing import NAType
+
+
 from src.config import PartitionInfoFetcher
 from src.config.enum_constants import (
+    AdminsAccountEnum,
+    ExitCodeEnum,
     InteractiveEnum,
     QOSEnum,
     StatusEnum,
-    ExitCodeEnum,
     AdminPartitionEnum,
-    AdminsAccountEnum,
-    PartitionTypeEnum
+    PartitionTypeEnum,
 )
+from src.preprocess import preprocess_data
+from src.preprocess.preprocess import _get_partition_constraint, _get_requested_vram, _get_vram_constraint
 
 
 def _helper_filter_irrelevant_records(
-    input_df: pd.DataFrame,
-    min_elapsed_seconds: int,
-    include_cpu_only_jobs: bool = False
+    input_df: pd.DataFrame, min_elapsed_seconds: int, include_cpu_only_jobs: bool = False
 ) -> pd.DataFrame:
     """
     Private function to help generate expected ground truth dataframe for test.
@@ -35,7 +38,7 @@ def _helper_filter_irrelevant_records(
         pd.DataFrame: Filtered dataframe.
     """
 
-    # TODO(Tan): Update implementation to use the same logic as preprocess_data 
+    # TODO(Tan): Update implementation to use the same logic as preprocess_data
     mask = pd.Series([True] * len(input_df), index=input_df.index)
 
     mask &= input_df["Elapsed"] >= min_elapsed_seconds
@@ -44,13 +47,14 @@ def _helper_filter_irrelevant_records(
     mask &= input_df["QOS"] != QOSEnum.UPDATES.value
     # Filter out jobs whose partition type is not 'gpu', unless include_cpu_only_jobs is True.
     partition_info = PartitionInfoFetcher().get_info()
-    gpu_partitions = [p['name'] for p in partition_info if p['type'] == PartitionTypeEnum.GPU.value]
+    gpu_partitions = [p["name"] for p in partition_info if p["type"] == PartitionTypeEnum.GPU.value]
     mask &= input_df["Partition"].isin(gpu_partitions) | include_cpu_only_jobs
 
     return input_df[mask].copy()
 
 
-def test_preprocess_data_filtered_columns(mock_data_frame):
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_preprocess_data_filtered_columns(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data does not contain irrelevant columns.
     """
@@ -59,9 +63,12 @@ def test_preprocess_data_filtered_columns(mock_data_frame):
     assert "EndTime" not in data.columns
     assert "Nodes" not in data.columns
     assert "Preempted" not in data.columns
+    assert "partition_constraint" in data.columns
+    assert "requested_vram" in data.columns
 
 
-def test_preprocess_data_filtered_gpu(mock_data_frame):
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_preprocess_data_filtered_gpu(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data does not contain null GPUType and GPUs.
     """
@@ -72,7 +79,8 @@ def test_preprocess_data_filtered_gpu(mock_data_frame):
     assert not any(is_gpu_null)
 
 
-def test_preprocess_data_filtered_status(mock_data_frame):
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_preprocess_data_filtered_status(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data does not contain FAILED or CANCELLED jobs.
     """
@@ -83,7 +91,8 @@ def test_preprocess_data_filtered_status(mock_data_frame):
     assert not any(status_cancelled)
 
 
-def test_preprocess_data_filtered_min_elapsed(mock_data_frame):
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_preprocess_data_filtered_min_elapsed_1(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data does not contain jobs with elapsed time below the threshold (300 seconds).
     """
@@ -94,7 +103,8 @@ def test_preprocess_data_filtered_min_elapsed(mock_data_frame):
     assert not any(elapsed_below_threshold)
 
 
-def test_preprocess_data_filter_min_esplapes_2(mock_data_frame):
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_preprocess_data_filter_min_elapsed_2(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data contains only jobs with elapsed time below the threshold (700 seconds).
     """
@@ -107,12 +117,12 @@ def test_preprocess_data_filter_min_esplapes_2(mock_data_frame):
     # TODO (Tan): Update the mock data to include jobs with elapsed time below 700 seconds
     ground_truth = _helper_filter_irrelevant_records(mock_data_frame, 700, include_cpu_only_jobs=True)
     assert len(data) == len(ground_truth), (
-    f"JobIDs in data: {data['JobID'].tolist()}, "
-    f"JobIDs in ground_truth: {ground_truth['JobID'].tolist()}"
-)
+        f"JobIDs in data: {data['JobID'].tolist()}, JobIDs in ground_truth: {ground_truth['JobID'].tolist()}"
+    )
 
 
-def test_preprocess_data_filtered_root_account(mock_data_frame):
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_preprocess_data_filtered_root_account(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data does not contain jobs with root account, partition building, or qos updates.
     """
@@ -125,7 +135,8 @@ def test_preprocess_data_filtered_root_account(mock_data_frame):
     assert not any(partition_building)
 
 
-def test_preprocess_data_include_cpu_job(mock_data_frame):
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_preprocess_data_include_cpu_job(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data includes CPU-only jobs when specified.
     """
@@ -145,11 +156,14 @@ def test_preprocess_data_include_cpu_job(mock_data_frame):
             & (ground_truth["Status"] != StatusEnum.CANCELLED.value)
         ]
     )
-    assert sum(x == ["cpu"] for x in data["GPUType"]) == expected_cpu_type
+    assert sum(pd.isna(x) for x in data["GPUType"]) == expected_cpu_type
     assert data["GPUs"].value_counts()[0] == expected_gpus_count_0
+    # Check that GPUType is NA for CPU-only jobs
+    assert all(isinstance(row, list | dict) for row in data["GPUType"] if not pd.isna(row))
 
 
-def test_preprocess_data_include_failed_cancelled_job(mock_data_frame):
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_preprocess_data_include_failed_cancelled_job(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data includes FAILED and CANCELLED jobs when specified.
     """
@@ -173,7 +187,8 @@ def test_preprocess_data_include_failed_cancelled_job(mock_data_frame):
     assert data["Status"].value_counts()[StatusEnum.CANCELLED.value] == expect_cancelled_status
 
 
-def test_preprocess_data_include_all(mock_data_frame):
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_preprocess_data_include_all(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data includes all jobs when both CPU-only and FAILED/CANCELLED jobs are specified.
     """
@@ -190,16 +205,16 @@ def test_preprocess_data_include_all(mock_data_frame):
     expect_completed_status = len(ground_truth[(ground_truth["Status"] == StatusEnum.COMPLETED.value)])
     expect_gpu_type_null = len(ground_truth[(ground_truth["GPUType"].isna())])
     expect_gpus_null = len(ground_truth[(ground_truth["GPUs"].isna())])
-
     assert len(data) == len(ground_truth)
-    assert sum(x == ["cpu"] for x in data["GPUType"]) == expect_gpu_type_null
+    assert sum(pd.isna(x) for x in data["GPUType"]) == expect_gpu_type_null
     assert data["GPUs"].value_counts()[0] == expect_gpus_null
     assert data["Status"].value_counts()[StatusEnum.FAILED.value] == expect_failed_status
     assert data["Status"].value_counts()[StatusEnum.CANCELLED.value] == expect_cancelled_status
     assert data["Status"].value_counts()[StatusEnum.COMPLETED.value] == expect_completed_status
 
 
-def test_preprocess_data_fill_missing_interactive(mock_data_frame):
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_preprocess_data_fill_missing_interactive(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data fills missing interactive job types with 'non-interactive' correctly.
     """
@@ -217,7 +232,8 @@ def test_preprocess_data_fill_missing_interactive(mock_data_frame):
     assert interactive_stat[InteractiveEnum.NON_INTERACTIVE.value] == expect_non_interactive
 
 
-def test_preprocess_data_fill_missing_array_id(mock_data_frame):
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_preprocess_data_fill_missing_array_id(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data fills missing ArrayID with -1 correctly.
     """
@@ -233,9 +249,10 @@ def test_preprocess_data_fill_missing_array_id(mock_data_frame):
     assert array_id_stat[-1] == expect_array_id_null
 
 
-def test_preprocess_data_fill_missing_gpu_type(mock_data_frame):
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_preprocess_data_fill_missing_gpu_type(mock_data_frame: pd.DataFrame) -> None:
     """
-    Test that the preprocessed data fills missing GPUType with 'cpu' correctly.
+    Test that the preprocessed data fills missing GPUType with pd.NA correctly.
     """
     data = preprocess_data(
         input_df=mock_data_frame,
@@ -246,16 +263,17 @@ def test_preprocess_data_fill_missing_gpu_type(mock_data_frame):
 
     ground_truth = _helper_filter_irrelevant_records(mock_data_frame, 100, include_cpu_only_jobs=True)
     expect_gpu_type_null = len(ground_truth[(ground_truth["GPUType"].isna())])
-    expect_gpus_null = len(ground_truth[(ground_truth["GPUs"].isna())])
+    expect_gpus_null = len(ground_truth[(ground_truth["GPUs"] == 0) | (ground_truth["GPUs"].isna())])
     gpus_stat = data["GPUs"].value_counts()
 
-    assert sum(x == ["cpu"] for x in data["GPUType"]) == expect_gpu_type_null
+    assert sum(pd.isna(x) for x in data["GPUType"]) == expect_gpu_type_null
     assert gpus_stat[0] == expect_gpus_null, (
         f"Expected {expect_gpus_null} null GPUs, but found {gpus_stat[0]} null GPUs."
     )
 
 
-def test_preprocess_data_fill_missing_constraints(mock_data_frame):
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_preprocess_data_fill_missing_constraints(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data fills missing Constraints with empty numpy array correctly.
     """
@@ -271,7 +289,8 @@ def test_preprocess_data_fill_missing_constraints(mock_data_frame):
     assert sum(len(x) == 0 for x in data["Constraints"]) == expect_constraints_null
 
 
-def test_category_interactive(mock_data_frame):
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_category_interactive(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data has 'Interactive' as a categorical variable and check values contained within it.
     """
@@ -290,7 +309,8 @@ def test_category_interactive(mock_data_frame):
     assert expected.issubset(set(data["Interactive"].cat.categories))
 
 
-def test_category_qos(mock_data_frame):
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_category_qos(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data has 'QOS' as a categorical variable and check values contained within it.
     """
@@ -308,7 +328,8 @@ def test_category_qos(mock_data_frame):
     assert expected.issubset(set(data["QOS"].cat.categories))
 
 
-def test_category_exit_code(mock_data_frame):
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_category_exit_code(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data has 'ExitCode' as a categorical variable and check values contained within it.
     """
@@ -327,7 +348,8 @@ def test_category_exit_code(mock_data_frame):
     assert expected.issubset(set(data["ExitCode"].cat.categories))
 
 
-def test_category_partition(mock_data_frame):
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_category_partition(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data has 'Partition' as a categorical variable and check values contained within it.
     """
@@ -346,7 +368,8 @@ def test_category_partition(mock_data_frame):
     assert expected.issubset(set(data["Partition"].cat.categories))
 
 
-def test_category_account(mock_data_frame):
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_category_account(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data has 'Account' as a categorical variable and check values contained within it.
     """
@@ -365,7 +388,8 @@ def test_category_account(mock_data_frame):
     assert expected.issubset(set(data["Account"].cat.categories))
 
 
-def test_preprocess_timedelta_conversion(mock_data_frame):
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_preprocess_timedelta_conversion(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data converts elapsed time to timedelta.
     """
@@ -380,21 +404,86 @@ def test_preprocess_timedelta_conversion(mock_data_frame):
     time_limit = data["TimeLimit"]
 
     assert time_limit.dtype == "timedelta64[ns]"
-    assert time_limit[0].total_seconds() / 60 == ground_truth["TimeLimit"][0] 
+    assert time_limit[0].total_seconds() / 60 == ground_truth["TimeLimit"][0]
     assert time_limit[max_len - 1].total_seconds() / 60 == ground_truth["TimeLimit"][max_len - 1]
 
 
-def test_preprocess_gpu_type(mock_data_frame):
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_preprocess_gpu_type(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the GPUType column is correctly filled and transformed during preprocessing.
     """
-
     data = preprocess_data(
         input_df=mock_data_frame,
         include_cpu_only_jobs=True,
     )
 
-    assert all(row == ["cpu"] for row in data.loc[data["GPUType"].isna(), "GPUType"])
+    # Check that GPUType is filled with NA for CPU-only jobs
+    assert all(pd.isna(row) for row in data.loc[data["GPUType"].isna(), "GPUType"])
 
-    # Check that numpy arrays in GPUType are converted to lists
-    assert all(isinstance(row, list) for row in data["GPUType"] if not pd.isna(row))
+
+def test_get_partition_constraint_known() -> None:
+    """
+    Test that _get_partition_constraint returns the correct VRAM constraint for known partitions.
+    """
+    # Known partition, e.g. "superpod-a100" maps to a100-80g (80 GiB)
+    assert _get_partition_constraint("superpod-a100", 2) == 160
+    # Known partition, e.g. "ece-gpu" maps to a100-40g (40 GiB)
+    assert _get_partition_constraint("ece-gpu", 1) == 40
+    # Known partition, e.g. "lan" maps to a40 (48 GiB)
+    assert _get_partition_constraint("lan", 2) == 96
+
+
+def test_get_partition_constraint_unknown() -> None:
+    """
+    Test that _get_partition_constraint returns pd.NA for unknown partitions.
+    """
+    # Unknown partition returns pd.NA
+    assert pd.isna(_get_partition_constraint("unknown-partition", 1))
+
+
+def test_get_requested_vram_cases() -> None:
+    """
+    Test that _get_requested_vram handles various cases correctly.
+    """
+    # Both constraints are int, choose partition constraint
+    assert _get_requested_vram(100, 80) == 80
+    assert _get_requested_vram(80, 100) == 100
+    # One constraint is NA
+    assert _get_requested_vram(pd.NA, 80) == 80
+    assert _get_requested_vram(100, pd.NA) == 100
+    # Both constraints are NA
+    assert pd.isna(_get_requested_vram(pd.NA, pd.NA))
+
+
+@pytest.mark.parametrize("mock_data_frame", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_partition_constraint_and_requested_vram_on_mock_data(mock_data_frame: pd.DataFrame) -> None:
+    """
+    Test that the partition_constraint and requested_vram columns are correctly computed in the preprocessed data.
+    """
+    # Run preprocess_data on the mock data
+    processed = preprocess_data(
+        mock_data_frame, min_elapsed_seconds=0, include_cpu_only_jobs=True, include_failed_cancelled_jobs=True
+    )
+
+    # Check that partition_constraint and requested_vram columns exist
+    assert "partition_constraint" in processed.columns
+    assert "requested_vram" in processed.columns
+
+    # For each row, check that requested_vram is set to partition_constraint if both are not NA.
+    for _idx, row in processed.iterrows():
+        part_con = _get_partition_constraint(row["Partition"], row["GPUs"])
+        constraint_val = _get_vram_constraint(row["Constraints"], row["GPUs"])
+        # Compute expected requested_vram
+        expected: int | NAType
+        if pd.isna(part_con) and pd.isna(constraint_val):
+            expected = pd.NA
+        elif pd.isna(part_con):
+            expected = constraint_val
+        else:
+            expected = part_con
+        actual = row["requested_vram"]
+        if pd.isna(expected):
+            assert pd.isna(actual)
+        else:
+            assert actual == expected
