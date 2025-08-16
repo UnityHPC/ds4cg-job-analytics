@@ -19,10 +19,10 @@ from ..config.enum_constants import (
     AdminPartitionEnum,
     QOSEnum,
     PartitionTypeEnum,
-    ErrorTypeEnum,
+    PreprocessingErrorTypeEnum,
 )
 from ..config.remote_config import PartitionInfoFetcher
-from ..config.paths import ERROR_SUMMARY_FILE
+from ..config.paths import PREPROCESSING_ERRORS_LOG_FILE
 from .errors import JobProcessingError
 
 processing_error_logs = []
@@ -104,14 +104,14 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int) -> int | NAType
             split_constr = constr.split(":")
             if len(split_constr) <= 1:
                 # Add error records for malformed constraints and missing GPU types
-                raise JobProcessingError(ErrorTypeEnum.MALFORMED_CONSTRAINT, constr)
+                raise JobProcessingError(PreprocessingErrorTypeEnum.MALFORMED_CONSTRAINT, constr)
 
             gpu_type = split_constr[1].lower()
 
             if gpu_type in VRAM_VALUES:
                 vram_constraints.append(VRAM_VALUES[gpu_type])
             else:
-                raise JobProcessingError(ErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu_type)
+                raise JobProcessingError(PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu_type)
         else:
             # if they enter a GPU name without the prefix
             if constr in VRAM_VALUES:
@@ -125,7 +125,7 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int) -> int | NAType
 
 def _get_partition_gpu(partition: str) -> str | None:
     """
-    Get the GPU type based on the partition name.
+    Get the GPU type based on the partition if it only has one type of GPU.
 
     This function maps specific partition names to their corresponding GPU types.
 
@@ -219,7 +219,7 @@ def _calculate_approx_vram_single_gpu_type(
         if gpu in VRAM_VALUES:
             return VRAM_VALUES[gpu] * gpu_count
         else:
-            raise JobProcessingError(ErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu)
+            raise JobProcessingError(PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu)
 
     # calculate VRAM for multivalent GPUs
     total_vram = 0
@@ -248,7 +248,7 @@ def _calculate_approx_vram_single_gpu_type(
         if not vram_values:
             # if no valid nodes are found for the multivalent GPU type in the node list, log an error
             raise JobProcessingError(
-                ErrorTypeEnum.UNKNOWN_GPU_TYPE,
+                PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE,
                 f"No valid nodes found for multivalent GPU type '{gpu}' in node list: {node_list}",
             )
 
@@ -377,7 +377,7 @@ def _calculate_non_multivalent_vram(non_multivalent: dict) -> int:
         if gpu in VRAM_VALUES:
             allocated_vram += VRAM_VALUES[gpu] * count
         else:
-            raise JobProcessingError(ErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu)
+            raise JobProcessingError(PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu)
     return allocated_vram
 
 
@@ -501,7 +501,7 @@ def _get_approx_allocated_vram(
                 if gpu in VRAM_VALUES:
                     total_vram += VRAM_VALUES[gpu]
                 else:
-                    raise JobProcessingError(ErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu)
+                    raise JobProcessingError(PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu)
         return total_vram
 
     # Handle cases where the number of GPUs is different from number of GPUTypes.
@@ -517,7 +517,7 @@ def _get_approx_allocated_vram(
             if gpu in VRAM_VALUES:
                 allocated_vrams.add(VRAM_VALUES[gpu])
             else:
-                raise JobProcessingError(ErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu)
+                raise JobProcessingError(PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu)
 
     vram_values = sorted(list(allocated_vrams))
     total_vram = vram_values.pop(0) * gpu_count  # use the GPU with the minimum VRAM value
@@ -556,7 +556,8 @@ def _validate_gpu_type(
     elif pd.isna(gpu_type_value):
         if not include_cpu_only_jobs:
             raise JobProcessingError(
-                error_type=ErrorTypeEnum.GPU_TYPE_NULL, info="GPU Type is null but include_cpu_only_jobs is False"
+                error_type=PreprocessingErrorTypeEnum.GPU_TYPE_NULL,
+                info="GPU Type is null but include_cpu_only_jobs is False",
             )
         return pd.NA
 
@@ -631,48 +632,48 @@ def _fill_missing(res: pd.DataFrame, include_cpu_only_jobs: bool) -> None:
     res.loc[:, "GPUs"] = res["GPUs"].fillna(0)
 
 
-def _write_error_summary_file(processing_error_logs: list[dict]) -> None:
+def _write_preprocessing_error_logs(preprocessing_error_logs: list[dict]) -> None:
     """
-    Write processing error logs to a summary file.
+    Write preprocessing error logs to a log file.
 
     Args:
-        processing_error_logs (list[dict]): List of error records to write to file.
+        preprocessing_error_logs (list[dict]): List of error records to write to file.
 
     Returns:
-        None: Writes the error summary to ERROR_SUMMARY_FILE.
+        None: Writes the error summary to PREPROCESSING_ERRORS_LOG_FILE.
     """
-    if not processing_error_logs:
+    if not preprocessing_error_logs:
         return
 
     print(
-        f"Found {len(processing_error_logs)} records with errors. "
-        f"Reporting them to a summary file {ERROR_SUMMARY_FILE}."
+        f"Found {len(preprocessing_error_logs)} records with errors. "
+        f"Reporting them to a summary file {PREPROCESSING_ERRORS_LOG_FILE}."
     )
 
-    if ERROR_SUMMARY_FILE.exists():
-        print(f"Processing error log file already exists. Overwriting {ERROR_SUMMARY_FILE.name}")
+    if PREPROCESSING_ERRORS_LOG_FILE.exists():
+        print(f"Processing error log file already exists. Overwriting {PREPROCESSING_ERRORS_LOG_FILE.name}")
 
     summary_lines = [
         "Records causing processing errors that were ignored:\n",
         "=" * 30 + "\n",
         f"Generated on: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}\n",
-        f"Total errors: {len(processing_error_logs)}\n\n",
+        f"Total errors: {len(preprocessing_error_logs)}\n\n",
     ]
 
-    for record in processing_error_logs:
+    for record in preprocessing_error_logs:
         summary_lines.append(
             f"Job ID: {record['job_id']}\n"
-            f"Error Type: {ErrorTypeEnum(record['error_type']).value}\n"
+            f"Error Type: {PreprocessingErrorTypeEnum(record['error_type']).value}\n"
             f"Info: {record['info']}\n"
             f"{'-' * 40}\n\n"
         )
 
     # Add all job IDs in one line for easy copying
-    job_ids = [str(record["job_id"]) for record in processing_error_logs if record["job_id"] is not None]
+    job_ids = [str(record["job_id"]) for record in preprocessing_error_logs if record["job_id"] is not None]
     if job_ids:
         summary_lines.append(f"All Job IDs: {', '.join(job_ids)}\n")
 
-    with open(ERROR_SUMMARY_FILE, "w", encoding="utf-8") as f:
+    with open(PREPROCESSING_ERRORS_LOG_FILE, "w", encoding="utf-8") as f:
         f.writelines(summary_lines)
 
 
@@ -802,8 +803,8 @@ def preprocess_data(
             message = f"Some entries in {col_name} having infinity values. This may be caused by an overflow."
             warnings.warn(message=message, stacklevel=2, category=UserWarning)
 
-    # Save error records to a summary file
-    _write_error_summary_file(processing_error_logs)
+    # Save preprocessing error logs to a file.
+    _write_preprocessing_error_logs(processing_error_logs)
 
     # Reset the error logs after writing to file
     processing_error_logs.clear()

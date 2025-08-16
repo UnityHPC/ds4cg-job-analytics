@@ -43,6 +43,7 @@ ATTRIBUTE_CATEGORIES = {
 # This is used to determine which GPU variant a job is using based on the VRAM usage
 MULTIVALENT_GPUS = {"a100": [40, 80], "v100": [16, 32]}
 
+# TODO (Ayush): Refactor to obtain partitions that have one GPUType from `src/config/remote_config.py` instead.
 # Mapping partitions to GPU types for specific constraints to calculate requested VRAM
 # Update this map as new partitions are added or existing ones change
 PARTITION_TO_GPU_MAP = {

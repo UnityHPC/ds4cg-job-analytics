@@ -158,12 +158,14 @@ class MetricsDataFrameNameEnum(Enum):
 
 
 @unique
-class ErrorTypeEnum(Enum):
-    """An enumeration representing different error types.
+class PreprocessingErrorTypeEnum(Enum):
+    """An enumeration representing different error types that could occur during preprocessing.
 
     Attributes:
         MALFORMED_CONSTRAINT: Represents errors due to malformed constraints.
         UNKNOWN_GPU_TYPE: Represents errors related to unknown GPU types specified in constraints.
+        NO_VALID_NODES: Represents errors when no valid nodes are found for a job.
+        GPU_TYPE_NULL: Represents errors when the GPU type is null in constraints.
     """
 
     MALFORMED_CONSTRAINT = "Malformed Constraint"
