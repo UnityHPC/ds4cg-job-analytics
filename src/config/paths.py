@@ -14,7 +14,7 @@ VISUALIZATION_DATA_DIR = DATA_DIR / "visualizations"
 REPORTS_DATA_DIR = DATA_DIR / "reports"
 
 # Specific file paths
-ERROR_SUMMARY_FILE = PREPROCESSING_DATA_DIR / "error_summary.txt"
+PREPROCESSING_ERRORS_LOG_FILE = PREPROCESSING_DATA_DIR / "preprocessing_errors.log"
 
 # Ensure data directories exist when imported
 DATA_DIR.mkdir(exist_ok=True)
