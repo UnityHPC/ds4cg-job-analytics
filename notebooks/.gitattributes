@@ -1,4 +1,3 @@
-# *.ipynb filter=strip-notebook-output
-# # keep the output of the following notebooks when committing
-# SlurmGPU.ipynb -filter=strip-notebook-output
-# notebooks/SlurmGPU.ipynb -filter=strip-notebook-output
+*.ipynb filter=strip-notebook-output
+# keep the output of the following notebooks when committing
+SlurmGPU.ipynb !filter=strip-notebook-output
