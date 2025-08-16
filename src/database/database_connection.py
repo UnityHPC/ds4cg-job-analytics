@@ -1,18 +1,21 @@
+import os
+
 import duckdb
 import pandas as pd
 
 
 class DatabaseConnection:
-    
     """
     A class to manage database connections using DuckDB.
 
-    This class provides methods to establish a connection to a DuckDB database using a given URL. 
+    This class provides methods to establish a connection to a DuckDB database using a given URL.
     It can be used to interact with the database and perform operations.
 
     """
+
     def __init__(self, db_url: str, read_only: bool = True) -> None:
         self.db_url = db_url
+        self.connection = None
         self.connection = self._connect(read_only=read_only)
         print(f"Connected to {self.db_url}")
 
@@ -22,44 +25,46 @@ class DatabaseConnection:
         Args:
             read_only (bool): If True, the connection will be read-only. We want to set the default to read_only=True.
 
-        Returns: 
+        Returns:
             duckdb.DuckDBPyConnection: The connection object to the DuckDB database.
         """
         self.connection = duckdb.connect(database=self.db_url, read_only=read_only)
         return self.connection
 
-    def _disconnect(self) -> None:
-        """Safely close the active database connection"""
-        self.connection.close()
+    def disconnect(self) -> None:
+        """Close the connection to the DuckDB database."""
+        if self.connection is not None:
+            self.connection.close()
+            self.connection = None
 
     def __del__(self) -> None:
         """Ensure the connection is closed when the object is deleted."""
-        if self.is_connected():
-            self._disconnect()
+        self.disconnect()
+        if os.getenv("RUN_ENV") != "TEST":
             print(f"Disconnected from {self.db_url}")
 
     def is_connected(self) -> bool:
         """
         Check if the database connection is active.
 
-        Returns: 
+        Returns:
             bool: True if the connection is active, False otherwise
         """
         return self.connection is not None
 
     def fetch_all_column_names(self, table_name: str = "Jobs") -> list[str]:
         """Fetch all column names from any table. By default, it fetches from a table named 'Jobs'.
-        
-        Args: 
-            table_name (str): The name of the table to fetch all the column names from. Defaults to "Jobs"  
+
+        Args:
+            table_name (str): The name of the table to fetch all the column names from. Defaults to "Jobs"
 
         Raises:
             ConnectionError: If the connection is not established.
 
         Returns:
-            list: A list of column names from the specified table.    
+            list: A list of column names from the specified table.
         """
-        if self.is_connected():
+        if self.connection is not None:
             query = f"SELECT * FROM {table_name} LIMIT 0"
             return self.connection.execute(query).df().columns.tolist()
         else:
@@ -78,7 +83,7 @@ class DatabaseConnection:
         Returns:
             pd.DataFrame: A DataFrame containing the column information.
         """
-        if self.is_connected():
+        if self.connection is not None:
             query = f"DESCRIBE {table_name}"
             return self.connection.execute(query).fetchdf()
         else:
@@ -92,11 +97,11 @@ class DatabaseConnection:
 
         Raises:
             ConnectionError: If the connection is not active.
-            
+
         Returns:
             pd.DataFrame: A pandas DataFrame containing all rows from the specified table.
         """
-        if self.is_connected():
+        if self.connection is not None:
             query = f"SELECT * FROM {table_name}"
             return self.connection.execute(query).fetchdf()
         else:
@@ -116,7 +121,7 @@ class DatabaseConnection:
         Returns:
             pd.DataFrame: The result of the query as a pandas DataFrame.
         """
-        if self.is_connected():
+        if self.connection is not None:
             try:
                 return self.connection.query(query).to_df()
             except duckdb.BinderException as e:

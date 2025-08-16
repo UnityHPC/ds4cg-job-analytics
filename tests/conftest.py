@@ -1,11 +1,14 @@
+import shutil
+import tempfile
+from collections.abc import Generator
+
+import pandas as pd
 import pytest
+
 from src.database import DatabaseConnection
 from .mock_data.convert_csv_to_db import convert_csv_to_db
-import tempfile
-import shutil
 from src.config.enum_constants import QOSEnum, AdminPartitionEnum, AdminsAccountEnum, PartitionTypeEnum, StatusEnum
 from src.config.remote_config import PartitionInfoFetcher
-import pandas as pd
 
 
 def preprocess_mock_data(
@@ -85,11 +88,13 @@ def preprocess_mock_data(
 
 # Get path to the temporary mock database file
 @pytest.fixture(scope="module")
-def mock_data_path():
+def mock_data_path(request: pytest.FixtureRequest) -> Generator[str]:
     try:
+        is_new_format = request.param
         temp_db_dir = tempfile.mkdtemp()
-        temp_db_path = f"{temp_db_dir}/mock.db"
-        convert_csv_to_db("tests/mock_data/mock.csv", temp_db_path)
+        temp_db_path = f"{temp_db_dir}/mock_new_format.db" if is_new_format else f"{temp_db_dir}/mock.db"
+        csv_path = "tests/mock_data/mock_new_format.csv" if is_new_format else "tests/mock_data/mock.csv"
+        convert_csv_to_db(csv_path, temp_db_path, new_format=is_new_format)
         yield temp_db_path
     finally:
         shutil.rmtree(temp_db_dir)
@@ -97,7 +102,7 @@ def mock_data_path():
 
 # load mock database as a Dataframe
 @pytest.fixture(scope="module")
-def mock_data_frame(mock_data_path):
+def mock_data_frame(mock_data_path: str) -> Generator[pd.DataFrame]:
     mem_db = None
     try:
         mem_db = DatabaseConnection(
@@ -108,5 +113,5 @@ def mock_data_frame(mock_data_path):
         raise Exception("Exception at mock_data_frame") from e
     finally:
         if mem_db is not None:
-            mem_db._disconnect()
+            mem_db.disconnect()
             del mem_db
