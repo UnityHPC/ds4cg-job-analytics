@@ -216,7 +216,9 @@ class EfficiencyAnalysis(Generic[MetricsDFNameEnumT]):
 
     def filter_jobs_for_analysis(
         self,
+        requested_vram_filter: int | float | list | set | tuple | dict | pd.api.typing.NAType | None = None,
         vram_constraint_filter: int | float | list | set | tuple | dict | pd.api.typing.NAType | None = None,
+        partition_constraint_filter: int | float | list | set | tuple | dict | pd.api.typing.NAType | None = None,
         gpu_mem_usage_filter: int | float | dict | None = None,
         allocated_vram_filter: int | float | list | set | tuple | dict | None = None,
         gpu_count_filter: int | float | list | set | tuple | dict | None = None,
@@ -226,12 +228,24 @@ class EfficiencyAnalysis(Generic[MetricsDFNameEnumT]):
         Filter jobs based on VRAM constraints, GPU allocation, and usage criteria.
 
         Args:
+            requested_vram_filter:
+                - None: no filtering on requested_vram
+                - int | float : select rows where requested_vram == value
+                - list/set/tuple: select rows where requested_vram is in the values provided
+                - dict with 'min'/'max' and required 'inclusive' (bool): select rows in the range
+                - pd.NA or <NA>: select rows where requested_vram is Nullable Int64 (i.e., pd.NA)
             vram_constraint_filter:
                 - None: no filtering on vram_constraint
                 - int | float : select rows where vram_constraint == value
                 - list/set/tuple: select rows where vram_constraint is in the values provided
                 - dict with 'min'/'max' and required 'inclusive' (bool): select rows in the range
                 - pd.NA or <NA>: select rows where vram_constraint is Nullable Int64 (i.e., pd.NA)
+            partition_constraint_filter:
+                - None: no filtering on partition_constraint
+                - int | float : select rows where partition_constraint == value
+                - list/set/tuple: select rows where partition_constraint is in the values provided
+                - dict with 'min'/'max' and required 'inclusive' (bool): select rows in the range
+                - pd.NA or <NA>: select rows where partition_constraint is Nullable Int64 (i.e., pd.NA)
             gpu_mem_usage_filter: the unit is bytes to match the GPUMemUsage column
                 - None: no filtering on GPUMemUsage
                 - int | float : select rows where GPUMemUsage == value
@@ -256,6 +270,30 @@ class EfficiencyAnalysis(Generic[MetricsDFNameEnumT]):
         """
 
         mask = pd.Series([True] * len(self.jobs_df), index=self.jobs_df.index)
+
+        # requested_vram
+        if requested_vram_filter is not None:
+            try:
+                mask &= EfficiencyAnalysis.apply_numeric_filter(
+                    self.jobs_df["requested_vram"],
+                    requested_vram_filter,
+                    set(FilterTypeEnum.__members__.values()),
+                    "requested_vram_filter",
+                )
+            except ValueError as e:
+                raise ValueError("Invalid requested_vram_filter.") from e
+
+        # partition_constraint
+        if partition_constraint_filter is not None:
+            try:
+                mask &= EfficiencyAnalysis.apply_numeric_filter(
+                    self.jobs_df["partition_constraint"],
+                    partition_constraint_filter,
+                    set(FilterTypeEnum.__members__.values()),
+                    "partition_constraint_filter",
+                )
+            except ValueError as e:
+                raise ValueError("Invalid partition_constraint_filter.") from e
 
         # vram_constraint
         if vram_constraint_filter is not None:
@@ -341,9 +379,9 @@ class EfficiencyAnalysis(Generic[MetricsDFNameEnumT]):
             filtered_jobs["used_vram_gib"] / filtered_jobs["allocated_vram"]
         )
 
-        # Compute vram_constraint_efficiency, a nullable float in the range [0, 1]. Set to NA if vram_constraint is NA
-        filtered_jobs.loc[:, "vram_constraint_efficiency"] = (
-            filtered_jobs["used_vram_gib"] / filtered_jobs["vram_constraint"]
+        # Compute requested_vram_efficiency, a nullable float in the range [0, 1]. Set to NA if requested_vram is NA
+        filtered_jobs.loc[:, "requested_vram_efficiency"] = (
+            filtered_jobs["used_vram_gib"] / filtered_jobs["requested_vram"]
         )
 
         # Calculate job allocated VRAM efficiency score
@@ -353,15 +391,15 @@ class EfficiencyAnalysis(Generic[MetricsDFNameEnumT]):
             np.log(alloc_vram_eff.where(alloc_vram_eff > 0)) * filtered_jobs["vram_hours"]
         ).where(alloc_vram_eff > 0, -np.inf)
 
-        # Calculate vram_constraint_efficiency score
-        vram_constraint_eff = filtered_jobs["vram_constraint_efficiency"]
+        # Calculate requested_vram_efficiency score
+        requested_vram_eff = filtered_jobs["requested_vram_efficiency"]
         # Avoid log(0) and propagate pd.NA: if NA, score is NA; if 0, score is -np.inf
         score = pd.Series(pd.NA, index=filtered_jobs.index, dtype=pd.Float64Dtype())
-        mask_valid = vram_constraint_eff.notna() & (vram_constraint_eff > 0)
-        mask_zero = vram_constraint_eff.notna() & (vram_constraint_eff == 0)
-        score[mask_valid] = np.log(vram_constraint_eff[mask_valid]) * filtered_jobs.loc[mask_valid, "vram_hours"]
+        mask_valid = requested_vram_eff.notna() & (requested_vram_eff > 0)
+        mask_zero = requested_vram_eff.notna() & (requested_vram_eff == 0)
+        score[mask_valid] = np.log(requested_vram_eff[mask_valid]) * filtered_jobs.loc[mask_valid, "vram_hours"]
         score[mask_zero] = -np.inf
-        filtered_jobs.loc[:, "vram_constraint_efficiency_score"] = score
+        filtered_jobs.loc[:, "requested_vram_efficiency_score"] = score
 
         # Add CPU memory metrics if available
         if {"CPUMemUsage", "Memory", "CPUs"}.issubset(self.jobs_df.columns):
@@ -404,8 +442,8 @@ class EfficiencyAnalysis(Generic[MetricsDFNameEnumT]):
                 user_job_hours=("job_hours", "sum"),
                 pi_account=("Account", "first"),
                 avg_alloc_vram_efficiency_score=("alloc_vram_efficiency_score", EfficiencyAnalysis.avg_non_inf),
-                avg_vram_constraint_efficiency_score=(
-                    "vram_constraint_efficiency_score",
+                avg_requested_vram_efficiency_score=(
+                    "requested_vram_efficiency_score",
                     EfficiencyAnalysis.avg_non_inf,
                 ),
             )
@@ -424,14 +462,14 @@ class EfficiencyAnalysis(Generic[MetricsDFNameEnumT]):
             .to_numpy()
         )
 
-        self.jobs_with_efficiency_metrics.loc[:, "weighted_vram_constraint_efficiency"] = (
-            self.jobs_with_efficiency_metrics["vram_constraint_efficiency"]
+        self.jobs_with_efficiency_metrics.loc[:, "weighted_requested_vram_efficiency"] = (
+            self.jobs_with_efficiency_metrics["requested_vram_efficiency"]
             * self.jobs_with_efficiency_metrics["vram_hours"]
             / user_vram_hours_per_job
         ).astype(pd.Float64Dtype())
 
-        users_w_efficiency_metrics.loc[:, "expected_value_vram_constraint_efficiency"] = (
-            self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_vram_constraint_efficiency"]
+        users_w_efficiency_metrics.loc[:, "expected_value_requested_vram_efficiency"] = (
+            self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_requested_vram_efficiency"]
             .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
             .to_numpy()
         )
@@ -457,7 +495,7 @@ class EfficiencyAnalysis(Generic[MetricsDFNameEnumT]):
         )
 
         self.jobs_with_efficiency_metrics = self.jobs_with_efficiency_metrics.drop(
-            columns=["weighted_alloc_vram_efficiency", "weighted_vram_constraint_efficiency", "weighted_gpu_count"]
+            columns=["weighted_alloc_vram_efficiency", "weighted_requested_vram_efficiency", "weighted_gpu_count"]
         )
 
         self.users_with_efficiency_metrics = users_w_efficiency_metrics
@@ -618,7 +656,7 @@ class EfficiencyAnalysis(Generic[MetricsDFNameEnumT]):
                 user_count=("User", "nunique"),
                 pi_acc_vram_hours=("vram_hours", "sum"),
                 avg_alloc_vram_efficiency_score=("avg_alloc_vram_efficiency_score", "mean"),
-                avg_vram_constraint_efficiency_score=("avg_vram_constraint_efficiency_score", "mean"),
+                avg_requested_vram_efficiency_score=("avg_requested_vram_efficiency_score", "mean"),
             )
             .reset_index()
         )
@@ -642,15 +680,15 @@ class EfficiencyAnalysis(Generic[MetricsDFNameEnumT]):
             .to_numpy()
         )
 
-        self.users_with_efficiency_metrics.loc[:, "weighted_ev_vram_constraint_efficiency"] = (
-            self.users_with_efficiency_metrics["expected_value_vram_constraint_efficiency"]
+        self.users_with_efficiency_metrics.loc[:, "weighted_ev_requested_vram_efficiency"] = (
+            self.users_with_efficiency_metrics["expected_value_requested_vram_efficiency"]
             * self.users_with_efficiency_metrics["vram_hours"]
             / pi_acc_vram_hours
         )
 
-        pi_efficiency_metrics.loc[:, "expected_value_vram_constraint_efficiency"] = (
+        pi_efficiency_metrics.loc[:, "expected_value_requested_vram_efficiency"] = (
             self.users_with_efficiency_metrics.groupby("pi_account", observed=True)[
-                "weighted_ev_vram_constraint_efficiency"
+                "weighted_ev_requested_vram_efficiency"
             ]
             .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
             .to_numpy()
@@ -670,7 +708,7 @@ class EfficiencyAnalysis(Generic[MetricsDFNameEnumT]):
         self.users_with_efficiency_metrics = self.users_with_efficiency_metrics.drop(
             columns=[
                 "weighted_ev_alloc_vram_efficiency",
-                "weighted_ev_vram_constraint_efficiency",
+                "weighted_ev_requested_vram_efficiency",
                 "weighted_ev_gpu_count",
             ]
         )
@@ -759,7 +797,7 @@ class EfficiencyAnalysis(Generic[MetricsDFNameEnumT]):
         if not isinstance(metrics_df_name_enum, self.metrics_df_name_enum):
             raise ValueError(
                 f"Invalid efficiency metric type: {metrics_df_name_enum}. "
-                f"Must be a member of MetricsDataFrameNameEnum."
+                f"Must be a member of {self.metrics_df_name_enum.__name__}."
             )
         metrics_df = getattr(self, metrics_df_name_enum.value)
 
