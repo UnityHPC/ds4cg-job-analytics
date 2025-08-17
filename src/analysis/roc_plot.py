@@ -399,24 +399,21 @@ class ROCVisualizer(EfficiencyAnalysis):
                 # add temporary handle for user graphs to handle vram_hours, job_count, job_hours plotting
                 if plot_type == ROCPlotTypes.USER and isinstance(threshold_metric, UserEfficiencyMetricsEnum):
                     proportion_metric_to_new_calculation = {
-                        ProportionMetricsEnum.JOB_HOURS: lambda: (
-                            filtered_jobs_df[JobEfficiencyMetricsEnum.JOB_HOURS.value]
+                        ProportionMetricsEnum.JOB_HOURS: lambda jobs_df: (
+                            jobs_df[JobEfficiencyMetricsEnum.JOB_HOURS.value]
                         )
-                        .groupby(filtered_jobs_df["User"], observed=True)
+                        .groupby(jobs_df["User"], observed=True)
                         .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
                         .to_numpy(),
-                        ProportionMetricsEnum.VRAM_HOURS: lambda: (
-                            (
-                                filtered_jobs_df["allocated_vram"]
-                                * filtered_jobs_df[JobEfficiencyMetricsEnum.JOB_HOURS.value]
-                            )
-                            .groupby(filtered_jobs_df["User"], observed=True)
+                        ProportionMetricsEnum.VRAM_HOURS: lambda jobs_df: (
+                            (jobs_df["allocated_vram"] * jobs_df[JobEfficiencyMetricsEnum.JOB_HOURS.value])
+                            .groupby(jobs_df["User"], observed=True)
                             .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
                             .to_numpy()
                         ),
-                        ProportionMetricsEnum.JOBS: lambda: (
-                            (filtered_jobs_df["JobID"])
-                            .groupby(filtered_jobs_df["User"], observed=True)
+                        ProportionMetricsEnum.JOBS: lambda jobs_df: (
+                            (jobs_df["JobID"])
+                            .groupby(jobs_df["User"], observed=True)
                             .apply(lambda series: len(series))
                         ),
                     }
@@ -425,11 +422,11 @@ class ROCVisualizer(EfficiencyAnalysis):
                     filtered_jobs_df = self.jobs_with_efficiency_metrics[
                         (self.jobs_with_efficiency_metrics[job_eff_column].notna())
                         & (self.jobs_with_efficiency_metrics[job_eff_column] != -np.inf)
-                    ]
+                    ].copy()
                     new_proportion_metric_col = f"{proportion_metric.value} for {threshold_metric.value}"
                     plot_data_frame.loc[:, new_proportion_metric_col] = proportion_metric_to_new_calculation[
                         proportion_metric
-                    ]()
+                    ](filtered_jobs_df)
                     metric_values = plot_data_frame[new_proportion_metric_col].to_numpy()
                     print("Reached here")
                 total_sum = metric_values.sum()

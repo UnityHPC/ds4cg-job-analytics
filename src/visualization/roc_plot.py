@@ -28,7 +28,8 @@
 #         self.analysis_instance = ROCVisualizer(self.df)
 
 #     def validate_visualize_kwargs(
-#         self, kwargs: dict[str, Any], validated_jobs_df: pd.DataFrame, kwargs_model: type[ROCVisualizationKwargsModel]
+#         self, kwargs: dict[str, Any],
+#         validated_jobs_df: pd.DataFrame, kwargs_model: type[ROCVisualizationKwargsModel]
 #     ) -> ROCVisualizationKwargsModel:
 #         """Validate the keyword arguments for the visualize method.
 
