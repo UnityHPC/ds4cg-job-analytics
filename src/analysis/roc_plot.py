@@ -57,18 +57,34 @@ class ROCVisualizer(EfficiencyAnalysis):
     }
 
     # metrics that may contain NULL or -inf values
-    # METRIC_TO_FILTER = {
-    #     JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY,
-    #     JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE,
-    #     JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY_SCORE,
-    #     UserEfficiencyMetricsEnum.WEIGHTED_AVG_VRAM_CONSTRAINTS_EFFICIENCY,
-    #     UserEfficiencyMetricsEnum.WEIGHTED_AVG_ALLOC_VRAM_EFFICIENCY,
-    #     UserEfficiencyMetricsEnum.AVG_ALLOC_VRAM_EFFICIENCY_SCORE,
-    #     UserEfficiencyMetricsEnum.AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE,
-    #     PIEfficiencyMetricsEnum.WEIGHTED_AVG_VRAM_CONSTRAINTS_EFFICIENCY,
-    #     PIEfficiencyMetricsEnum.AVG_ALLOC_VRAM_EFFICIENCY_SCORE,
-    #     PIEfficiencyMetricsEnum.AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE,
-    # }
+    METRICS_WITH_INVALID_VALUES = {
+        JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY,
+        JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE,
+        JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY_SCORE,
+        UserEfficiencyMetricsEnum.EXPECTED_VALUE_VRAM_CONSTRAINTS_EFFICIENCY,
+        UserEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY,
+        UserEfficiencyMetricsEnum.AVG_ALLOC_VRAM_EFFICIENCY_SCORE,
+        UserEfficiencyMetricsEnum.AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE,
+        PIEfficiencyMetricsEnum.EXPECTED_VALUE_VRAM_CONSTRAINTS_EFFICIENCY,
+        PIEfficiencyMetricsEnum.AVG_ALLOC_VRAM_EFFICIENCY_SCORE,
+        PIEfficiencyMetricsEnum.AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE,
+    }
+
+    USER_TO_JOB_EFFICIENCY_METRIC_MAPPING = {
+        UserEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY: (
+            JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY
+        ),
+        UserEfficiencyMetricsEnum.EXPECTED_VALUE_VRAM_CONSTRAINTS_EFFICIENCY: (
+            JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY
+        ),
+        UserEfficiencyMetricsEnum.AVG_ALLOC_VRAM_EFFICIENCY_SCORE: (
+            JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY_SCORE
+        ),
+        UserEfficiencyMetricsEnum.AVG_VRAM_CONSTRAINT_EFFICIENCY_SCORE: (
+            JobEfficiencyMetricsEnum.VRAM_CONSTRAINT_EFFICIENCY_SCORE
+        ),
+        UserEfficiencyMetricsEnum.EXPECTED_VALUE_GPU_COUNT: (JobEfficiencyMetricsEnum.GPU_COUNT),
+    }
 
     def __init__(self, jobs_df: pd.DataFrame) -> None:
         super().__init__(jobs_df)
@@ -380,6 +396,42 @@ class ROCVisualizer(EfficiencyAnalysis):
                     proportion = unique_count / total_unique * 100 if plot_percentage else unique_count
                     proportions.append(proportion)
             else:
+                # add temporary handle for user graphs to handle vram_hours, job_count, job_hours plotting
+                if plot_type == ROCPlotTypes.USER and isinstance(threshold_metric, UserEfficiencyMetricsEnum):
+                    proportion_metric_to_new_calculation = {
+                        ProportionMetricsEnum.JOB_HOURS: lambda: (
+                            filtered_jobs_df[JobEfficiencyMetricsEnum.JOB_HOURS.value]
+                        )
+                        .groupby(filtered_jobs_df["User"], observed=True)
+                        .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
+                        .to_numpy(),
+                        ProportionMetricsEnum.VRAM_HOURS: lambda: (
+                            (
+                                filtered_jobs_df["allocated_vram"]
+                                * filtered_jobs_df[JobEfficiencyMetricsEnum.JOB_HOURS.value]
+                            )
+                            .groupby(filtered_jobs_df["User"], observed=True)
+                            .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
+                            .to_numpy()
+                        ),
+                        ProportionMetricsEnum.JOBS: lambda: (
+                            (filtered_jobs_df["JobID"])
+                            .groupby(filtered_jobs_df["User"], observed=True)
+                            .apply(lambda series: len(series))
+                        ),
+                    }
+                    # Use the filtered jobs data that excludes inf/NULL threshold_metric values
+                    job_eff_column = self.USER_TO_JOB_EFFICIENCY_METRIC_MAPPING[threshold_metric].value
+                    filtered_jobs_df = self.jobs_with_efficiency_metrics[
+                        (self.jobs_with_efficiency_metrics[job_eff_column].notna())
+                        & (self.jobs_with_efficiency_metrics[job_eff_column] != -np.inf)
+                    ]
+                    new_proportion_metric_col = f"{proportion_metric.value} for {threshold_metric.value}"
+                    plot_data_frame.loc[:, new_proportion_metric_col] = proportion_metric_to_new_calculation[
+                        proportion_metric
+                    ]()
+                    metric_values = plot_data_frame[new_proportion_metric_col].to_numpy()
+                    print("Reached here")
                 total_sum = metric_values.sum()
 
                 if total_sum == 0:
