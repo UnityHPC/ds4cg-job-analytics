@@ -4,17 +4,12 @@ Tools to analyze efficiency of Jobs based on their VRAM usage.
 The aim is to identify potential inefficiencies in GPU usage and notify users or PIs about these issues.
 """
 
-from pathlib import Path
 from typing import cast
 
 import numpy as np
 import pandas as pd
-import numpy as np
 from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
 from src.config.enum_constants import FilterTypeEnum, MetricsDataFrameNameEnum
-
-from src.database import DatabaseConnection
-from src.preprocess.preprocess import preprocess_data
 
 
 class EfficiencyAnalysis:

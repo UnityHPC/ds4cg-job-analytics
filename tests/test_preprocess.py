@@ -359,9 +359,9 @@ def test_preprocess_timedelta_conversion(mock_data_path: str, mock_data_frame: p
     time_limit = data["TimeLimit"]
     assert time_limit.dtype == "timedelta64[ns]"  # assert correct type
 
-    time_limit = time_limit.tolist()
+    time_limit_list = time_limit.tolist()
     ground_truth_time_limit = ground_truth["TimeLimit"].tolist()
-    for i, timedelta in enumerate(time_limit):
+    for i, timedelta in enumerate(time_limit_list):
         assert timedelta.total_seconds() / 60 == ground_truth_time_limit[i]
 
 
