@@ -5,7 +5,7 @@ from ..config.constants import (
 )
 from pandas.api.typing import NAType
 import pandas as pd
-from .errors import JobProcessingError
+from .errors import JobPreprocessingError
 
 
 def _get_vram_constraint(constraints: list[str], gpu_count: int) -> int | NAType:
@@ -24,7 +24,7 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int) -> int | NAType
                     number of GPUs. Returns pd.NA if no VRAM constraints are provided or if no GPUs are requested.
 
     Raises:
-        JobProcessingError: If a malformed constraint is encountered or if an unknown GPU type is specified.
+        JobPreprocessingError: If a malformed constraint is encountered or if an unknown GPU type is specified.
     """
     vram_constraints = []
     for constr in constraints:
@@ -36,14 +36,14 @@ def _get_vram_constraint(constraints: list[str], gpu_count: int) -> int | NAType
             split_constr = constr.split(":")
             if len(split_constr) <= 1:
                 # Add error records for malformed constraints and missing GPU types
-                raise JobProcessingError(PreprocessingErrorTypeEnum.MALFORMED_CONSTRAINT, constr)
+                raise JobPreprocessingError(PreprocessingErrorTypeEnum.MALFORMED_CONSTRAINT, constr)
 
             gpu_type = split_constr[1].lower()
 
             if gpu_type in VRAM_VALUES:
                 vram_constraints.append(VRAM_VALUES[gpu_type])
             else:
-                raise JobProcessingError(PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu_type)
+                raise JobPreprocessingError(PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu_type)
         else:
             # if they enter a GPU name without the prefix
             if constr in VRAM_VALUES:

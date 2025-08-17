@@ -6,7 +6,7 @@ from ..config.constants import (
     MULTIVALENT_GPUS,
 )
 from ..config.enum_constants import PreprocessingErrorTypeEnum
-from .errors import JobProcessingError
+from .errors import JobPreprocessingError
 
 
 def _get_multivalent_vram_based_on_node(gpu_type: str, node: str) -> int:
@@ -77,7 +77,8 @@ def _calculate_approx_vram_single_gpu_type(
         int: Total allocated VRAM for the job in GiB (gibibyte).
 
     Raises:
-        JobProcessingError: If an unknown GPU type is encountered or if no valid nodes are found for a multivalent GPU.
+        JobPreprocessingError: If an unknown GPU type is encountered or if no valid nodes are found for a
+            multivalent GPU.
     """
 
     if isinstance(gpu_types, dict):
@@ -91,7 +92,7 @@ def _calculate_approx_vram_single_gpu_type(
         if gpu in VRAM_VALUES:
             return VRAM_VALUES[gpu] * gpu_count
         else:
-            raise JobProcessingError(PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu)
+            raise JobPreprocessingError(PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu)
 
     # calculate VRAM for multivalent GPUs
     total_vram = 0
@@ -119,7 +120,7 @@ def _calculate_approx_vram_single_gpu_type(
 
         if not vram_values:
             # if no valid nodes are found for the multivalent GPU type in the node list, log an error
-            raise JobProcessingError(
+            raise JobPreprocessingError(
                 PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE,
                 f"No valid nodes found for multivalent GPU type '{gpu}' in node list: {node_list}",
             )
@@ -242,14 +243,14 @@ def _calculate_non_multivalent_vram(non_multivalent: dict) -> int:
         int: Total allocated VRAM for non-multivalent GPUs in GiB.
 
     Raises:
-        JobProcessingError: If an unknown GPU type is encountered.
+        JobPreprocessingError: If an unknown GPU type is encountered.
     """
     allocated_vram = 0
     for gpu, count in non_multivalent.items():
         if gpu in VRAM_VALUES:
             allocated_vram += VRAM_VALUES[gpu] * count
         else:
-            raise JobProcessingError(PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu)
+            raise JobPreprocessingError(PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu)
     return allocated_vram
 
 
@@ -334,7 +335,7 @@ def _get_approx_allocated_vram(
         int: Total allocated (estimate) VRAM for the job in GiB (gibibyte).
 
     Raises:
-        JobProcessingError: If an unknown GPU type is encountered or if the GPU types are malformed.
+        JobPreprocessingError: If an unknown GPU type is encountered or if the GPU types are malformed.
 
     Notes:
         - When `gpu_types` is a dictionary, the function calculates VRAM based on the counts of each GPU type.
@@ -373,7 +374,7 @@ def _get_approx_allocated_vram(
                 if gpu in VRAM_VALUES:
                     total_vram += VRAM_VALUES[gpu]
                 else:
-                    raise JobProcessingError(PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu)
+                    raise JobPreprocessingError(PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu)
         return total_vram
 
     # Case 2.2.2: Handle cases where the number of GPUs is different from number of GPUTypes.
@@ -389,7 +390,7 @@ def _get_approx_allocated_vram(
             if gpu in VRAM_VALUES:
                 allocated_vrams.add(VRAM_VALUES[gpu])
             else:
-                raise JobProcessingError(PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu)
+                raise JobPreprocessingError(PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu)
 
     vram_values = sorted(list(allocated_vrams))
     total_vram = vram_values.pop(0) * gpu_count  # use the GPU with the minimum VRAM value

@@ -21,7 +21,7 @@ from .allocated_vram import _get_approx_allocated_vram
 from .constraints import _get_vram_constraint, _get_partition_constraint, _get_requested_vram
 from ..config.remote_config import PartitionInfoFetcher
 from ..config.paths import PREPROCESSING_ERRORS_LOG_FILE
-from .errors import JobProcessingError
+from .errors import JobPreprocessingError
 
 processing_error_logs: list = []
 error_indices: set = set()
@@ -41,7 +41,7 @@ def _validate_gpu_type(
         list | dict | NATpe: Processed GPU type value for GPU jobs or pd.NA for CPU-only jobs.
 
     Raises:
-        JobProcessingError: If GPU type is null and CPU-only jobs are not allowed.
+        JobPreprocessingError: If GPU type is null and CPU-only jobs are not allowed.
     """
 
     # Handle dict and list types first (these are never NA)
@@ -55,7 +55,7 @@ def _validate_gpu_type(
     # Handle missing/empty values (now only NAType remains)
     elif pd.isna(gpu_type_value):
         if not include_cpu_only_jobs:
-            raise JobProcessingError(
+            raise JobPreprocessingError(
                 error_type=PreprocessingErrorTypeEnum.GPU_TYPE_NULL,
                 info="GPU Type is null but include_cpu_only_jobs is False",
             )
@@ -66,9 +66,9 @@ def _safe_apply_function(
     func: Callable, *args: object, job_id: int | None = None, idx: int | None = None
 ) -> int | NAType:
     """
-    Safely apply calculation functions, catching JobProcessingError and logging it.
+    Safely apply calculation functions, catching JobPreprocessingError and logging it.
 
-    This function wraps calculation functions to catch JobProcessingError exceptions
+    This function wraps calculation functions to catch JobPreprocessingError exceptions
     that may occur during column or metric processing, logs the error details for
     later review, and returns pd.NA instead of allowing the error to propagate.
 
@@ -82,17 +82,17 @@ def _safe_apply_function(
 
     Returns:
         int | NAType: The result of calling func(*args) if successful, or pd.NA if a
-            JobProcessingError occurs.
+            JobPreprocessingError occurs.
 
     Note:
-        When a JobProcessingError is caught, the function:
+        When a JobPreprocessingError is caught, the function:
         - Adds the index to error_indices for later row removal
         - Logs error details to processing_error_logs for summary reporting
         - Returns pd.NA to maintain DataFrame structure
     """
     try:
         return func(*args)
-    except JobProcessingError as e:
+    except JobPreprocessingError as e:
         if idx is not None:
             error_indices.add(idx)
         processing_error_logs.append({

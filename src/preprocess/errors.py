@@ -1,7 +1,7 @@
 from ..config.enum_constants import PreprocessingErrorTypeEnum
 
 
-class JobProcessingError(ValueError):
+class JobPreprocessingError(ValueError):
     """
     Custom exception for errors encountered during job processing.
     """
