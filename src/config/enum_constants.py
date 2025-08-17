@@ -158,6 +158,110 @@ class MetricsDataFrameNameEnum(Enum):
 
 
 @unique
+class PreprocessingErrorTypeEnum(Enum):
+    """An enumeration representing different error types that could occur during preprocessing.
+
+    Attributes:
+        MALFORMED_CONSTRAINT: Represents errors due to malformed constraints.
+        UNKNOWN_GPU_TYPE: Represents errors related to unknown GPU types specified in constraints.
+        NO_VALID_NODES: Represents errors when no valid nodes are found for a job.
+        GPU_TYPE_NULL: Represents errors when the GPU type is null in constraints.
+    """
+
+    MALFORMED_CONSTRAINT = "Malformed Constraint"
+    UNKNOWN_GPU_TYPE = "Unknown GPU Type"
+    NO_VALID_NODES = "No Valid Nodes"
+    GPU_TYPE_NULL = "GPU Type is Null"
+
+
+@unique
+class OptionalColumnsEnum(Enum):
+    """
+    An enumeration representing optional columns used for filtering in preprocess code.
+
+    Attributes:
+        STATUS: Job status column.
+        ACCOUNT: Account column.
+        QOS: Quality of Service column.
+        ARRAY_ID: Position in job array.
+        JOB_NAME: Name of job.
+        IS_ARRAY: Indicator if job is part of an array.
+        INTERACTIVE: Indicator if job was interactive.
+        USER: Unity user.
+        EXIT_CODE: Job exit code.
+        TIME_LIMIT: Job time limit (seconds).
+        GPU_COMPUTE_USAGE: GPU compute usage (pct).
+        CPUS: Number of CPUs.
+        MEMORY: Job allocated memory (bytes).
+        CPU_MEM_USAGE: CPU memory usage column.
+        CPU_COMPUTE_USAGE: CPU compute usage (pct).
+    """
+
+    STATUS = "Status"
+    ACCOUNT = "Account"
+    QOS = "QOS"
+    ARRAY_ID = "ArrayID"
+    JOB_NAME = "JobName"
+    IS_ARRAY = "IsArray"
+    INTERACTIVE = "Interactive"
+    USER = "User"
+    EXIT_CODE = "ExitCode"
+    TIME_LIMIT = "TimeLimit"
+    GPU_COMPUTE_USAGE = "GPUComputeUsage"
+    CPUS = "CPUs"
+    MEMORY = "Memory"
+    CPU_MEM_USAGE = "CPUMemUsage"
+    CPU_COMPUTE_USAGE = "CPUComputeUsage"
+
+
+@unique
+class RequiredColumnsEnum(Enum):
+    """
+    An enumeration representing required columns that must be present in the dataframe.
+
+    Attributes:
+        GPU_TYPE: GPU type column.
+        CONSTRAINTS: Job constraints column.
+        START_TIME: Job start time column.
+        SUBMIT_TIME: Job submit time column.
+        NODE_LIST: Node list column.
+        GPUS: Number of GPUs column.
+        GPU_MEM_USAGE: GPU memory usage column.
+        PARTITION: Partition column.
+        ELAPSED: Job elapsed time column.
+    """
+
+    JOB_ID = "JobID"
+    GPU_TYPE = "GPUType"
+    CONSTRAINTS = "Constraints"
+    START_TIME = "StartTime"
+    SUBMIT_TIME = "SubmitTime"
+    NODE_LIST = "NodeList"
+    GPUS = "GPUs"
+    GPU_MEM_USAGE = "GPUMemUsage"
+    ELAPSED = "Elapsed"
+    PARTITION = "Partition"
+
+
+@unique
+class ExcludedColumnsEnum(Enum):
+    """
+    An enumeration representing columns that should be omitted during preprocessing.
+
+    Attributes:
+        UUID: Unique identifier column.
+        END_TIME: Job end time column.
+        NODES: Number of nodes column.
+        PREEMPTED: Job preemption status column.
+    """
+
+    UUID = "UUID"
+    END_TIME = "EndTime"
+    NODES = "Nodes"
+    PREEMPTED = "Preempted"
+
+
+@unique
 class ProportionMetricsEnum(Enum):
     """
     Contains metrics for calculating proportion of data on ROC plot (y-axis).
