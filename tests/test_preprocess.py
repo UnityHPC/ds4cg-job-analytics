@@ -68,7 +68,7 @@ def test_preprocess_data_filtered_min_elapsed_1(mock_data_frame: pd.DataFrame) -
 @pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_preprocess_data_filter_min_elapsed_2(mock_data_path: str, mock_data_frame: pd.DataFrame) -> None:
     """
-    Test that the preprocessed data contains only jobs with elapsed time below the threshold (700 seconds).
+    Test that the preprocessed data contains only jobs with elapsed time above the threshold (700 seconds).
     """
     data = preprocess_data(
         input_df=mock_data_frame,
@@ -111,7 +111,7 @@ def test_preprocess_data_include_cpu_job(mock_data_path: str, mock_data_frame: p
     expected_cpu_type = len(ground_truth[ground_truth["GPUType"].isna()])
     expected_gpus_count_0 = len(ground_truth[ground_truth["GPUs"].isna()])
     assert sum(pd.isna(x) for x in data["GPUType"]) == expected_cpu_type
-    assert data["GPUs"].value_counts()[0] == expected_gpus_count_0
+    assert sum(x == 0 for x in data["GPUs"]) == expected_gpus_count_0
 
     # Check that GPUType is NA for CPU-only jobs
     assert all(isinstance(row, list | dict) for row in data["GPUType"] if not pd.isna(row))
@@ -126,8 +126,8 @@ def test_preprocess_data_include_failed_cancelled_job(mock_data_path: str, mock_
     ground_truth = preprocess_mock_data(mock_data_path, min_elapsed_seconds=600, include_failed_cancelled_jobs=True)
     expect_failed_status = len(ground_truth[(ground_truth["Status"] == StatusEnum.FAILED.value)])
     expect_cancelled_status = len(ground_truth[(ground_truth["Status"] == StatusEnum.CANCELLED.value)])
-    assert data["Status"].value_counts()[StatusEnum.FAILED.value] == expect_failed_status
-    assert data["Status"].value_counts()[StatusEnum.CANCELLED.value] == expect_cancelled_status
+    assert sum(x == StatusEnum.FAILED.value for x in data["Status"]) == expect_failed_status
+    assert sum(x == StatusEnum.CANCELLED.value for x in data["Status"]) == expect_cancelled_status
 
 
 @pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
@@ -200,8 +200,7 @@ def test_preprocess_data_fill_missing_interactive(mock_data_path: str, mock_data
 
     expect_non_interactive = len(ground_truth[(ground_truth["Interactive"].isna())])
 
-    interactive_stat = data["Interactive"].value_counts()
-    assert interactive_stat[InteractiveEnum.NON_INTERACTIVE.value] == expect_non_interactive
+    assert sum(x == InteractiveEnum.NON_INTERACTIVE.value for x in data["Interactive"]) == expect_non_interactive
 
 
 @pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
@@ -222,8 +221,7 @@ def test_preprocess_data_fill_missing_array_id(mock_data_path: str, mock_data_fr
         include_failed_cancelled_jobs=True,
     )
     expect_array_id_null = len(ground_truth[(ground_truth["ArrayID"].isna())])
-    array_id_stat = data["ArrayID"].value_counts()
-    assert array_id_stat[-1] == expect_array_id_null
+    assert sum(x == -1 for x in data["ArrayID"]) == expect_array_id_null
 
 
 @pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
@@ -246,11 +244,10 @@ def test_preprocess_data_fill_missing_gpu_type(mock_data_path: str, mock_data_fr
     )
     expect_gpu_type_null = len(ground_truth[(ground_truth["GPUType"].isna())])
     expect_gpus_null = len(ground_truth[(ground_truth["GPUs"] == 0) | (ground_truth["GPUs"].isna())])
-    gpus_stat = data["GPUs"].value_counts()
-
+    actual_count_gpu_0 = sum(x == 0 for x in data["GPUs"])
     assert sum(pd.isna(x) for x in data["GPUType"]) == expect_gpu_type_null
-    assert gpus_stat[0] == expect_gpus_null, (
-        f"Expected {expect_gpus_null} null GPUs, but found {gpus_stat[0]} null GPUs."
+    assert actual_count_gpu_0 == expect_gpus_null, (
+        f"Expected {expect_gpus_null} null GPUs, but found {actual_count_gpu_0} null GPUs."
     )
 
 
@@ -356,13 +353,16 @@ def test_preprocess_timedelta_conversion(mock_data_path: str, mock_data_frame: p
         include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
     )
-    ground_truth = preprocess_mock_data(mock_data_path, include_cpu_only_jobs=True, include_failed_cancelled_jobs=True)
-    max_len = len(ground_truth)
+    ground_truth = preprocess_mock_data(
+        mock_data_path, min_elapsed_seconds=600, include_cpu_only_jobs=True, include_failed_cancelled_jobs=True
+    )
     time_limit = data["TimeLimit"]
+    assert time_limit.dtype == "timedelta64[ns]"  # assert correct type
 
-    assert time_limit.dtype == "timedelta64[ns]"
-    assert time_limit[0].total_seconds() / 60 == ground_truth["TimeLimit"][0]
-    assert time_limit[max_len - 1].total_seconds() / 60 == ground_truth["TimeLimit"][max_len - 1]
+    time_limit = time_limit.tolist()
+    ground_truth_time_limit = ground_truth["TimeLimit"].tolist()
+    for i, timedelta in enumerate(time_limit):
+        assert timedelta.total_seconds() / 60 == ground_truth_time_limit[i]
 
 
 @pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
@@ -493,7 +493,6 @@ def test_preprocess_empty_dataframe_warning(mock_data_frame: pd.DataFrame, recwa
     # Make a copy of mock_data_frame and remove all entries to make it empty
     empty_df = mock_data_frame.copy()
     empty_df = empty_df.iloc[0:0]
-    print(empty_df)
     # Should trigger the warning since the dataframe is empty
     result = preprocess_data(empty_df)
 

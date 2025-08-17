@@ -6,7 +6,8 @@ from src.config.enum_constants import OptionalColumnsEnum, RequiredColumnsEnum
 from datetime import datetime, timedelta
 
 
-def test_return_correct_types(mock_data_path):
+@pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_return_correct_types(mock_data_path: str) -> None:
     """
     Basic test on return type of function
     """
@@ -14,7 +15,8 @@ def test_return_correct_types(mock_data_path):
     assert isinstance(res, pandas.DataFrame)
 
 
-def test_no_filter(mock_data_path):
+@pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_no_filter(mock_data_path: str) -> None:
     """
     Test in case there is no filtering, function should return every valid records from database.
     """
@@ -24,8 +26,9 @@ def test_no_filter(mock_data_path):
     assert expect_num_records == len(res)
 
 
+@pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
 @pytest.mark.parametrize("dates_back", [90, 150])
-def test_filter_date_back(mock_data_path, dates_back):
+def test_filter_date_back(mock_data_path: str, dates_back: int) -> None:
     """
     Test for filtering by dates_back.
 
@@ -41,7 +44,8 @@ def test_filter_date_back(mock_data_path, dates_back):
         assert id in expect_job_ids
 
 
-def test_filter_min_elapsed(mock_data_path):
+@pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_filter_min_elapsed(mock_data_path: str) -> None:
     """
     Test for filtering by days back and minimum elapsed time.
     """
@@ -55,7 +59,8 @@ def test_filter_min_elapsed(mock_data_path):
         assert id in expect_job_ids
 
 
-def test_filter_date_back_include_all(mock_data_path):
+@pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_filter_date_back_include_all(mock_data_path: str) -> None:
     """
     Test for filtering by days_back, including CPU only jobs and FAILED/ CANCELLED jobs
     """
@@ -82,8 +87,9 @@ def test_filter_date_back_include_all(mock_data_path):
         assert id in expect_job_ids
 
 
+@pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
 @pytest.mark.parametrize("missing_col", [col.value for col in RequiredColumnsEnum])
-def test_missing_required_columns_error_raised(mock_data_path, missing_col):
+def test_missing_required_columns_error_raised(mock_data_path: str, missing_col: str) -> None:
     """
     Test enforcement of errors when the database is missing a required column.
 
@@ -100,8 +106,9 @@ def test_missing_required_columns_error_raised(mock_data_path, missing_col):
         _res = load_and_preprocess_jobs_custom_query(db_path=mock_data_path, custom_query=query)
 
 
+@pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
 @pytest.mark.parametrize("missing_col", [col.value for col in OptionalColumnsEnum])
-def test_optional_column_warnings(mock_data_path, recwarn, missing_col):
+def test_optional_column_warnings(mock_data_path: str, recwarn: pytest.WarningsRecorder, missing_col: str) -> None:
     """
     Test handling the dataframe loads from database when missing one of the columns
 
@@ -128,7 +135,10 @@ def test_optional_column_warnings(mock_data_path, recwarn, missing_col):
     assert str(recwarn[0].message) == expect_warning_msg
 
 
-def test_custom_query(mock_data_frame, mock_data_path, recwarn):
+@pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_custom_query(
+    mock_data_frame: pandas.DataFrame, mock_data_path: str, recwarn: pytest.WarningsRecorder
+) -> None:
     """
     Test if function fetches expected records when using custom sql query.
 
@@ -136,7 +146,8 @@ def test_custom_query(mock_data_frame, mock_data_path, recwarn):
         covers warning for optional columns missing.
     """
     query = (
-        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage, CPUMemUsage, Elapsed "
+        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, "
+        "NodeList, GPUs, GPUMemUsage, CPUMemUsage, Elapsed, Partition "
         "FROM Jobs WHERE Status != 'CANCELLED' AND Status !='FAILED' "
         "AND ArrayID is not NULL AND Interactive is not NULL"
     )
@@ -153,8 +164,11 @@ def test_custom_query(mock_data_frame, mock_data_path, recwarn):
         assert id in expect_ids
 
 
+@pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
 @pytest.mark.parametrize("days_back", [90, 150])
-def test_custom_query_days_back(mock_data_frame, mock_data_path, recwarn, days_back):
+def test_custom_query_days_back(
+    mock_data_frame: pandas.DataFrame, mock_data_path: str, recwarn: pytest.WarningsRecorder, days_back: int
+) -> None:
     """
     Test custom query with dates_back condition.
 
@@ -165,7 +179,8 @@ def test_custom_query_days_back(mock_data_frame, mock_data_path, recwarn, days_b
     """
     cutoff = datetime.now() - timedelta(days=days_back)
     query = (
-        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, NodeList, GPUs, GPUMemUsage, CPUMemUsage, Elapsed "
+        "SELECT JobID, GPUType, Constraints, StartTime, SubmitTime, "
+        "NodeList, GPUs, GPUMemUsage, CPUMemUsage, Elapsed, Partition "
         "FROM Jobs WHERE Status != 'CANCELLED' AND Status !='FAILED' AND ArrayID is not NULL "
         f"AND Interactive is not NULL AND StartTime >= '{cutoff}'"
     )
@@ -185,7 +200,8 @@ def test_custom_query_days_back(mock_data_frame, mock_data_path, recwarn, days_b
         assert id in expect_ids
 
 
-def test_empty_dataframe_warning(mock_data_path, recwarn):
+@pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_empty_dataframe_warning(mock_data_path: str, recwarn: pytest.WarningsRecorder) -> None:
     """
     Test handling the dataframe loads from database when the result is empty.
 
