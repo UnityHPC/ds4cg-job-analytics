@@ -1,3 +1,5 @@
+import os
+
 import duckdb
 import pandas as pd
 
@@ -12,6 +14,16 @@ class DatabaseConnection:
     """
 
     def __init__(self, db_url: str, read_only: bool = True) -> None:
+        """
+        Initialize the DatabaseConnection object.
+
+        Args:
+            db_url (str): The URL of the DuckDB database.
+            read_only (bool): If True, the connection will be read-only. Defaults to True.
+
+        Returns:
+            None
+        """
         self.db_url = db_url
         self.connection: duckdb.DuckDBPyConnection | None = self._connect(read_only=read_only)
         print(f"Connected to {self.db_url}")
@@ -28,16 +40,17 @@ class DatabaseConnection:
         self.connection = duckdb.connect(database=self.db_url, read_only=read_only)
         return self.connection
 
-    def _disconnect(self) -> None:
-        """Safely close the active database connection"""
+    def disconnect(self) -> None:
+        """Close the connection to the DuckDB database."""
         if self.connection is not None:
             self.connection.close()
             self.connection = None
-            print(f"Disconnected from {self.db_url}")
 
     def __del__(self) -> None:
         """Ensure the connection is closed when the object is deleted."""
-        self._disconnect()
+        self.disconnect()
+        if os.getenv("RUN_ENV") != "TEST":
+            print(f"Disconnected from {self.db_url}")
 
     def is_connected(self) -> bool:
         """
@@ -60,7 +73,7 @@ class DatabaseConnection:
         Returns:
             list: A list of column names from the specified table.
         """
-        if self.connection:
+        if self.connection is not None:
             query = f"SELECT * FROM {table_name} LIMIT 0"
             return self.connection.execute(query).df().columns.tolist()
         else:
@@ -79,7 +92,7 @@ class DatabaseConnection:
         Returns:
             pd.DataFrame: A DataFrame containing the column information.
         """
-        if self.connection:
+        if self.connection is not None:
             query = f"DESCRIBE {table_name}"
             return self.connection.execute(query).fetchdf()
         else:
@@ -97,7 +110,7 @@ class DatabaseConnection:
         Returns:
             pd.DataFrame: A pandas DataFrame containing all rows from the specified table.
         """
-        if self.connection:
+        if self.connection is not None:
             query = f"SELECT * FROM {table_name}"
             return self.connection.execute(query).fetchdf()
         else:
@@ -117,7 +130,7 @@ class DatabaseConnection:
         Returns:
             pd.DataFrame: The result of the query as a pandas DataFrame.
         """
-        if self.connection:
+        if self.connection is not None:
             try:
                 return self.connection.query(query).to_df()
             except duckdb.BinderException as e:

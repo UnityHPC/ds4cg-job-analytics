@@ -8,14 +8,14 @@ from typing import Generic, TypeVar, Annotated, cast
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from src.preprocess.preprocess import preprocess_data
-from src.database import DatabaseConnection
 from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
 from src.config.enum_constants import (
     FilterTypeEnum,
     MetricsDataFrameNameBase,
 )
 from pydantic import validate_call, AfterValidator, SkipValidation
+from src.database import DatabaseConnection
+from src.preprocess.preprocess import preprocess_data
 
 
 def load_preprocessed_jobs_dataframe_from_duckdb(

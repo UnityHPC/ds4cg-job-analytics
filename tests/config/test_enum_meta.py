@@ -7,7 +7,7 @@ from src.config.enum_constants import (
 )
 
 
-def test_valid_subclass_creation_passes():
+def test_valid_subclass_creation_passes() -> None:
     class ValidMetricsEnum(MetricsDataFrameNameBase):
         JOBS = "jobs_with_efficiency_metrics"
         USERS = "users_with_efficiency_metrics"
@@ -19,7 +19,7 @@ def test_valid_subclass_creation_passes():
     assert ValidMetricsEnum.PI_GROUPS.value == "pi_accounts_with_efficiency_metrics"
 
 
-def test_missing_required_members_raises():
+def test_missing_required_members_raises() -> None:
     with pytest.raises(TypeError, match="must define members"):
 
         class MissingMembersEnum(MetricsDataFrameNameBase):
@@ -27,7 +27,7 @@ def test_missing_required_members_raises():
             PI_GROUPS = "pi_accounts_with_efficiency_metrics"
 
 
-def test_wrong_value_for_required_member_raises():
+def test_wrong_value_for_required_member_raises() -> None:
     with pytest.raises(TypeError, match=r"JOBS must equal 'jobs_with_efficiency_metrics'"):
 
         class WrongValueEnum(MetricsDataFrameNameBase):
@@ -36,7 +36,7 @@ def test_wrong_value_for_required_member_raises():
             PI_GROUPS = "pi_accounts_with_efficiency_metrics"
 
 
-def test_existing_enums_satisfy_contract():
+def test_existing_enums_satisfy_contract() -> None:
     # The canonical enum should satisfy the metaclass contract exactly
     assert MetricsDataFrameNameEnum.JOBS.value == "jobs_with_efficiency_metrics"
     assert MetricsDataFrameNameEnum.USERS.value == "users_with_efficiency_metrics"
