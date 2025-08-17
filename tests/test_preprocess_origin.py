@@ -3,7 +3,6 @@ import pytest
 from pandas.api.typing import NAType
 
 
-from src.config import PartitionInfoFetcher
 from src.config.enum_constants import (
     AdminsAccountEnum,
     ExitCodeEnum,
@@ -11,8 +10,9 @@ from src.config.enum_constants import (
     QOSEnum,
     StatusEnum,
     AdminPartitionEnum,
-    PartitionTypeEnum,
     ExcludedColumnsEnum,
+    RequiredColumnsEnum,
+    OptionalColumnsEnum,
 )
 from src.preprocess import preprocess_data
 from src.preprocess.preprocess import _get_partition_constraint, _get_requested_vram, _get_vram_constraint
@@ -128,6 +128,21 @@ def test_preprocess_data_include_failed_cancelled_job(mock_data_path: str, mock_
     expect_cancelled_status = len(ground_truth[(ground_truth["Status"] == StatusEnum.CANCELLED.value)])
     assert data["Status"].value_counts()[StatusEnum.FAILED.value] == expect_failed_status
     assert data["Status"].value_counts()[StatusEnum.CANCELLED.value] == expect_cancelled_status
+
+
+@pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_preprocess_data_include_custom_qos_values(mock_data_path: str, mock_data_frame: pd.DataFrame) -> None:
+    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_custom_qos_jobs=True)
+    ground_truth = preprocess_mock_data(mock_data_path, min_elapsed_seconds=600, include_custom_qos_jobs=True)
+    filtered_ground_truth = ground_truth[
+        (ground_truth["Status"] != "CANCELLED") & (ground_truth["Status"] != "FAILED")
+    ].copy()
+    assert len(data) == len(filtered_ground_truth), (
+        f"JobIDs in data: {data['JobID'].tolist()}, JobIDs in ground_truth: {filtered_ground_truth['JobID'].tolist()}"
+    )
+    expect_ids = filtered_ground_truth["JobID"].to_list()
+    for id in data["JobID"]:
+        assert id in expect_ids
 
 
 @pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
@@ -429,3 +444,91 @@ def test_partition_constraint_and_requested_vram_on_mock_data(mock_data_frame: p
             assert pd.isna(actual)
         else:
             assert actual == expected
+
+
+@pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
+@pytest.mark.parametrize("missing_col", [col.value for col in RequiredColumnsEnum])
+def test_preprocess_missing_required_columns(mock_data_frame: pd.DataFrame, missing_col: str) -> None:
+    """
+    Test handling the dataframe when missing one of the ENFORCE_COLUMNS in constants.py.
+
+    Expect to raise KeyError for any of these columns if they are missing in the dataframe.
+    """
+    cur_df = mock_data_frame.drop(missing_col, axis=1, inplace=False)
+    with pytest.raises(KeyError, match=f"Column {missing_col} does not exist in dataframe."):
+        _res = preprocess_data(cur_df)
+
+
+@pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
+@pytest.mark.parametrize("missing_col", [col.value for col in OptionalColumnsEnum])
+def test_preprocess_missing_optional_columns(
+    mock_data_frame: pd.DataFrame, missing_col: str, recwarn: pytest.WarningsRecorder
+) -> None:
+    """
+    Test handling the dataframe when missing one of the columns.
+
+    These columns are not in ENFORCE_COLUMNS so only warnings are expected to be raised.
+    """
+    cur_df = mock_data_frame.drop(missing_col, axis=1, inplace=False)
+
+    expect_warning_msg = (
+        f"Column '{missing_col}' is missing from the dataframe. "
+        "This may impact filtering operations and downstream processing."
+    )
+    _res = preprocess_data(cur_df)
+
+    # Check that a warning was raised with the expected message
+    assert len(recwarn) == 1
+    assert str(recwarn[0].message) == expect_warning_msg
+
+
+@pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
+def test_preprocess_empty_dataframe_warning(mock_data_frame: pd.DataFrame, recwarn: pytest.WarningsRecorder) -> None:
+    """
+    Test handling when preprocess_data results in an empty dataframe.
+
+    Expect a UserWarning to be raised with the appropriate message.
+    Also verify that columns added and type-casted in _cast_type_and_add_columns have correct data types.
+    """
+    # Make a copy of mock_data_frame and remove all entries to make it empty
+    empty_df = mock_data_frame.copy()
+    empty_df = empty_df.iloc[0:0]
+    print(empty_df)
+    # Should trigger the warning since the dataframe is empty
+    result = preprocess_data(empty_df)
+
+    # Check that the result is still empty
+    assert result.empty
+
+    # Check that a warning was raised about empty dataframe
+    assert len(recwarn) == 1
+    assert str(recwarn[0].message) == "Dataframe results from database and filtering is empty."
+
+    # Test that columns added in _cast_type_and_add_columns have correct types
+    # New columns added for empty dataframes
+    assert "Queued" in result.columns
+    assert result["Queued"].dtype == "timedelta64[ns]"
+
+    assert "vram_constraint" in result.columns
+    assert result["vram_constraint"].dtype == pd.Int64Dtype()
+
+    assert "allocated_vram" in result.columns
+    assert result["allocated_vram"].dtype == pd.Int64Dtype()
+
+    # Test that time columns were converted to datetime (if they exist)
+    time_columns = ["StartTime", "SubmitTime"]
+    for col in time_columns:
+        if col in result.columns:
+            assert pd.api.types.is_datetime64_any_dtype(result[col])
+
+    # Test that duration columns were converted to timedelta (if they exist)
+    duration_columns = ["TimeLimit", "Elapsed"]
+    for col in duration_columns:
+        if col in result.columns:
+            assert pd.api.types.is_timedelta64_dtype(result[col])
+
+    # Test that categorical columns have correct dtype (if they exist)
+    categorical_columns = ["Interactive", "QOS", "ExitCode", "Partition", "Account", "Status"]
+    for col in categorical_columns:
+        if col in result.columns:
+            assert result[col].dtype == "category"

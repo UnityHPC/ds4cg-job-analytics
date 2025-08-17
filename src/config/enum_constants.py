@@ -182,7 +182,6 @@ class OptionalColumnsEnum(Enum):
     Attributes:
         STATUS: Job status column.
         ACCOUNT: Account column.
-        PARTITION: Partition column.
         QOS: Quality of Service column.
         ARRAY_ID: Position in job array.
         JOB_NAME: Name of job.
@@ -200,7 +199,6 @@ class OptionalColumnsEnum(Enum):
 
     STATUS = "Status"
     ACCOUNT = "Account"
-    PARTITION = "Partition"
     QOS = "QOS"
     ARRAY_ID = "ArrayID"
     JOB_NAME = "JobName"
@@ -229,6 +227,7 @@ class RequiredColumnsEnum(Enum):
         NODE_LIST: Node list column.
         GPUS: Number of GPUs column.
         GPU_MEM_USAGE: GPU memory usage column.
+        PARTITION: Partition column.
         ELAPSED: Job elapsed time column.
     """
 
@@ -241,6 +240,7 @@ class RequiredColumnsEnum(Enum):
     GPUS = "GPUs"
     GPU_MEM_USAGE = "GPUMemUsage"
     ELAPSED = "Elapsed"
+    PARTITION = "Partition"
 
 
 @unique

@@ -773,7 +773,14 @@ def _cast_type_and_add_columns(data: pd.DataFrame) -> None:
         # Add new columns with correct types for empty dataframe
         data["Queued"] = pd.Series([], dtype="timedelta64[ns]")
         data["vram_constraint"] = pd.Series([], dtype=pd.Int64Dtype())
+        data["partition_constraint"] = pd.Series([], dtype=pd.Int64Dtype())
+        data["requested_vram"] = pd.Series([], dtype=pd.Int64Dtype())
         data["allocated_vram"] = pd.Series([], dtype=pd.Int64Dtype())
+        # Only add user_jobs/account_jobs if columns exist
+        if "User" in data.columns:
+            data["user_jobs"] = pd.Series([], dtype=pd.Int64Dtype())
+        if "Account" in data.columns:
+            data["account_jobs"] = pd.Series([], dtype=pd.Int64Dtype())
     else:
         # Calculate queue time
         data.loc[:, "Queued"] = data["StartTime"] - data["SubmitTime"]
@@ -820,8 +827,11 @@ def _cast_type_and_add_columns(data: pd.DataFrame) -> None:
         if error_indices:
             data = data.drop(index=list(error_indices)).reset_index(drop=True)
 
-    data.loc[:, "user_jobs"] = data.groupby("User", observed=True)["User"].transform("size")
-    data.loc[:, "account_jobs"] = data.groupby("Account", observed=True)["Account"].transform("size")
+    # Add derived columns for user_jobs and account_jobs only if the source columns exist
+    if "User" in exist_column_set:
+        data.loc[:, "user_jobs"] = data.groupby("User", observed=True)["User"].transform("size")
+    if "Account" in exist_column_set:
+        data.loc[:, "account_jobs"] = data.groupby("Account", observed=True)["Account"].transform("size")
 
 
 def _check_for_infinity_values(data: pd.DataFrame) -> None:
@@ -930,7 +940,9 @@ def preprocess_data(
     if apply_filter:
         # Drop unnecessary columns, ignoring errors in case any of them is not in the dataframe
         data = input_df.drop(
-            columns=[member.value for member in ExcludedColumnsEnum], axis=1, inplace=False, errors="ignore"
+            columns=[member.value for member in ExcludedColumnsEnum if member.value in input_df.columns],
+            axis=1,
+            inplace=False,
         )
         # Perform column validation and filtering
         data = _validate_columns_and_filter_records(
@@ -940,14 +952,13 @@ def preprocess_data(
             include_cpu_only_jobs,
             include_custom_qos_jobs,
         )
-
-    first_non_null = data["GPUType"].dropna().iloc[0]
     # Log the format of GPUType being used
-    if isinstance(first_non_null, dict):
-        print("[Preprocessing] Running with new database format: GPU types as dictionary.")
-    elif isinstance(first_non_null, list):
-        print("[Preprocessing] Running with old database format: GPU types as list.")
-
+    if not data.empty:
+        first_non_null = data["GPUType"].dropna().iloc[0]
+        if isinstance(first_non_null, dict):
+            print("[Preprocessing] Running with new database format: GPU types as dictionary.")
+        elif isinstance(first_non_null, list):
+            print("[Preprocessing] Running with old database format: GPU types as list.")
     _fill_missing(data, include_cpu_only_jobs)
     _cast_type_and_add_columns(data)
 
