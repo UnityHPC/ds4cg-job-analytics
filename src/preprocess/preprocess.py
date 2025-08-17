@@ -820,8 +820,8 @@ def _cast_type_and_add_columns(data: pd.DataFrame) -> None:
         if error_indices:
             data = data.drop(index=list(error_indices)).reset_index(drop=True)
 
-    data.loc[:, "user_jobs"] = data.groupby("User")["User"].transform("size")
-    data.loc[:, "account_jobs"] = data.groupby("Account")["Account"].transform("size")
+    data.loc[:, "user_jobs"] = data.groupby("User", observed=True)["User"].transform("size")
+    data.loc[:, "account_jobs"] = data.groupby("Account", observed=True)["Account"].transform("size")
 
 
 def _check_for_infinity_values(data: pd.DataFrame) -> None:
