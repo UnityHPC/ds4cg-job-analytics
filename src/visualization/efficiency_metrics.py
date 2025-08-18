@@ -4,7 +4,7 @@ Module with utilities for visualizing efficiency metrics.
 
 from abc import ABC
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,9 +12,14 @@ import pandas as pd
 import seaborn as sns
 from pydantic import ValidationError
 from matplotlib.transforms import blended_transform_factory
+from .models import (
+    EfficiencyMetricsKwargsModel,
+    JobsWithMetricsKwargsModel,
+    UsersWithMetricsKwargsModel,
+    UsersWithMetricsHistKwargsModel,
+    PIGroupsWithMetricsKwargsModel,
+)
 
-
-from .models import EfficiencyMetricsKwargsModel, UsersWithMetricsKwargsModel, PIGroupsWithMetricsKwargsModel
 from .visualization import DataVisualizer
 
 
@@ -54,7 +59,8 @@ class EfficiencyMetricsVisualizer(DataVisualizer[EfficiencyMetricsKwargsModel], 
             ) from e
 
         self.validate_column_argument(col_kwargs.column, validated_jobs_df)
-        self.validate_columns(col_kwargs.bar_label_columns, validated_jobs_df)
+        if hasattr(col_kwargs, "bar_label_columns") and col_kwargs.bar_label_columns is not None:
+            self.validate_columns(col_kwargs.bar_label_columns, validated_jobs_df)
         self.validate_figsize(col_kwargs.figsize)
         return col_kwargs
 
@@ -83,7 +89,8 @@ class JobsWithMetricsVisualizer(EfficiencyMetricsVisualizer):
             None: Displays the bar plot of jobs ranked by the specified efficiency metric.
         """
         jobs_with_metrics_df = self.validate_dataframe()
-        validated_kwargs = self.validate_visualize_kwargs(kwargs, jobs_with_metrics_df, EfficiencyMetricsKwargsModel)
+        validated_kwargs = self.validate_visualize_kwargs(kwargs, jobs_with_metrics_df, JobsWithMetricsKwargsModel)
+        validated_kwargs = cast(JobsWithMetricsKwargsModel, validated_kwargs)
         column = validated_kwargs.column
         bar_label_columns = validated_kwargs.bar_label_columns
         figsize = validated_kwargs.figsize
@@ -208,6 +215,7 @@ class UsersWithMetricsVisualizer(EfficiencyMetricsVisualizer):
         users_with_metrics_df = self.validate_dataframe()
         validated_kwargs = self.validate_visualize_kwargs(kwargs, users_with_metrics_df, UsersWithMetricsKwargsModel)
         column = validated_kwargs.column
+        validated_kwargs = cast(UsersWithMetricsKwargsModel, validated_kwargs)
         bar_label_columns = validated_kwargs.bar_label_columns
         figsize = validated_kwargs.figsize
         output_dir_path = self.validate_output_dir(output_dir_path)
@@ -287,6 +295,119 @@ class UsersWithMetricsVisualizer(EfficiencyMetricsVisualizer):
             plt.savefig(output_dir_path / f"users_ranked_by_{column}_barplot.png", bbox_inches="tight")
         plt.show()
 
+    def visualize_metric_distribution(self, output_dir_path: Path | None = None, **kwargs: dict[str, Any]) -> None:
+        """Visualize the distribution of efficiency metrics for users.
+
+        Args:
+            output_dir_path (Path | None): Path to save the output plot.
+            **kwargs (dict[str, Any]): Keyword arguments for visualization.
+                This can include:
+                - column (str): The efficiency metric to visualize.
+                - figsize (tuple[int | float, int | float]): Size of the figure.
+
+        Returns:
+            None: Displays the distribution plot of the specified efficiency metric.
+        """
+        users_with_metrics_df = self.validate_dataframe()
+        validated_kwargs = self.validate_visualize_kwargs(
+            kwargs,
+            users_with_metrics_df,
+            UsersWithMetricsHistKwargsModel,
+        )
+        column = validated_kwargs.column
+        figsize = validated_kwargs.figsize
+        output_dir_path = self.validate_output_dir(output_dir_path)
+
+        # Distribution of Avg Requested VRAM Efficiency Score (actual values; all are <= 0)
+        # We keep scores as-is (negative or zero) and construct bins that respect the skew while
+        # still giving higher resolution near zero using log-spaced absolute values mapped back to negatives.
+        scores = users_with_metrics_df[column]
+        xmin = users_with_metrics_df[column].min()
+
+        if scores.empty:
+            print("No values to plot.")
+        if xmin > 0:
+            # TODO (Arda): implement histogram for positive values
+            print("All values are positive; histogram not implemented.")
+        # If all scores are exactly zero, a histogram is not informative
+        if (scores != 0).sum() == 0:
+            print("All values are zero; histogram not informative.")
+            return None
+        fig, ax = plt.subplots(figsize=figsize)
+
+        # Separate negatives (expected) from zeros
+        neg_scores = scores[scores < 0]
+
+        min_abs = None  # track smallest non-zero absolute value for symlog threshold
+
+        # Build bins: if we have negative values, create log-spaced absolute edges then map back
+        if not neg_scores.empty:
+            n_bins = 100
+            min_abs = neg_scores.abs().min()
+            max_abs = neg_scores.abs().max()
+            if min_abs == max_abs:
+                # Degenerate case: all negative values identical -> fall back to linear bins
+                bins = np.linspace(neg_scores.min(), 0, 20)
+            else:
+                abs_edges = np.logspace(np.log10(min_abs), np.log10(max_abs), n_bins)
+                # Convert absolute edges to negative edges (descending), then append 0 as the last edge
+                neg_edges = -abs_edges[::-1]
+                bins = np.unique(np.concatenate([neg_edges, [0]]))  # ensure strictly increasing
+
+        sns.histplot(scores, bins=bins, color="#1f77b4", ax=ax)
+        ax.set_xlabel("Avg Requested VRAM Efficiency Score (<= 0)")
+        ax.set_ylabel("Count")
+        ax.set_title("Distribution of Avg Requested VRAM Efficiency Scores (Actual Values, Log X)")
+
+        # Apply symmetrical log scale to x-axis to compress the long negative tail while keeping zero.
+        # linthresh defines the range around zero that stays linear; choose smallest non-zero magnitude.
+        if min_abs is not None and min_abs > 0:
+            linthresh = min_abs
+        else:
+            linthresh = 1e-6  # fallback small threshold
+        ax.set_xscale("symlog", linthresh=linthresh, linscale=1.0, base=10)
+
+        # Annotation: counts (negative & zero) and total
+        neg_count = (scores < 0).sum()
+        zero_count = (scores == 0).sum()
+        total = len(scores)
+        ax.text(
+            0.98,
+            0.95,
+            (f"Counts:\nNegative: {neg_count}\nZero: {zero_count}\n# of Users: {total}"),
+            transform=ax.transAxes,
+            ha="right",
+            va="top",
+            fontsize=9,
+            bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.9),
+        )
+
+        # Cumulative distribution (CDF) over actual score values
+        counts, bin_edges = np.histogram(scores, bins=bins)
+        cdf = np.cumsum(counts) / counts.sum()
+        mids = (bin_edges[1:] + bin_edges[:-1]) / 2
+        ax2 = ax.twinx()
+        ax2.plot(mids, cdf, color="crimson", marker="o", linestyle="-", linewidth=1, markersize=3)
+        ax2.set_ylim(0, 1)
+        ax2.set_ylabel("Cumulative Fraction", color="crimson")
+        ax2.tick_params(axis="y", colors="crimson")
+
+        # Ensure x-axis spans to (slightly) include zero for clarity
+        left, right = ax.get_xlim()
+        if right < 0:
+            ax.set_xlim(left, 0)
+
+        # Notes:
+        # - We plot the actual (negative/zero) scores instead of absolute values.
+        # - symlog x-scale provides a log-like compression for large negative magnitudes while keeping zero.
+        # - linthresh picks the smallest non-zero magnitude so near-zero structure is visible.
+        # - CDF is computed over actual values to show accumulation from most negative toward zero.
+
+        plt.tight_layout()
+        if output_dir_path is not None:
+            plt.savefig(output_dir_path / f"user_{column}_distribution.png", bbox_inches="tight")
+        plt.show()
+
 
 class PIGroupsWithMetricsVisualizer(EfficiencyMetricsVisualizer):
     """Visualizer for PI groups with efficiency metrics.
@@ -318,6 +439,7 @@ class PIGroupsWithMetricsVisualizer(EfficiencyMetricsVisualizer):
             PIGroupsWithMetricsKwargsModel,
         )
         column = validated_kwargs.column
+        validated_kwargs = cast(PIGroupsWithMetricsKwargsModel, validated_kwargs)
         bar_label_columns = validated_kwargs.bar_label_columns
         figsize = validated_kwargs.figsize
         output_dir_path = self.validate_output_dir(output_dir_path)
