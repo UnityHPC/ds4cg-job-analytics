@@ -120,7 +120,6 @@ class JobsWithMetricsVisualizer(EfficiencyMetricsVisualizer):
             "job_index_and_username": yticklabels,
         })
 
-        # barplot = sns.barplot(y=yticklabels, x=jobs_with_metrics_df[column], orient="h")
         barplot = sns.barplot(
             data=plot_df,
             y="job_index_and_username",
@@ -198,9 +197,32 @@ class UsersWithMetricsVisualizer(EfficiencyMetricsVisualizer):
         figsize = validated_kwargs.figsize
         output_dir_path = self.validate_output_dir(output_dir_path)
 
-        yticklabels = users_with_metrics_df["User"]
+        xmin = users_with_metrics_df[column].min()
+        # If the minimum value is negative, we need to adjust the heights of the bars
+        # to ensure they start from zero for better visualization.
+        # This is particularly useful for metrics like allocated VRAM efficiency score.
+        if xmin < 0:
+            col_heights = pd.Series(
+                [abs(xmin)] * len(users_with_metrics_df[column]), index=users_with_metrics_df[column].index
+            ) - abs(users_with_metrics_df[column])
+            print(f"Minimum value for {column}: {xmin}")
+        else:
+            col_heights = users_with_metrics_df[column]
+
         plt.figure(figsize=figsize)
-        barplot = sns.barplot(y=yticklabels, x=users_with_metrics_df[column], orient="h")
+        plot_df = pd.DataFrame({
+            "col_height": col_heights.to_numpy(),
+            "job_hours": users_with_metrics_df["user_job_hours"],
+            "username": users_with_metrics_df["User"],
+        })
+        barplot = sns.barplot(
+            data=plot_df,
+            y="username",
+            x="col_height",
+            orient="h",
+            palette="Blues_r",
+            hue="username"
+        )
         plt.xlabel(column.upper())
         plt.ylabel(f"{'Users'}")
         plt.title(f"Top Inefficient Users by {column.upper()}")
@@ -210,14 +232,20 @@ class UsersWithMetricsVisualizer(EfficiencyMetricsVisualizer):
         # Set x-axis limit to 1.6 times the maximum value
         # This ensures that the bars do not touch the right edge of the plot
         xlim_multiplier = 1.6
-        xlim = xmax * xlim_multiplier if xmax > 0 else 1
+        xlim = abs(xmin) * xlim_multiplier if xmin < 0 else (xmax * xlim_multiplier if xmax > 0 else 1)
         ax.set_xlim(0, xlim)
+        # If the minimum value is negative, we need to adjust the x-ticks accordingly
+        if xmin < 0:
+            num_xticks = max(4, min(12, int(abs(xmin) // (xlim * 0.10)) + 1))
+            xticks = np.linspace(xmin, 0, num=num_xticks)
+            ax.set_xticks([abs(xmin) - abs(val) for val in xticks])
+            ax.set_xticklabels([f"{val:.2f}" if -1 < val < 1 else f"{val:.0f}" for val in xticks], rotation=45)
 
         if bar_label_columns is not None:
             for i, (*label_values_columns, column_value) in enumerate(
                 zip(
                     *(users_with_metrics_df[col] for col in bar_label_columns),
-                    users_with_metrics_df[column],
+                    plot_df["col_height"],
                     strict=True,
                 )
             ):
@@ -233,5 +261,5 @@ class UsersWithMetricsVisualizer(EfficiencyMetricsVisualizer):
 
         plt.tight_layout()
         if output_dir_path is not None:
-            plt.savefig(output_dir_path / f"jobs_ranked_by_{column}_barplot.png", bbox_inches="tight")
+            plt.savefig(output_dir_path / f"users_ranked_by_{column}_barplot.png", bbox_inches="tight")
         plt.show()
