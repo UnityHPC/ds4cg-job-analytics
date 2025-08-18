@@ -33,7 +33,7 @@ from src.config.enum_constants import (
 import warnings
 
 
-class ROCVisualizer(EfficiencyAnalysis):
+class ETCVisualizer(EfficiencyAnalysis):
     """
     A class for visualizing ROC plots, inheriting from EfficiencyAnalysis.
     """
