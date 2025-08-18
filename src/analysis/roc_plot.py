@@ -579,7 +579,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         # Generate title if not provided
         if title is None:
             title = (
-                f"ROC plot ({plot_type_labels[plot_type]}) for {'proportion' if plot_percentage else 'amounts'} of "
+                f"ETC plot ({plot_type_labels[plot_type]}) for {'proportion' if plot_percentage else 'amounts'} of "
                 f"{proportion_metric.value} by threshold {threshold_metric.value}"
             )
         title += (
@@ -597,7 +597,7 @@ class ROCVisualizer(EfficiencyAnalysis):
         y_max = proportions_data.max()
         y_min = proportions_data.min()
         y_range = y_max - y_min
-        padding = max(y_range * 0.05, 1.0)  # 5% of range or minimum 1 unit
+        padding = max(y_range * 0.09, 1.0)  # 9% of range or minimum 1 unit
         axe.set_ylim(top=y_max + padding)
 
         self._generate_num_marker(axe, thresholds_arr, proportions_data, num_markers)
@@ -688,7 +688,7 @@ class ROCVisualizer(EfficiencyAnalysis):
 
         if title is None:
             title = (
-                f"Multple line ROC plot ({object_column_type.value}) for "
+                f"Multple line ETC plot ({object_column_type.value}) for "
                 f"{'proportion' if plot_percentage else 'amounts'} of "
                 f"{proportion_metric.value} by threshold {threshold_metric.value}"
             )
