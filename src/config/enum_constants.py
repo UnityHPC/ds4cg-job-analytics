@@ -279,16 +279,20 @@ class ROCPlotTypes(Enum):
 
 
 @unique
-class ErrorTypeEnum(Enum):
-    """An enumeration representing different error types.
+class PreprocessingErrorTypeEnum(Enum):
+    """An enumeration representing different error types that could occur during preprocessing.
 
     Attributes:
         MALFORMED_CONSTRAINT: Represents errors due to malformed constraints.
         UNKNOWN_GPU_TYPE: Represents errors related to unknown GPU types specified in constraints.
+        NO_VALID_NODES: Represents errors when no valid nodes are found for a job.
+        GPU_TYPE_NULL: Represents errors when the GPU type is null in constraints.
     """
 
-    MALFORMED_CONSTRAINT = "malformed_constraint"
-    UNKNOWN_GPU_TYPE = "unknown_gpu_type"
+    MALFORMED_CONSTRAINT = "Malformed Constraint"
+    UNKNOWN_GPU_TYPE = "Unknown GPU Type"
+    NO_VALID_NODES = "No Valid Nodes"
+    GPU_TYPE_NULL = "GPU Type is Null"
 
 
 @unique

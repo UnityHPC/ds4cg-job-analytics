@@ -25,5 +25,4 @@ def mock_data_frame(request: pytest.FixtureRequest) -> Generator[pd.DataFrame]:
     finally:
         if mem_db is not None:
             mem_db.disconnect()
-            del mem_db
         shutil.rmtree(temp_db_dir)

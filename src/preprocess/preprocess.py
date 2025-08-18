@@ -1,6 +1,6 @@
 import re
 import warnings
-from pathlib import Path
+from collections.abc import Callable
 
 import numpy as np
 import pandas as pd
@@ -19,13 +19,14 @@ from ..config.enum_constants import (
     AdminPartitionEnum,
     QOSEnum,
     PartitionTypeEnum,
-    ErrorTypeEnum,
+    PreprocessingErrorTypeEnum,
 )
 from ..config.remote_config import PartitionInfoFetcher
+from ..config.paths import PREPROCESSING_ERRORS_LOG_FILE
+from .errors import JobProcessingError
 
-
-# Initialize a global list to store error records
-error_records = []
+processing_error_logs = []
+error_indices = set()
 
 
 def _get_multivalent_vram_based_on_node(gpu_type: str, node: str) -> int:
@@ -46,8 +47,6 @@ def _get_multivalent_vram_based_on_node(gpu_type: str, node: str) -> int:
     Notes:
         This logic is based on the cluster specifications documented at:
         https://docs.unity.rc.umass.edu/documentation/cluster_specs/nodes/
-
-        TODO (Ayush): Consider reading this information from a config file or database.
     """
     gpu_type = gpu_type.lower()
     vram = 0
@@ -77,7 +76,7 @@ def _get_multivalent_vram_based_on_node(gpu_type: str, node: str) -> int:
     return vram
 
 
-def _get_vram_constraint(job_id: int, constraints: list[str], gpu_count: int) -> int | NAType:
+def _get_vram_constraint(constraints: list[str], gpu_count: int) -> int | NAType:
     """
     Get the VRAM assigned to a job based on its constraints and GPU usage.
 
@@ -85,7 +84,6 @@ def _get_vram_constraint(job_id: int, constraints: list[str], gpu_count: int) ->
     constraints.
 
     Args:
-        job_id (int): Unique identifier for the job.
         constraints (list[str]): List of constraints from the job, which may include VRAM requests.
         gpu_count (int): Number of GPUs requested by the job.
 
@@ -93,6 +91,8 @@ def _get_vram_constraint(job_id: int, constraints: list[str], gpu_count: int) ->
         int | NAType: Maximum VRAM amount in GiB obtained based on the provided constraints, multiplied by the
                     number of GPUs. Returns pd.NA if no VRAM constraints are provided or if no GPUs are requested.
 
+    Raises:
+        JobProcessingError: If a malformed constraint is encountered or if an unknown GPU type is specified.
     """
     vram_constraints = []
     for constr in constraints:
@@ -104,23 +104,14 @@ def _get_vram_constraint(job_id: int, constraints: list[str], gpu_count: int) ->
             split_constr = constr.split(":")
             if len(split_constr) <= 1:
                 # Add error records for malformed constraints and missing GPU types
-                error_records.append({
-                    "job_id": job_id,
-                    "error_type": ErrorTypeEnum.MALFORMED_CONSTRAINT,
-                    "info": constr,
-                })
-                continue
+                raise JobProcessingError(PreprocessingErrorTypeEnum.MALFORMED_CONSTRAINT, constr)
 
             gpu_type = split_constr[1].lower()
 
             if gpu_type in VRAM_VALUES:
                 vram_constraints.append(VRAM_VALUES[gpu_type])
             else:
-                error_records.append({
-                    "job_id": job_id,
-                    "error_type": ErrorTypeEnum.UNKNOWN_GPU_TYPE,
-                    "info": gpu_type,
-                })
+                raise JobProcessingError(PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu_type)
         else:
             # if they enter a GPU name without the prefix
             if constr in VRAM_VALUES:
@@ -129,13 +120,12 @@ def _get_vram_constraint(job_id: int, constraints: list[str], gpu_count: int) ->
     if not (len(vram_constraints)):
         return pd.NA  # if no VRAM constraints are provided or no GPUs are requested return pd.NA
 
-    # TODO (Ayush): Check if we want to take max or min of the VRAM constraints
     return max(vram_constraints) * gpu_count
 
 
 def _get_partition_gpu(partition: str) -> str | None:
     """
-    Get the GPU type based on the partition name.
+    Get the GPU type based on the partition if it only has one type of GPU.
 
     This function maps specific partition names to their corresponding GPU types.
 
@@ -152,8 +142,8 @@ def _get_partition_constraint(partition: str, gpu_count: int) -> int | NAType:
     """
     Get the VRAM size based on the partition name requested.
 
-    This function returns the VRAM size in GiB for a given partition name. If the partition is not recognized,
-    it returns NAType.
+    This function returns the VRAM size in GiB for a given partition name if it has only one type of GPU.
+    If the partition is not recognized, or if it has multiple types of GPUs, it returns NAType.
 
     Args:
         partition (str): The name of the partition (e.g., "superpod-a100", "umd-cscdr-gpu").
@@ -195,7 +185,7 @@ def _get_requested_vram(vram_constraint: int | NAType, partition_constraint: int
 
 
 def _calculate_approx_vram_single_gpu_type(
-    job_id: int, gpu_types: list[str] | dict[str, int], node_list: list[str], gpu_count: int, gpu_mem_usage: int
+    gpu_types: list[str] | dict[str, int], node_list: list[str], gpu_count: int, gpu_mem_usage: int
 ) -> int:
     """
     Calculate the approximate VRAM for a job with a single GPU type.
@@ -204,7 +194,6 @@ def _calculate_approx_vram_single_gpu_type(
     the nodes where the job ran, the number of GPUs requested, and the GPU memory usage.
 
     Args:
-        job_id (int): Unique identifier for the job.
         gpu_types:
             - list[str]: list containing a single GPU type used in the job.
             - dict[str, int]: dictionary of GPU types and the count of GPUs of each type used in the job.
@@ -216,7 +205,7 @@ def _calculate_approx_vram_single_gpu_type(
         int: Total allocated VRAM for the job in GiB (gibibyte).
 
     Raises:
-        ValueError: if no valid nodes are found for the multivalent GPU type in the node list.
+        JobProcessingError: If an unknown GPU type is encountered or if no valid nodes are found for a multivalent GPU.
     """
 
     if isinstance(gpu_types, dict):
@@ -230,7 +219,7 @@ def _calculate_approx_vram_single_gpu_type(
         if gpu in VRAM_VALUES:
             return VRAM_VALUES[gpu] * gpu_count
         else:
-            error_records.append({"job_id": job_id, "error_type": ErrorTypeEnum.UNKNOWN_GPU_TYPE, "info": gpu})
+            raise JobProcessingError(PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu)
 
     # calculate VRAM for multivalent GPUs
     total_vram = 0
@@ -249,21 +238,25 @@ def _calculate_approx_vram_single_gpu_type(
     # if there are multiple nodes, but not all GPUs are on different nodes
     # we need to calculate the total VRAM based on the minimum VRAM of the nodes
     else:
-        # calculate all VRAM for all nodes in the node_list
-        node_values = set()  # to avoid duplicates
+        # calculate available VRAM for all nodes in the node_list
+        vram_values = set()  # to avoid duplicates
         for node in node_list:
             node_vram = _get_multivalent_vram_based_on_node(gpu, node)
             if node_vram != 0:  # only consider nodes with non-zero VRAM
-                node_values.add(_get_multivalent_vram_based_on_node(gpu, node))
+                vram_values.add(_get_multivalent_vram_based_on_node(gpu, node))
 
-        if not node_values:
-            raise ValueError(f"No valid nodes found for multivalent GPU type '{gpu}' in node list: {node_list}")
+        if not vram_values:
+            # if no valid nodes are found for the multivalent GPU type in the node list, log an error
+            raise JobProcessingError(
+                PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE,
+                f"No valid nodes found for multivalent GPU type '{gpu}' in node list: {node_list}",
+            )
 
-        sorted_node_values = sorted(list(node_values))
-        total_vram = sorted_node_values.pop(0) * gpu_count  # use the node with the minimum VRAM value
+        sorted_vram_values = sorted(list(vram_values))
+        total_vram = sorted_vram_values.pop(0) * gpu_count  # use the node with the minimum VRAM value
         # if the total VRAM is less than the GPU memory usage, use the VRAM from the GPU in the next larger node
-        while total_vram < (gpu_mem_usage / 2**30) and sorted_node_values:
-            total_vram = sorted_node_values.pop(0) * gpu_count
+        while total_vram < (gpu_mem_usage / 2**30) and sorted_vram_values:
+            total_vram = sorted_vram_values.pop(0) * gpu_count
 
     return total_vram
 
@@ -272,7 +265,7 @@ def _adjust_vram_for_multivalent_gpus(
     multivalent: dict,
     allocated_vram: int,
     gpu_mem_usage: int | float,
-    gpus_with_exact_values: dict[str, int] | None = None,
+    gpus_with_exact_values: dict[str, int],
 ) -> int:
     """
     Adjust the allocated VRAM for multivalent GPUs to meet or exceed the GPU memory usage.
@@ -284,16 +277,15 @@ def _adjust_vram_for_multivalent_gpus(
         multivalent (dict): Dictionary of GPU types (str) to counts (int) for multivalent GPUs.
         allocated_vram (int): Current total allocated VRAM in GiB.
         gpu_mem_usage (int | float): GPU memory usage in bytes.
-        gpus_with_exact_values (dict[str, int], optional): Dictionary of GPU types (str) to exact VRAM values (int).
+        gpus_with_exact_values (dict[str, int]): Dictionary of GPU types (str) to exact VRAM values (int).
 
     Returns:
         int: Adjusted total allocated VRAM in GiB.
     """
-    # Adjust VRAM for GPUs with exact values first if available
-    if gpus_with_exact_values:
-        for gpu, exact_vram in gpus_with_exact_values.items():
-            allocated_vram += exact_vram
-            multivalent[gpu] -= 1  # Reduce count for GPUs with exact values
+    # Adjust VRAM for GPUs with exact values first
+    for gpu, exact_vram in gpus_with_exact_values.items():
+        allocated_vram += exact_vram
+        multivalent[gpu] -= 1  # Reduce count for GPUs with exact values
 
     # Assume they wanted the bigger VRAM variant for each GPU until the condition is satisfied
     for gpu, gpu_count in multivalent.items():
@@ -325,9 +317,9 @@ def _get_possible_vram_values(multivalent_gpu_type: str, node_list: list[str]) -
     return possible_vrams
 
 
-def _can_calculate_perfectly(multivalent_gpu_type: str, count: int, node_list: list[str]) -> bool:
+def _can_calculate_accurately(multivalent_gpu_type: str, count: int, node_list: list[str]) -> bool:
     """
-    Determine whether VRAM can be calculated precisely for a GPU type based on matching nodes.
+    Determine whether VRAM can be calculated accurately for a multivalent GPU type based on the job's node list.
 
     Args:
         multivalent_gpu_type (str): The GPU type (e.g., "a100", "v100").
@@ -335,16 +327,17 @@ def _can_calculate_perfectly(multivalent_gpu_type: str, count: int, node_list: l
         node_list (list[str]): List of node names that the job ran on.
 
     Returns:
-        bool: True if all matching VRAM values are the same or if there are enough distinct nodes for the GPU.
+        bool:  True if all there's one possible VRAM value for this GPU type across given nodes or
+               if each node corresponds to a different possible VRAM value for this GPU type.
     """
     multivalent_gpu = multivalent_gpu_type.lower()
     possible_vrams = _get_possible_vram_values(multivalent_gpu, node_list)
     return len(possible_vrams) == count or len(set(possible_vrams)) == 1
 
 
-def _calculate_precise_vram(multivalent_gpu_type: str, count: int, node_list: list[str]) -> int:
+def _calculate_vram_accurately(multivalent_gpu_type: str, count: int, node_list: list[str]) -> int:
     """
-    Calculate total VRAM for a multivalent GPU precisely.
+    Calculate VRAM for a multivalent GPU type based on the job's node list.
 
     This can be done when all matched nodes have consistent VRAM configuration or enough distinct nodes exist.
 
@@ -366,8 +359,60 @@ def _calculate_precise_vram(multivalent_gpu_type: str, count: int, node_list: li
     return sum(possible_vrams)
 
 
+def _calculate_non_multivalent_vram(non_multivalent: dict) -> int:
+    """
+    Calculate the VRAM allocated for non-multivalent GPUs.
+
+    Args:
+        non_multivalent (dict): Dictionary with non-multivalent GPU types as keys and their counts as values.
+
+    Returns:
+        int: Total allocated VRAM for non-multivalent GPUs in GiB.
+
+    Raises:
+        JobProcessingError: If an unknown GPU type is encountered.
+    """
+    allocated_vram = 0
+    for gpu, count in non_multivalent.items():
+        if gpu in VRAM_VALUES:
+            allocated_vram += VRAM_VALUES[gpu] * count
+        else:
+            raise JobProcessingError(PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu)
+    return allocated_vram
+
+
+def _calculate_multivalent_vram(multivalent: dict, node_list: list[str], gpu_mem_usage: int) -> int:
+    """
+    Calculate the VRAM allocated for multivalent GPUs.
+
+    Args:
+        multivalent (dict): Dictionary with multivalent GPU types as keys and their counts as values.
+        node_list (list[str]): List of nodes that the job ran on.
+        gpu_mem_usage (int): GPU memory usage in bytes.
+
+    Returns:
+        int: Total allocated VRAM for multivalent GPUs in GiB.
+    """
+    allocated_vram = 0
+    gpus_with_exact_values: dict[str, int] = dict()
+
+    for gpu, count in multivalent.items():
+        if _can_calculate_accurately(gpu, count, node_list):
+            vram_value = _calculate_vram_accurately(gpu, count, node_list)
+            allocated_vram += vram_value
+            gpus_with_exact_values[gpu] = vram_value
+        else:
+            allocated_vram += min(MULTIVALENT_GPUS[gpu]) * count
+
+    if allocated_vram < gpu_mem_usage / 2**30 and len(gpus_with_exact_values) < len(multivalent):
+        allocated_vram = _adjust_vram_for_multivalent_gpus(
+            multivalent, allocated_vram, gpu_mem_usage, gpus_with_exact_values
+        )
+    return allocated_vram
+
+
 def _calculate_alloc_vram_multiple_gpu_types_with_count(
-    job_id: int, gpu_types: dict[str, int], node_list: list[str], gpu_mem_usage: int
+    gpu_types: dict[str, int], node_list: list[str], gpu_mem_usage: int
 ) -> int:
     """
     Calculate allocated VRAM for a job with multiple GPU types given a dictionary.
@@ -375,7 +420,6 @@ def _calculate_alloc_vram_multiple_gpu_types_with_count(
     The dictionary has GPU Types as keys and their respective counts as values.
 
     Args:
-        job_id (int): Unique identifier for the job.
         gpu_types (dict[str, int]): Dictionary with GPU types as keys and their counts as values.
         node_list (list[str]): List of nodes that the job ran on.
         gpu_mem_usage (int): GPU memory usage in bytes.
@@ -383,78 +427,20 @@ def _calculate_alloc_vram_multiple_gpu_types_with_count(
     Returns:
         int: Total allocated VRAM for the job in GiB.
     """
-    # Determine which GPUs are multivalent and which are not
-    multivalent = {gpu.lower(): count for gpu, count in gpu_types.items() if gpu.lower() in MULTIVALENT_GPUS}
-    non_multivalent = {gpu.lower(): count for gpu, count in gpu_types.items() if gpu.lower() not in MULTIVALENT_GPUS}
+    multivalent_gpus = {gpu.lower(): count for gpu, count in gpu_types.items() if gpu.lower() in MULTIVALENT_GPUS}
+    non_multivalent_gpus = {
+        gpu.lower(): count for gpu, count in gpu_types.items() if gpu.lower() not in MULTIVALENT_GPUS
+    }
 
-    allocated_vram = 0
+    alloc_vram = 0
+    alloc_vram += _calculate_non_multivalent_vram(non_multivalent_gpus)
+    alloc_vram += _calculate_multivalent_vram(multivalent_gpus, node_list, gpu_mem_usage)
 
-    # Case 1: All GPUs are not multivalent so we know their exact VRAM only based on the GPUType.
-    if len(multivalent) == 0:
-        for gpu, count in non_multivalent.items():
-            if gpu in VRAM_VALUES:
-                allocated_vram += VRAM_VALUES[gpu] * count
-            else:
-                # Update error handling for missing GPU types in allocated VRAM calculations
-                error_records.append({"job_id": job_id, "error_type": ErrorTypeEnum.UNKNOWN_GPU_TYPE, "info": gpu})
-
-        return allocated_vram
-
-    # Case 2: All GPUs multivalent. Number of GPUs is either equal or more than the number of GPU nodes.
-    if len(non_multivalent) == 0:
-        gpus_with_exact_values = dict()  # to keep track of GPUs for which we can calculate exact VRAM
-
-        for gpu, count in multivalent.items():
-            if _can_calculate_perfectly(gpu, count, node_list):
-                # If we can calculate perfectly, use the VRAM from the matching nodes
-                vram_value = _calculate_precise_vram(gpu, count, node_list)
-                allocated_vram += vram_value
-                gpus_with_exact_values[gpu] = vram_value
-
-            else:
-                # Estimate using the minimum VRAM for multivalent GPUs
-                allocated_vram += min(MULTIVALENT_GPUS[gpu]) * count
-
-        # if the estimate is less than the usage and not all GPU VRAMs were calculated exactly, update it
-        if allocated_vram < gpu_mem_usage / 2**30 and len(gpus_with_exact_values) < len(multivalent):
-            allocated_vram = _adjust_vram_for_multivalent_gpus(
-                multivalent, allocated_vram, gpu_mem_usage, gpus_with_exact_values
-            )
-
-        return allocated_vram
-
-    # Case 3: Mixed multivalent and non-multivalent GPUs
-
-    # Add VRAM for non-multivalent GPUs
-    for gpu, count in non_multivalent.items():
-        if gpu in VRAM_VALUES:
-            allocated_vram += VRAM_VALUES[gpu] * count
-        else:
-            # Update error handling for missing GPU types in allocated VRAM calculations
-            error_records.append({"job_id": job_id, "error_type": ErrorTypeEnum.UNKNOWN_GPU_TYPE, "info": gpu})
-            allocated_vram += 0
-
-    # for each multivalent GPU, find its corresponding node and calculate its VRAM
-    node_idx = 0
-    for gpu, count in multivalent.items():
-        for _ in range(count):
-            if node_idx < len(node_list):
-                allocated_vram += _get_multivalent_vram_based_on_node(gpu, node_list[node_idx])
-                node_idx += 1
-            else:
-                allocated_vram += min(MULTIVALENT_GPUS[gpu])
-
-    if allocated_vram >= gpu_mem_usage / 2**30:
-        # If the allocated VRAM is sufficient, no need to adjust
-        return allocated_vram
-
-    # If the allocated VRAM is still less than the GPU memory usage, adjust the VRAM
-    allocated_vram = _adjust_vram_for_multivalent_gpus(multivalent, allocated_vram, gpu_mem_usage)
-    return allocated_vram
+    return alloc_vram
 
 
 def _get_approx_allocated_vram(
-    job_id: int, gpu_types: list[str] | dict[str, int], node_list: list[str], gpu_count: int, gpu_mem_usage: int
+    gpu_types: list[str] | dict[str, int], node_list: list[str], gpu_count: int, gpu_mem_usage: int
 ) -> int:
     """
     Get the total allocated VRAM for a job based on its GPU type and node list.
@@ -463,7 +449,6 @@ def _get_approx_allocated_vram(
     and the nodes that the job ran on.
 
     Args:
-        job_id (int): Unique identifier for the job.
         gpu_types:
             This could be a list of strings (if using the old database format) or a dictionary with GPU types as keys
             and their counts as values (if using the new database format).
@@ -475,6 +460,9 @@ def _get_approx_allocated_vram(
 
     Returns:
         int: Total allocated (estimate) VRAM for the job in GiB (gibibyte).
+
+    Raises:
+        JobProcessingError: If an unknown GPU type is encountered or if the GPU types are malformed.
 
     Notes:
         - When `gpu_types` is a dictionary, the function calculates VRAM based on the counts of each GPU type.
@@ -488,19 +476,18 @@ def _get_approx_allocated_vram(
     elif pd.isna(gpu_types):
         return 0
 
-    # Handle cases with one type of GPU
+    # Case 1: Handle jobs with one type of GPU
     if len(gpu_types) == 1:
-        total_vram = _calculate_approx_vram_single_gpu_type(job_id, gpu_types, node_list, gpu_count, gpu_mem_usage)
+        return _calculate_approx_vram_single_gpu_type(gpu_types, node_list, gpu_count, gpu_mem_usage)
 
-        return total_vram
-
-    # Calculate approximate allocated VRAM for jobs with multiple GPUTypes using the new GPUType format
+    # Case 2: Handle jobs with multiple types of GPUs
+    # Case 2.1: Handle jobs using the new GPUType format
     if isinstance(gpu_types, dict):
         gpu_types = {gpu.lower(): count for gpu, count in gpu_types.items()}
-        total_vram = _calculate_alloc_vram_multiple_gpu_types_with_count(job_id, gpu_types, node_list, gpu_mem_usage)
+        total_vram = _calculate_alloc_vram_multiple_gpu_types_with_count(gpu_types, node_list, gpu_mem_usage)
         return total_vram
 
-    # Handle cases with GPU types in a list
+    # Case 2.2: Handle jobs with the old GPUType format (a list)
 
     # Calculate allocated VRAM when there are multiple GPU types in a job
     if len(gpu_types) == gpu_count:
@@ -514,11 +501,10 @@ def _get_approx_allocated_vram(
                 if gpu in VRAM_VALUES:
                     total_vram += VRAM_VALUES[gpu]
                 else:
-                    total_vram += 0
+                    raise JobProcessingError(PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu)
         return total_vram
 
-    # Using the old data format, calculate allocated VRAM for jobs with multiple GPU Types when
-    # the number of GPUs is different from number of GPUTypes.
+    # Handle cases where the number of GPUs is different from number of GPUTypes.
     allocated_vrams = set()
     for gpu in gpu_types:
         gpu = gpu.lower()
@@ -531,7 +517,7 @@ def _get_approx_allocated_vram(
             if gpu in VRAM_VALUES:
                 allocated_vrams.add(VRAM_VALUES[gpu])
             else:
-                allocated_vrams.add(0)
+                raise JobProcessingError(PreprocessingErrorTypeEnum.UNKNOWN_GPU_TYPE, gpu)
 
     vram_values = sorted(list(allocated_vrams))
     total_vram = vram_values.pop(0) * gpu_count  # use the GPU with the minimum VRAM value
@@ -541,32 +527,154 @@ def _get_approx_allocated_vram(
     return total_vram
 
 
-def _fill_missing(res: pd.DataFrame) -> None:
+def _validate_gpu_type(
+    gpu_type_value: NAType | np.ndarray | list | dict, include_cpu_only_jobs: bool
+) -> list | dict | NAType:
+    """
+    Validate and process GPU type value.
+
+    Args:
+        gpu_type_value (list | dict | np.ndarray): The GPU type value from the DataFrame.
+        include_cpu_only_jobs (bool): Whether CPU-only jobs are allowed.
+
+    Returns:
+        list | dict | NATpe: Processed GPU type value for GPU jobs or pd.NA for CPU-only jobs.
+
+    Raises:
+        JobProcessingError: If GPU type is null and CPU-only jobs are not allowed.
+    """
+
+    # Handle dict and list types first (these are never NA)
+    if isinstance(gpu_type_value, (dict, list)):
+        return gpu_type_value
+
+    # Handle numpy arrays
+    elif isinstance(gpu_type_value, np.ndarray):
+        return gpu_type_value.tolist()
+
+    # Handle missing/empty values (now only NAType remains)
+    elif pd.isna(gpu_type_value):
+        if not include_cpu_only_jobs:
+            raise JobProcessingError(
+                error_type=PreprocessingErrorTypeEnum.GPU_TYPE_NULL,
+                info="GPU Type is null but include_cpu_only_jobs is False",
+            )
+        return pd.NA
+
+
+def _safe_apply_function(
+    func: Callable, *args: object, job_id: int | None = None, idx: int | None = None
+) -> int | NAType:
+    """
+    Safely apply calculation functions, catching JobProcessingError and logging it.
+
+    This function wraps calculation functions to catch JobProcessingError exceptions
+    that may occur during column or metric processing, logs the error details for
+    later review, and returns pd.NA instead of allowing the error to propagate.
+
+    Args:
+        func (Callable): The calculation function to call with the provided arguments.
+        *args: Variable length argument list to pass to the metric function.
+        job_id (int | None, optional): Job ID associated with the row being processed,
+            used for error logging and tracking. Defaults to None.
+        idx (int | None, optional): DataFrame index of the row being processed,
+            used for error tracking and row removal. Defaults to None.
+
+    Returns:
+        int | NAType: The result of calling func(*args) if successful, or pd.NA if a
+            JobProcessingError occurs.
+
+    Note:
+        When a JobProcessingError is caught, the function:
+        - Adds the index to error_indices for later row removal
+        - Logs error details to processing_error_logs for summary reporting
+        - Returns pd.NA to maintain DataFrame structure
+    """
+    try:
+        return func(*args)
+    except JobProcessingError as e:
+        if idx is not None:
+            error_indices.add(idx)
+        processing_error_logs.append({
+            "job_id": job_id,
+            "index": idx,
+            "error_type": e.error_type,
+            "info": e.info,
+        })
+        return pd.NA
+
+
+def _fill_missing(res: pd.DataFrame, include_cpu_only_jobs: bool) -> None:
     """
     Intended for internal use inside preprocess_data() only. Fill missing values in the DataFrame with default values.
 
     Args:
         res (pd.DataFrame): The DataFrame to fill missing values in.
+        include_cpu_only_jobs (bool): Whether to include CPU-only jobs in the DataFrame.
 
     Returns:
         None: The function modifies the DataFrame in place.
     """
 
-    # all Nan value are np.nan
+    # all NaN values are np.nan
     # fill default values for specific columns
     res.loc[:, "ArrayID"] = res["ArrayID"].fillna(-1)
     res.loc[:, "Interactive"] = res["Interactive"].fillna("non-interactive")
     res.loc[:, "Constraints"] = (
         res["Constraints"].fillna("").apply(lambda x: [] if isinstance(x, str) and x == "" else list(x))
     )
-    res.loc[:, "GPUType"] = (
-        res["GPUType"]
-        .fillna("")
-        .apply(
-            lambda x: (pd.NA if (isinstance(x, str) and x == "") else x.tolist() if isinstance(x, np.ndarray) else x)
-        )
+    res.loc[:, "GPUType"] = res.apply(
+        lambda row: _safe_apply_function(
+            _validate_gpu_type, row["GPUType"], include_cpu_only_jobs, job_id=row["JobID"], idx=row.name
+        ),
+        axis=1,
     )
     res.loc[:, "GPUs"] = res["GPUs"].fillna(0)
+
+
+def _write_preprocessing_error_logs(preprocessing_error_logs: list[dict]) -> None:
+    """
+    Write preprocessing error logs to a log file.
+
+    Args:
+        preprocessing_error_logs (list[dict]): List of error records to write to file.
+
+    Returns:
+        None: Writes the error summary to PREPROCESSING_ERRORS_LOG_FILE.
+    """
+    if not preprocessing_error_logs:
+        return
+
+    print(
+        f"Found {len(preprocessing_error_logs)} records with errors. "
+        f"Reporting them to a summary file {PREPROCESSING_ERRORS_LOG_FILE}."
+    )
+
+    if PREPROCESSING_ERRORS_LOG_FILE.exists():
+        print(f"Processing error log file already exists. Overwriting {PREPROCESSING_ERRORS_LOG_FILE.name}")
+
+    summary_lines = [
+        "Records causing processing errors that were ignored:\n",
+        "=" * 30 + "\n",
+        f"Generated on: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}\n",
+        f"Total errors: {len(preprocessing_error_logs)}\n\n",
+    ]
+
+    for record in preprocessing_error_logs:
+        summary_lines.append(
+            f"Job ID: {record['job_id']}\n"
+            f"Error Type: {PreprocessingErrorTypeEnum(record['error_type']).value}\n"
+            f"Info: {record['info']}\n"
+            f"{'-' * 40}\n\n"
+        )
+
+    # Add all job IDs in one line for easy copying
+    job_ids = [str(record["job_id"]) for record in preprocessing_error_logs if record["job_id"] is not None]
+    if job_ids:
+        summary_lines.append(f"All Job IDs: {', '.join(job_ids)}\n")
+
+    with open(PREPROCESSING_ERRORS_LOG_FILE, "w", encoding="utf-8") as f:
+        f.writelines(summary_lines)
 
 
 def preprocess_data(
@@ -574,7 +682,6 @@ def preprocess_data(
     min_elapsed_seconds: int = DEFAULT_MIN_ELAPSED_SECONDS,
     include_failed_cancelled_jobs: bool = False,
     include_cpu_only_jobs: bool = False,
-    filtered: bool = False,
 ) -> pd.DataFrame:
     """
     Preprocess dataframe, filtering out unwanted rows and columns, filling missing values and converting types.
@@ -599,10 +706,8 @@ def preprocess_data(
           and new columns added for VRAM and job statistics.
     """
 
-    # Only drop columns that actually exist in the dataframe
-    columns_to_drop = ["UUID", "EndTime", "Nodes", "Preempted"]
-    existing_columns = [col for col in columns_to_drop if col in input_df.columns]
-    data = input_df.drop(columns=existing_columns, inplace=False)
+    cols_to_remove = [col for col in ["UUID", "EndTime", "Nodes", "Preempted"] if col in input_df.columns]
+    data = input_df.drop(columns=cols_to_remove, axis=1, inplace=False)
 
     first_non_null = data["GPUType"].dropna().iloc[0]
     # Log the format of GPUType being used
@@ -611,25 +716,24 @@ def preprocess_data(
     elif isinstance(first_non_null, list):
         print("[Preprocessing] Running with old database format: GPU types as list.")
 
-    if not filtered:
-        mask = pd.Series([True] * len(data), index=data.index)
+    mask = pd.Series([True] * len(data), index=data.index)
 
-        mask &= data["Elapsed"] >= min_elapsed_seconds
-        mask &= data["Account"] != AdminsAccountEnum.ROOT.value
-        mask &= data["Partition"] != AdminPartitionEnum.BUILDING.value
-        mask &= data["QOS"] != QOSEnum.UPDATES.value
-        # Filter out failed or cancelled jobs, except when include_failed_cancel_jobs is True
-        mask &= (
-            (data["Status"] != StatusEnum.FAILED.value) & (data["Status"] != StatusEnum.CANCELLED.value)
-        ) | include_failed_cancelled_jobs
-        # Filter out jobs whose partition type is not 'gpu', unless include_cpu_only_jobs is True.
-        partition_info = PartitionInfoFetcher().get_info()
-        gpu_partitions = [p["name"] for p in partition_info if p["type"] == PartitionTypeEnum.GPU.value]
-        mask &= data["Partition"].isin(gpu_partitions) | include_cpu_only_jobs
+    mask &= data["Elapsed"] >= min_elapsed_seconds
+    mask &= data["Account"] != AdminsAccountEnum.ROOT.value
+    mask &= data["Partition"] != AdminPartitionEnum.BUILDING.value
+    mask &= data["QOS"] != QOSEnum.UPDATES.value
+    # Filter out failed or cancelled jobs, except when include_failed_cancel_jobs is True
+    mask &= (
+        (data["Status"] != StatusEnum.FAILED.value) & (data["Status"] != StatusEnum.CANCELLED.value)
+    ) | include_failed_cancelled_jobs
+    # Filter out jobs whose partition type is not 'gpu', unless include_cpu_only_jobs is True.
+    partition_info = PartitionInfoFetcher().get_info()
+    gpu_partitions = [p["name"] for p in partition_info if p["type"] == PartitionTypeEnum.GPU.value]
+    mask &= data["Partition"].isin(gpu_partitions) | include_cpu_only_jobs
 
-        data = data[mask].copy()
+    data = data[mask].copy()
 
-    _fill_missing(data)
+    _fill_missing(data, include_cpu_only_jobs)
 
     # Type casting for columns involving time
     time_columns = ["StartTime", "SubmitTime"]
@@ -642,26 +746,49 @@ def preprocess_data(
 
     # Added parameters for calculating VRAM metrics
     data.loc[:, "Queued"] = data["StartTime"] - data["SubmitTime"]
+
+    # Apply all metrics using the single safe function
     data.loc[:, "vram_constraint"] = data.apply(
-        lambda row: _get_vram_constraint(row["JobID"], row["Constraints"], row["GPUs"]), axis=1
-    ).astype(pd.Int64Dtype())  # Use Int64Dtype to allow for nullable integers
+        lambda row: _safe_apply_function(
+            _get_vram_constraint, row["Constraints"], row["GPUs"], job_id=row["JobID"], idx=row.name
+        ),
+        axis=1,
+    ).astype(pd.Int64Dtype())
+
     data.loc[:, "partition_constraint"] = data.apply(
-        lambda row: _get_partition_constraint(row["Partition"], row["GPUs"]), axis=1
-    ).astype(pd.Int64Dtype())  # Use Int64Dtype to allow for nullable integers
+        lambda row: _safe_apply_function(
+            _get_partition_constraint, row["Partition"], row["GPUs"], job_id=row["JobID"], idx=row.name
+        ),
+        axis=1,
+    ).astype(pd.Int64Dtype())
+
     data.loc[:, "requested_vram"] = data.apply(
-        lambda row: _get_requested_vram(row["vram_constraint"], row["partition_constraint"]), axis=1
-    ).astype(pd.Int64Dtype())  # Use Int64Dtype to allow for nullable integers
+        lambda row: _safe_apply_function(
+            _get_requested_vram, row["vram_constraint"], row["partition_constraint"], job_id=row["JobID"], idx=row.name
+        ),
+        axis=1,
+    ).astype(pd.Int64Dtype())
+
     data.loc[:, "allocated_vram"] = data.apply(
-        lambda row: _get_approx_allocated_vram(
-            row["JobID"], row["GPUType"], row["NodeList"], row["GPUs"], row["GPUMemUsage"]
+        lambda row: _safe_apply_function(
+            _get_approx_allocated_vram,
+            row["GPUType"],
+            row["NodeList"],
+            row["GPUs"],
+            row["GPUMemUsage"],
+            job_id=row["JobID"],
+            idx=row.name,
         ),
         axis=1,
     )
+
+    if error_indices:
+        data = data.drop(index=list(error_indices)).reset_index(drop=True)
+
     data.loc[:, "user_jobs"] = data.groupby("User")["User"].transform("size")
     data.loc[:, "account_jobs"] = data.groupby("Account")["Account"].transform("size")
 
     # Convert columns to categorical
-
     for col, enum_obj in ATTRIBUTE_CATEGORIES.items():
         enum_values = [e.value for e in enum_obj]
         unique_values = data[col].unique().tolist()
@@ -676,23 +803,11 @@ def preprocess_data(
             message = f"Some entries in {col_name} having infinity values. This may be caused by an overflow."
             warnings.warn(message=message, stacklevel=2, category=UserWarning)
 
-    # Save error records to a summary file
-    if len(error_records) > 0:
-        print(f"Found {len(error_records)} records with errors. Reporting them to a summary file.")
-        summary_file_path = Path("data/preprocessing/error_summary.txt")
-        summary_file_path.parent.mkdir(parents=True, exist_ok=True)  # Ensure directory exists
+    # Save preprocessing error logs to a file.
+    _write_preprocessing_error_logs(processing_error_logs)
 
-        if summary_file_path.exists():
-            print("Error summary file already exists. Overwriting it.")
-
-        summary_lines = ["Error Summary\n", "=" * 30 + "\n"]
-        for record in error_records:
-            summary_lines.append(
-                f"Job ID: {record['job_id']}\n"
-                f"Error Type: {ErrorTypeEnum(record['error_type']).value}, "
-                f"Info: {record['info']}\n"
-            )
-        with open(summary_file_path, "w", encoding="utf-8") as f:
-            f.writelines(summary_lines)
+    # Reset the error logs after writing to file
+    processing_error_logs.clear()
+    error_indices.clear()
 
     return data
