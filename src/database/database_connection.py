@@ -42,7 +42,7 @@ class DatabaseConnection:
 
     def disconnect(self) -> None:
         """Close the connection to the DuckDB database."""
-        if self.connection is not None:
+        if hasattr(self, 'connection') and self.connection is not None:
             self.connection.close()
             self.connection = None
 
