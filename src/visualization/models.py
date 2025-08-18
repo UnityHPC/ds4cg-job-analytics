@@ -28,3 +28,12 @@ class UsersWithMetricsKwargsModel(EfficiencyMetricsKwargsModel):
     column: str
     bar_label_columns: list[str] | None
     figsize: tuple[int | float, int | float] = Field(default=(8, 8))
+
+
+class PIGroupsWithMetricsKwargsModel(EfficiencyMetricsKwargsModel):
+    """Model for keyword arguments used in PI group metrics visualizations."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+    column: str
+    bar_label_columns: list[str] | None
+    figsize: tuple[int | float, int | float] = Field(default=(8, 8))
