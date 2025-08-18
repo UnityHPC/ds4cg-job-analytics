@@ -152,8 +152,19 @@ class JobsWithMetricsVisualizer(EfficiencyMetricsVisualizer):
                     strict=True,
                 )
             ):
+                def _format_col(col: str) -> str:
+                    prefix = "expected_value_"
+                    if col.startswith(prefix):
+                        return f'EV("{col[len(prefix):]}")'
+                    return col
+
                 label_lines = [
-                    f"{col}: {val:.2f}" for col, val in zip(bar_label_columns, label_values_columns, strict=True)
+                    f"{_format_col(col)}: {val:.2f}" 
+                    for col, val in zip(
+                        bar_label_columns, 
+                        label_values_columns, 
+                        strict=True,
+                    )
                 ]
                 label_text = "\n".join(label_lines)
                 # Calculate x position for label text
@@ -249,8 +260,19 @@ class UsersWithMetricsVisualizer(EfficiencyMetricsVisualizer):
                     strict=True,
                 )
             ):
+                def _format_col(col: str) -> str:
+                    prefix = "expected_value_"
+                    if col.startswith(prefix):
+                        return f'EV("{col[len(prefix):]}")'
+                    return col
+
                 label_lines = [
-                    f"{col}: {val:.2f}" for col, val in zip(bar_label_columns, label_values_columns, strict=True)
+                    f"{_format_col(col)}: {val:.2f}" 
+                    for col, val in zip(
+                        bar_label_columns, 
+                        label_values_columns, 
+                        strict=True,
+                    )
                 ]
                 label_text = "\n".join(label_lines)
                 # Calculate x position for label text
