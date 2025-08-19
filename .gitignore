@@ -42,3 +42,11 @@ data/
 *.diff
 /docs/build
 /site
+
+# Quarto specific files
+.quarto/
+*.html
+reports/user_reports/*
+reports/user_report_template_files/*
+*.pkl
+reports/*.yml
