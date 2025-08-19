@@ -23,6 +23,7 @@ def load_preprocessed_jobs_dataframe_from_duckdb(
     table_name: str = "Jobs",
     sample_size: int | None = None,
     random_state: pd._typing.RandomState | None = None,
+    anonymize: bool = False,
 ) -> pd.DataFrame:
     """
     Load jobs DataFrame from a DuckDB database and preprocess it.
@@ -32,6 +33,7 @@ def load_preprocessed_jobs_dataframe_from_duckdb(
         table_name (str, optional): Table name to query. Defaults to 'Jobs'.
         sample_size (int, optional): Number of rows to sample from the DataFrame. Defaults to None (no sampling).
         random_state (pd._typing.RandomState, optional): Random state for reproducibility. Defaults to None.
+        anonymize (bool, optional): Whether to anonymize the DataFrame. Defaults to False.
 
     Returns:
         pd.DataFrame: DataFrame containing the table data.
@@ -46,7 +48,11 @@ def load_preprocessed_jobs_dataframe_from_duckdb(
 
         jobs_df = db.fetch_all_jobs(table_name=table_name)
         processed_data = preprocess_data(
-            jobs_df, min_elapsed_seconds=0, include_failed_cancelled_jobs=False, include_cpu_only_jobs=False
+            jobs_df,
+            min_elapsed_seconds=0,
+            include_failed_cancelled_jobs=False,
+            include_cpu_only_jobs=False,
+            anonymize=anonymize,
         )
         if sample_size is not None:
             processed_data = processed_data.sample(n=sample_size, random_state=random_state)

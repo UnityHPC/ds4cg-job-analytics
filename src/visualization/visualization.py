@@ -46,7 +46,7 @@ class DataVisualizer(Generic[KwargsModelType], ABC):
         if self.df.columns.empty:
             raise ValueError("DataFrame has no columns.")
         return self.df
-    
+
     @staticmethod
     def anonymize_str_column(column: pd.Series, prefix: str) -> pd.Series:
         """Anonymize a DataFrame column by replacing its values with a unique identifier.

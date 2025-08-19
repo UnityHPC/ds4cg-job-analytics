@@ -322,7 +322,7 @@ class UsersWithMetricsVisualizer(EfficiencyMetricsVisualizer):
         )
         column = validated_kwargs.column
         figsize = validated_kwargs.figsize
-        output_dir_path = self.validate_output_dir(output_dir_path)            
+        output_dir_path = self.validate_output_dir(output_dir_path)
 
         # Distribution of Avg Requested VRAM Efficiency Score (actual values; all are <= 0)
         # We keep scores as-is (negative or zero) and construct bins that respect the skew while

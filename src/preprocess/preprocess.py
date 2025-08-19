@@ -180,11 +180,25 @@ def _write_preprocessing_error_logs(preprocessing_error_logs: list[dict]) -> Non
         f.writelines(summary_lines)
 
 
+def anonymize_str_column(column: pd.Series, prefix: str) -> pd.Series:
+    """Anonymize a DataFrame column by replacing its values with a unique identifier.
+
+    Args:
+        column (pd.Series): The column to anonymize.
+        prefix (str): The prefix to add to the anonymized values.
+
+    Returns:
+        pd.Series: The anonymized column.
+    """
+    return prefix + column.rank(method="dense").astype(int).astype(str).str.zfill(2)
+
+
 def preprocess_data(
     input_df: pd.DataFrame,
     min_elapsed_seconds: int = DEFAULT_MIN_ELAPSED_SECONDS,
     include_failed_cancelled_jobs: bool = False,
     include_cpu_only_jobs: bool = False,
+    anonymize: bool = False,
 ) -> pd.DataFrame:
     """
     Preprocess dataframe, filtering out unwanted rows and columns, filling missing values and converting types.
@@ -196,6 +210,7 @@ def preprocess_data(
         min_elapsed_seconds (int, optional): Minimum elapsed time in seconds to keep a job record. Defaults to 600.
         include_failed_cancelled_jobs (bool, optional): Whether to include jobs with status FAILED or CANCELLED.
         include_cpu_only_jobs (bool, optional): Whether to include jobs that do not use GPUs (CPU-only jobs).
+        anonymize (bool, optional): Whether to anonymize user and account information.
 
     Returns:
         pd.DataFrame: The preprocessed dataframe
@@ -288,8 +303,14 @@ def preprocess_data(
     if error_indices:
         data = data.drop(index=list(error_indices)).reset_index(drop=True)
 
+    # TODO (Tan): remove these two columns as they are calculated during analysis
     data.loc[:, "user_jobs"] = data.groupby("User")["User"].transform("size")
     data.loc[:, "account_jobs"] = data.groupby("Account")["Account"].transform("size")
+
+    # Anonymize user and account information
+    if anonymize:
+        data.loc[:, "User"] = anonymize_str_column(data["User"], "user_")
+        data.loc[:, "Account"] = anonymize_str_column(data["Account"], "account_")
 
     # Convert columns to categorical
     for col, enum_obj in ATTRIBUTE_CATEGORIES.items():
