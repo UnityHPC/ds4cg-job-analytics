@@ -18,6 +18,7 @@ class EfficiencyMetricsKwargsModel(BaseModel):
     model_config = ConfigDict(strict=True, extra="allow")
     column: str
     figsize: tuple[int | float, int | float] = Field(default=(8, 10))
+    anonymize: bool = Field(default=False)
 
 
 class JobsWithMetricsKwargsModel(EfficiencyMetricsKwargsModel):

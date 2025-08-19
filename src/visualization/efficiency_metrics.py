@@ -321,69 +321,160 @@ class UsersWithMetricsVisualizer(EfficiencyMetricsVisualizer):
         # Distribution of Avg Requested VRAM Efficiency Score (actual values; all are <= 0)
         # We keep scores as-is (negative or zero) and construct bins that respect the skew while
         # still giving higher resolution near zero using log-spaced absolute values mapped back to negatives.
-        scores = users_with_metrics_df[column]
-        xmin = users_with_metrics_df[column].min()
+        values = users_with_metrics_df[column].dropna()
+        max_val = users_with_metrics_df[column].max()
+        min_val = users_with_metrics_df[column].min()
 
-        if scores.empty:
-            print("No values to plot.")
-        if xmin > 0:
-            # TODO (Arda): implement histogram for positive values
-            print("All values are positive; histogram not implemented.")
+        if values.empty:
+            print(f"No values to plot for column '{column}'.")
+            print(f"{users_with_metrics_df[column].isna().sum()} NaN values found.")
+            return
         # If all scores are exactly zero, a histogram is not informative
-        if (scores != 0).sum() == 0:
-            print("All values are zero; histogram not informative.")
-            return None
+        if (values != 0).sum() == 0:
+            print(f"All values are zero for column '{column}'; histogram not informative.")
+            return
+
         fig, ax = plt.subplots(figsize=figsize)
 
-        # Separate negatives (expected) from zeros
-        neg_scores = scores[scores < 0]
-
-        min_abs = None  # track smallest non-zero absolute value for symlog threshold
-
-        # Build bins: if we have negative values, create log-spaced absolute edges then map back
-        if not neg_scores.empty:
-            n_bins = 100
-            min_abs = neg_scores.abs().min()
-            max_abs = neg_scores.abs().max()
-            if min_abs == max_abs:
-                # Degenerate case: all negative values identical -> fall back to linear bins
-                bins = np.linspace(neg_scores.min(), 0, 20)
+        # Calculate bins and set the span of x-axis limits
+        min_abs = None  # initialize so later symlog logic is safe for both branches
+        use_log = False  # Will be determined based on the distribution
+        xlim_multiplier_right = 1.6
+        xlim_multiplier_left = 0.8
+        xlim_threshold = 2
+        if max_val < 0:
+            left, right = ax.get_xlim()
+            if right < 0:
+                ax.set_xlim(left, 0)
+            # All values strictly negative (or zero filtered out earlier). Build log-spaced bins on abs values.
+            neg_scores = values[values < 0]
+            if not neg_scores.empty:
+                n_bins = 100
+                min_abs = neg_scores.abs().min()
+                max_abs = neg_scores.abs().max()
+                if min_abs == max_abs:
+                    # Degenerate: every negative value identical.
+                    bins = np.linspace(neg_scores.min(), 0, 20)
+                else:
+                    abs_edges = np.logspace(np.log10(min_abs), np.log10(max_abs), n_bins)
+                    # Convert absolute edges to negative edges (descending), then append 0 as the last edge
+                    neg_edges = -abs_edges[::-1]
+                    bins = np.unique(np.concatenate([neg_edges, [0]]))
+                    use_log = True
             else:
-                abs_edges = np.logspace(np.log10(min_abs), np.log10(max_abs), n_bins)
-                # Convert absolute edges to negative edges (descending), then append 0 as the last edge
-                neg_edges = -abs_edges[::-1]
-                bins = np.unique(np.concatenate([neg_edges, [0]]))  # ensure strictly increasing
+                # Fallback (should not normally happen because zeros-only handled earlier)
+                bins = np.linspace(-1, 0, 20)
+        else:
+            # All scores are non-negative (>= 0). Decide between linear and log bins heuristically.
+            # We'll set the upper x-limit now, and defer the lower x-limit until after we decide
+            # whether a log-like scale is used so we can avoid an unnecessary empty span from 0
+            # to a much larger minimum positive value.
+            non_negative_values = values[values >= 0]
+            if non_negative_values.empty:
+                # All zeros already handled above, but keep a safe fallback.
+                bins = np.linspace(0, 1, 20)
+            else:
+                # Heuristics:
+                # - Use log bins if dynamic range spans many orders of magnitude OR high dispersion.
+                # - Keep linear if range is modest or very few unique values.
+                min_non_negative = non_negative_values.min()
+                max_val = non_negative_values.max()
+                xlim_right = max_val * xlim_multiplier_right if max_val > xlim_threshold else 1
+                xlim_left = min_val * xlim_multiplier_left if min_val > 0 else 0
+                ax.set_xlim(xlim_left, xlim_right)
 
-        sns.histplot(scores, bins=bins, color="#1f77b4", ax=ax)
-        ax.set_xlabel("Avg Requested VRAM Efficiency Score (<= 0)")
+                # Guard: if min_non_negative == max_non_negative, just create narrow linear bins.
+                if min_non_negative == max_val:
+                    center = min_non_negative
+                    width = center * 0.05 if center != 0 else 1.0
+                    bins = np.linspace(center - width, center + width, 20)
+                else:
+                    dynamic_range = max_val / min_non_negative
+                    range_span = max_val - min_non_negative
+                    mean_pos = non_negative_values.mean()
+                    coef_var = non_negative_values.std() / mean_pos if mean_pos != 0 else 0
+                    unique_count = non_negative_values.nunique()
+                    use_log = (
+                        (dynamic_range >= 50 and range_span > xlim_threshold)  # wide dynamic range
+                        or (dynamic_range >= 20 and coef_var > 1.0)  # moderately wide but highly dispersed
+                    ) and unique_count >= 5
+                    # Choose number of bins scaling sublinearly with sample size but capped.
+                    est_bins = max(20, min(100, int(np.sqrt(len(non_negative_values)) * 10)))
+                    if use_log:
+                        bins = np.logspace(
+                            np.log10(min_non_negative) if min_non_negative > 0 else 0,
+                            np.log10(max_val),
+                            est_bins,
+                        )
+                    else:
+                        bins = np.linspace(values.min(), values.max(), est_bins)
+
+        # plot and get height of tallest bin
+        sns.histplot(values, bins=bins, color="#1f77b4", ax=ax)
+        ax.set_xlabel(column.replace("_", " ").upper())
         ax.set_ylabel("Count")
-        ax.set_title("Distribution of Avg Requested VRAM Efficiency Scores (Actual Values, Log X)")
+        ax.set_title(f"Distribution of {column.replace('_', ' ').upper()}")
 
         # Apply symmetrical log scale to x-axis to compress the long negative tail while keeping zero.
         # linthresh defines the range around zero that stays linear; choose smallest non-zero magnitude.
-        if min_abs is not None and min_abs > 0:
-            linthresh = min_abs
-        else:
-            linthresh = 1e-6  # fallback small threshold
-        ax.set_xscale("symlog", linthresh=linthresh, linscale=1.0, base=10)
+
+        # Ensure endpoint ticks (user request): when the distribution has non-negative values (max_val >= 0),
+        # guarantee that the left-most and right-most x-limits are explicitly represented as ticks.
+        if use_log:
+            if min_abs is not None and min_abs > 0:
+                linthresh = min_abs
+            else:
+                # Fallback: adapt threshold to data sign & scale
+                if max_val < 0:
+                    # Negative-only distribution: scale threshold to magnitude of most negative value
+                    linthresh = max(1e-6, abs(values.min()) * 0.01)
+                else:
+                    # Positive distribution: base on smallest positive value (if any)
+                    non_negative_values = values[values > 0]
+                    if not non_negative_values.empty:
+                        linthresh = max(1e-6, non_negative_values.min() * 0.1)
+                    else:
+                        linthresh = 1e-6
+            ax.set_xscale("symlog", linthresh=linthresh, linscale=1.0, base=10)
 
         # Annotation: counts (negative & zero) and total
-        neg_count = (scores < 0).sum()
-        zero_count = (scores == 0).sum()
-        total = len(scores)
+        neg_count = (values < 0).sum()
+        zero_count = (values == 0).sum()
+        positive_count = (values > 0).sum()
+        count = neg_count if neg_count > 0 else positive_count
+        total = len(values)
+        annotation_text = (
+            f"# of Users: {total}\n"
+            f"Counts:\n"
+            f"  {'Negative' if neg_count > 0 else 'Positive'}: {count}\n"
+            f"  Zero: {zero_count}"
+        )
+
+        # Automatic placement similar in spirit to legend(loc='best'):
+        # Choose left/right based on where the data mass (mean) lies; choose top/bottom based on headroom.
+        data_min, data_max = bins[0], bins[-1]
+        midpoint = (data_min + data_max) / 2
+        mean_val = values.mean()
+        # Horizontal placement: opposite side of main mass
+        place_right = mean_val < midpoint  # mass on left -> annotate on right
+        x_pos = 0.82 if place_right else 0.02
+
+        # Ensure limits are updated (draw figure canvas if needed)
+        ax.figure.canvas.draw_idle()
+
         ax.text(
-            0.98,
-            0.95,
-            (f"Counts:\nNegative: {neg_count}\nZero: {zero_count}\n# of Users: {total}"),
+            x_pos,
+            0.90,
+            annotation_text,
             transform=ax.transAxes,
-            ha="right",
+            ha="left",
             va="top",
             fontsize=9,
             bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.9),
         )
 
         # Cumulative distribution (CDF) over actual score values
-        counts, bin_edges = np.histogram(scores, bins=bins)
+        counts, bin_edges = np.histogram(values, bins=bins)
         cdf = np.cumsum(counts) / counts.sum()
         mids = (bin_edges[1:] + bin_edges[:-1]) / 2
         ax2 = ax.twinx()
@@ -392,11 +483,6 @@ class UsersWithMetricsVisualizer(EfficiencyMetricsVisualizer):
         ax2.set_ylabel("Cumulative Fraction", color="crimson")
         ax2.tick_params(axis="y", colors="crimson")
 
-        # Ensure x-axis spans to (slightly) include zero for clarity
-        left, right = ax.get_xlim()
-        if right < 0:
-            ax.set_xlim(left, 0)
-
         # Notes:
         # - We plot the actual (negative/zero) scores instead of absolute values.
         # - symlog x-scale provides a log-like compression for large negative magnitudes while keeping zero.
@@ -404,6 +490,7 @@ class UsersWithMetricsVisualizer(EfficiencyMetricsVisualizer):
         # - CDF is computed over actual values to show accumulation from most negative toward zero.
 
         plt.tight_layout()
+        plt.setp(ax.get_xticklabels(), visible=True)
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"user_{column}_distribution.png", bbox_inches="tight")
         plt.show()

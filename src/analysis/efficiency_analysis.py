@@ -772,7 +772,7 @@ class EfficiencyAnalysis(Generic[MetricsDFNameEnumT]):
         metrics_df_name_enum: MetricsDFNameEnumT,
         sorting_key: str,
         ascending: bool,
-        filter_criteria: dict[str, int | float | dict | pd.api.typing.NAType],
+        filter_criteria: dict[str, int | float | dict | pd.api.typing.NAType] | None = None,
     ) -> pd.DataFrame:
         """
         Sort and filter records based on specified criteria.
@@ -817,17 +817,17 @@ class EfficiencyAnalysis(Generic[MetricsDFNameEnumT]):
             [True] * len(getattr(self, metrics_df_name_enum.value)),
             index=getattr(self, metrics_df_name_enum.value).index,
         )
-
-        for column, filter in filter_criteria.items():
-            try:
-                mask &= EfficiencyAnalysis.apply_numeric_filter(
-                    getattr(self, metrics_df_name_enum.value)[column],
-                    filter,
-                    {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY, FilterTypeEnum.PD_NA},
-                    filter_name=f"{column}_filter",
-                )
-            except ValueError as e:
-                raise ValueError(f"Invalid filter for {column}.") from e
+        if filter_criteria is not None:
+            for column, filter in filter_criteria.items():
+                try:
+                    mask &= EfficiencyAnalysis.apply_numeric_filter(
+                        getattr(self, metrics_df_name_enum.value)[column],
+                        filter,
+                        {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY, FilterTypeEnum.PD_NA},
+                        filter_name=f"{column}_filter",
+                    )
+                except ValueError as e:
+                    raise ValueError(f"Invalid filter for {column}.") from e
 
         filtered_records = getattr(self, metrics_df_name_enum.value)[mask]
 
