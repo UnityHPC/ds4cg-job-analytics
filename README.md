@@ -15,10 +15,15 @@ The following guidelines may prove helpful in maximizing the utility of this rep
 ## Getting started on Unity
 
 You'll need to first install a few dependencies, which include DuckDB, Pandas, and some plotting libraries. More details for running the project will need be added here later.
+
 ### Version Control
 To provide the path of the git configuration file of this project to git, run:
 
     git config --local include.path ../.gitconfig
+
+To ensure consistent LF line endings across all platforms, run the following command when developing on Windows machines:
+
+    git config --local core.autocrlf input
 
 ### Jupyter notebooks
 
@@ -161,6 +166,7 @@ contains tools to add a number of useful derived columns for plotting and analys
 | UUID   | VARCHAR | Unique identifier | 
 | JobID  | INTEGER | Slurm job ID |
 | ArrayID | INTEGER | Position in job array |
+|ArrayJobID| INTEGER | Slurm job ID within array|
 | JobName |  VARCHAR | Name of job |
 | IsArray |  BOOLEAN | Indicator if job is part of an array |
 | Interactive |  VARCHAR | Indicator if job was interactive
@@ -179,10 +185,10 @@ contains tools to add a number of useful derived columns for plotting and analys
 | Partition |  VARCHAR | Job partition |
 | Nodes |  VARCHAR | Job nodes as compact string |
 | NodeList |  VARCHAR[] | List of job nodes |
-| CPUs |  SMALLINT | Number of CPUs |
+| CPUs |  SMALLINT | Number of CPU cores |
 | Memory |  INTEGER | Job allocated memory (bytes) |
 | GPUs |  SMALLINT | Number of GPUs requested |
-| GPUType |  VARCHAR[] | List of GPU types |
+| GPUType |  DICT | Dictionary with keys as type of GPU (str) and the values as number of GPUs corresponding to that type (int) |
 | GPUMemUsage |  FLOAT | GPU memory usage (bytes) |
 | GPUComputeUsage |  FLOAT | GPU compute usage (pct) |
 | CPUMemUsage |  FLOAT | GPU memory usage (bytes) |
