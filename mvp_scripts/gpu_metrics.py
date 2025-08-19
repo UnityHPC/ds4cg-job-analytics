@@ -60,7 +60,6 @@ class GPUMetrics:
         self,
         metricsfile="./modules/admin-resources/reporting/slurm_data.db",
         min_elapsed=600,
-        local=False,
     ) -> None:
         """Initialize GPUMetrics with job data from a DuckDB database.
 
@@ -114,21 +113,17 @@ class GPUMetrics:
 
         new_df["UserRank"] = new_df["User"].map(new_df["User"].value_counts().rank(pct=True))
         thresh = (100 - top_pct) / 100
-        plotting_df = pd.DataFrame(
-            {
-                f"Top {top_pct}% of users": new_df[col][new_df["UserRank"] > thresh],
-                f"Bottom {100 - top_pct}% of users": new_df[col][new_df["UserRank"] <= thresh],
-            }
-        )
+        plotting_df = pd.DataFrame({
+            f"Top {top_pct}% of users": new_df[col][new_df["UserRank"] > thresh],
+            f"Bottom {100 - top_pct}% of users": new_df[col][new_df["UserRank"] <= thresh],
+        })
         if col == "GPUMemUsage":
             plotting_df = (plotting_df / 2**30).clip(0, 95)
         if vram_buckets or col != "GPUMemUsage":
-            plotting_df = pd.DataFrame(
-                {
-                    x: pd.cut(plotting_df[x], bins=vram_cutoffs, labels=vram_labels).value_counts().sort_index()
-                    for x in plotting_df.columns
-                }
-            )
+            plotting_df = pd.DataFrame({
+                x: pd.cut(plotting_df[x], bins=vram_cutoffs, labels=vram_labels).value_counts().sort_index()
+                for x in plotting_df.columns
+            })
             print(plotting_df)
             plotting_df.plot.bar(stacked=True)
             xlabel = "Min needed VRAM Constraint" if col == "GPUMemUsage" else "VRAM (G)"

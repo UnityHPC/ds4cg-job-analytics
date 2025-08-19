@@ -1,15 +1,15 @@
+-r requirements.txt
 ruff
 pytest
+pytest-env
 mkdocs
 mkdocs-material
 mkdocstrings-python
-ipykernel
 build
 black
 mypy
 coverage
-pandas-stubs
 types-seaborn
-jupyterlab
 nbconvert
 nbdime
+types-requests

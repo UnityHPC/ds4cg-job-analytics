@@ -6,3 +6,8 @@ tabulate
 matplotlib
 seaborn
 jupyterlab
+jq
+pydantic
+requests
+requests-cache
+ipykernel
