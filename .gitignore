@@ -43,6 +43,9 @@ data/
 /docs/build
 /site
 
-# Quarto Reports
+# Quarto Report files
 .quarto 
 *.html
+*.pdf
+*.yml
+*.pkl

@@ -6,7 +6,7 @@ This page showcases the DS4CG Unity Job Analytics project in action with interac
 
 Explore our comprehensive Jupyter notebooks that demonstrate the full capabilities:
 
-### 📊 [Frequency Analysis Demo](../notebooks/Frequency Analysis/)
+### 📊 [Frequency Analysis Demo](notebooks/Frequency Analysis/)
 **Complete end-to-end workflow** showing:
 
 - Database connection and preprocessing
@@ -15,7 +15,7 @@ Explore our comprehensive Jupyter notebooks that demonstrate the full capabiliti
 - Interactive visualizations
 - Best/worst user identification
 
-### 📈 [Basic Visualization](../notebooks/Basic%20Visualization/)
+### 📈 [Basic Visualization](notebooks/Basic%20Visualization/)
 **Column statistics and exploratory analysis** including:
 
 - Data loading and preprocessing
@@ -23,7 +23,7 @@ Explore our comprehensive Jupyter notebooks that demonstrate the full capabiliti
 - Distribution analysis
 - Data quality assessment
 
-### 🔍 [Efficiency Analysis](../notebooks/Efficiency%20Analysis/)
+### 🔍 [Efficiency Analysis](notebooks/Efficiency%20Analysis/)
 **Advanced efficiency analysis techniques** covering:
 
 - Job filtering and metrics calculation
@@ -31,10 +31,10 @@ Explore our comprehensive Jupyter notebooks that demonstrate the full capabiliti
 - Inefficiency identification
 - Performance comparison workflows
 
-### 🎯 [Clustering Analysis](../notebooks/clustering_analysis/)
+### 🎯 [Clustering Analysis](notebooks/clustering_analysis/)
 **User behavior clustering and pattern analysis**
 
-### 📊 [Frequency Analysis](../notebooks/Frequency%20Analysis/)
+### 📊 [Frequency Analysis](notebooks/Frequency%20Analysis/)
 **Time series frequency analysis and patterns**
 
 ---

@@ -53,7 +53,6 @@ def load_preprocessed_jobs_dataframe_from_duckdb(
         raise RuntimeError(f"Failed to load jobs DataFrame: {e}") from e
 
 
-
 class EfficiencyAnalysis:
     """
     Class to encapsulate the efficiency analysis of jobs based on various metrics.

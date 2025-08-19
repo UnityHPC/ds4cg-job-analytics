@@ -27,7 +27,7 @@ vram_cutoffs = [-1, 1e-6, 8, 11, 12, 16, 23, 32, 40, 48, 80]
 vram_labels = [0] + vram_cutoffs[2:]
 
 
-def get_requested_vram(constraints):
+def get_requested_vram(constraints) -> int:
     """Get the minimum requested VRAM from job constraints.
 
     Args:
@@ -67,8 +67,6 @@ class GPUMetrics:
             metricsfile (str, optional): Path to the DuckDB database file containing job data.
             min_elapsed (int, optional): Minimum elapsed time (in seconds) for jobs to be included.
         """
-        if local:
-            metricsfile = "../data/slurm_data_small.db"
         self.con = duckdb.connect(metricsfile)
         # TODO - handle array jobs properly
         df = self.con.query(
