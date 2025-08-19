@@ -1,3 +1,3 @@
 # CPU Metrics
 
-::: scripts.cpu_metrics
+::: mvp_scripts.cpu_metrics

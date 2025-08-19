@@ -1,3 +1,3 @@
 # GPU Metrics
 
-::: scripts.gpu_metrics
+::: mvp_scripts.gpu_metrics
