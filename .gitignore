@@ -42,10 +42,3 @@ data/
 *.diff
 /docs/build
 /site
-
-# Quarto Report files
-.quarto 
-*.html
-*.pdf
-*.yml
-*.pkl
