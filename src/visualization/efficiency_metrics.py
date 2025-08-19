@@ -95,6 +95,9 @@ class JobsWithMetricsVisualizer(EfficiencyMetricsVisualizer):
         bar_label_columns = validated_kwargs.bar_label_columns
         figsize = validated_kwargs.figsize
         output_dir_path = self.validate_output_dir(output_dir_path)
+        if validated_kwargs.anonymize:
+            jobs_with_metrics_df["User"] = self.anonymize_str_column(jobs_with_metrics_df["User"], "user_")
+            jobs_with_metrics_df["Account"] = self.anonymize_str_column(jobs_with_metrics_df["Account"], "pi_")
 
         # Create y-tick labels with JobID and User
         # Only include idx in the label if there are duplicate JobID values
@@ -219,6 +222,9 @@ class UsersWithMetricsVisualizer(EfficiencyMetricsVisualizer):
         bar_label_columns = validated_kwargs.bar_label_columns
         figsize = validated_kwargs.figsize
         output_dir_path = self.validate_output_dir(output_dir_path)
+        if validated_kwargs.anonymize:
+            users_with_metrics_df["User"] = self.anonymize_str_column(users_with_metrics_df["User"], "user_")
+            users_with_metrics_df["pi_account"] = self.anonymize_str_column(users_with_metrics_df["pi_account"], "pi_")
 
         xmin = users_with_metrics_df[column].min()
         # If the minimum value is negative, we need to adjust the heights of the bars
@@ -316,7 +322,7 @@ class UsersWithMetricsVisualizer(EfficiencyMetricsVisualizer):
         )
         column = validated_kwargs.column
         figsize = validated_kwargs.figsize
-        output_dir_path = self.validate_output_dir(output_dir_path)
+        output_dir_path = self.validate_output_dir(output_dir_path)            
 
         # Distribution of Avg Requested VRAM Efficiency Score (actual values; all are <= 0)
         # We keep scores as-is (negative or zero) and construct bins that respect the skew while
@@ -530,6 +536,10 @@ class PIGroupsWithMetricsVisualizer(EfficiencyMetricsVisualizer):
         bar_label_columns = validated_kwargs.bar_label_columns
         figsize = validated_kwargs.figsize
         output_dir_path = self.validate_output_dir(output_dir_path)
+        if validated_kwargs.anonymize:
+            pi_groups_with_metrics_df["pi_account"] = self.anonymize_str_column(
+                pi_groups_with_metrics_df["pi_account"], "pi_"
+            )
 
         xmin = pi_groups_with_metrics_df[column].min()
         # If the minimum value is negative, we need to adjust the heights of the bars

@@ -46,6 +46,19 @@ class DataVisualizer(Generic[KwargsModelType], ABC):
         if self.df.columns.empty:
             raise ValueError("DataFrame has no columns.")
         return self.df
+    
+    @staticmethod
+    def anonymize_str_column(column: pd.Series, prefix: str) -> pd.Series:
+        """Anonymize a DataFrame column by replacing its values with a unique identifier.
+
+        Args:
+            column (pd.Series): The column to anonymize.
+            prefix (str): The prefix to add to the anonymized values.
+
+        Returns:
+            pd.Series: The anonymized column.
+        """
+        return prefix + column.rank(method="dense").astype(int).astype(str).str.zfill(2)
 
     @staticmethod
     def validate_sampling_arguments(sample_size: int | None, random_seed: int | None) -> tuple[int | None, int | None]:
