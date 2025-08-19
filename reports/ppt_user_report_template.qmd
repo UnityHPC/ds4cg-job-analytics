@@ -1,0 +1,825 @@
+---
+title: "Unity GPU Jobs Analytics Report"
+format: 
+  html:
+    theme: cosmo
+    css: styles.css
+    toc: true
+    toc-depth: 3
+    page-layout: article
+    self-contained: true
+    output_file: test_report.html
+params:
+  data_file: "user_data.json"
+  pickle_file: null
+---
+
+```{python}
+#| tags: [parameters]
+#| echo: false
+
+data_file = "user_data.json"
+```
+
+```{python}
+#| echo: false
+#| output: asis
+
+# Import required libraries
+import pandas as pd
+import numpy as np
+import json
+import sys
+import os
+import pickle
+from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
+import seaborn as sns
+from pathlib import Path
+
+# Add the project root to Python path so we can import from src
+project_root = Path.cwd().parent  # Go up from reports directory to project root
+sys.path.insert(0, str(project_root))
+
+# Set up plotting style
+plt.style.use('default')
+sns.set_palette("husl")
+
+# Load data from JSON file
+with open(pickle_file, "rb") as f:
+    data = pickle.load(f)
+
+summary_stats = data["summary_stats"]
+comparison_stats = data["comparison_stats"]
+time_series_data = data["time_series_data"]
+gpu_type_data = data["gpu_type_data"]
+all_users_job_metrics = data["all_users_job_metrics"]
+all_users_data = data["all_users_data"]
+recommendations = data["recommendations"]
+user_data = data["user_data"]
+user_jobs = data["user_jobs"]
+user_id = data["user_id"]
+start_date = data["start_date"]
+end_date = data["end_date"]
+analysis_period = data["analysis_period"]
+
+print(f"Report generated for user: **{user_id}**")
+print()
+print(f"Analysis period: **{analysis_period}**")
+print()
+print(f"Total jobs analyzed: {len(user_jobs)}")
+print()
+print(f"Total VRAM Hours used: {int(user_jobs['vram_hours'].sum())}")
+```
+
+
+### User Details
+
+#### Why is the user inefficient?
+
+```{python}
+#| echo: false
+#| output: asis
+#| fig-cap: "Percentile Plot of Requested VRAM Efficiency"
+#| fig-width: 12
+#| fig-height: 8
+
+# Generate horizontal percentile plot
+eff_plot_data = all_users_job_metrics.copy()
+user_eff = user_jobs["requested_vram_efficiency"].mean() if len(user_jobs) > 0 else 0
+eff_plot_data["requested_vram_efficiency"] = eff_plot_data["requested_vram_efficiency"].clip(0, 1)
+print(f"User's Efficiency: {user_eff:.4f}")
+
+
+sns.boxplot(data=eff_plot_data, x="requested_vram_efficiency", color="lightblue")
+plt.axvline(x=user_eff, color="red", linestyle="--", label="User's Percentile")
+plt.title("Percentile Plot of Requested VRAM Efficiency")
+plt.xlabel("Requested VRAM Efficiency (0-1))")
+plt.legend()
+plt.show()
+```
+
+---
+### Time
+
+```{python}
+#| echo: false
+#| fig-cap: "VRAM Efficiency Over Time - Monthly"
+#| fig-width: 10
+#| fig-height: 6
+
+import matplotlib.pyplot as plt
+import pandas as pd
+
+if len(user_jobs) > 0 and 'StartTime' in user_jobs.columns:
+    try:
+        from src.analysis.frequency_analysis import FrequencyAnalysis
+        from src.visualization.time_series import TimeSeriesVisualizer
+        from src.config.enum_constants import TimeUnitEnum
+        if len(time_series_data) > 2:
+            # Convert time_series_data list to DataFrame for TimeSeriesVisualizer
+            time_series_df = pd.DataFrame(time_series_data)
+            
+            # Add required columns for TimeSeriesVisualizer
+            time_series_df['User'] = user_id
+            time_series_df['TimeGroup_Str'] = time_series_df['period']
+            time_series_df['requested_vram_efficiency'] = time_series_df['efficiency']
+            time_series_df['GPUHours'] = time_series_df['vram_hours']
+            time_series_df['JobCount'] = time_series_df['job_count']
+            
+            # Convert period string to datetime for TimeGroup_Datetime
+            time_series_df['TimeGroup_Datetime'] = pd.to_datetime(time_series_df['period'] + '-01')  # Add day to make it a full date
+            
+            # Create the time series visualizer
+            ts_visualizer = TimeSeriesVisualizer(time_series_df)
+            
+            # Plot VRAM efficiency over time with responsive dimensions
+            ts_visualizer.plot_vram_efficiency_interactive(
+                users=[user_id],
+                width=820,  # Responsive width for Quarto reports
+                height=500  # Responsive height for Quarto reports
+            )
+        else:
+            print("Not enough data points for time series visualization (need at least 2 data points).")
+        
+    except Exception as e:
+        print(f"Error using FrequencyAnalysis for monthly time series: {e}")
+        # Fallback to basic time series plot
+        if 'StartTime' in user_jobs.columns:
+            user_jobs_sorted = user_jobs.sort_values('StartTime').copy()
+            
+            # Group by month for fallback
+            user_jobs_sorted['Month'] = pd.to_datetime(user_jobs_sorted['StartTime']).dt.to_period('M')
+            monthly_avg = user_jobs_sorted.groupby('Month').agg({
+                'alloc_vram_efficiency': 'mean' if 'alloc_vram_efficiency' in user_jobs_sorted.columns else lambda x: 0
+            }).reset_index()
+            
+            if len(monthly_avg) >= 2:
+                # Use consistent figure size with Quarto chunk options
+                fig, ax = plt.subplots(figsize=(10, 6))
+                ax.plot(monthly_avg['Month'].astype(str), monthly_avg['alloc_vram_efficiency'], 
+                       marker='o', linewidth=2, markersize=6)
+                ax.set_xlabel('Month')
+                ax.set_ylabel('VRAM Efficiency')
+                ax.set_title('VRAM Efficiency Over Time (Monthly Average)')
+                
+                # Improve x-axis label handling to prevent scrolling
+                ax.tick_params(axis='x', rotation=45, labelsize=9)
+                if len(monthly_avg) > 12:  # If more than 12 months, show every other label
+                    ax.set_xticks(ax.get_xticks()[::2])
+                
+                ax.grid(True, alpha=0.3)
+                plt.tight_layout()
+                plt.show()
+            else:
+                print("Not enough data points for time series visualization (need at least 2 data points).")
+
+```
+
+### Comparison with Other Users
+### VRAM Hours Comparison
+
+```{python}
+#| echo: false
+#| fig-cap: "Comparison of VRAM Hours: Specific User vs Average of Other Users"
+#| fig-width: 8
+#| fig-height: 6
+
+# Generate VRAM hours comparison plot for this user against average
+import matplotlib.pyplot as plt
+
+# Filter data for the specific user and calculate average for other users
+user_vram_hours = user_jobs['vram_hours'].sum()
+average_vram_hours = all_users_job_metrics[all_users_job_metrics['User'] != user_id]['vram_hours'].mean()
+
+# Data for the plot
+categories = [user_id, 'Average of Other Users']
+vram_hours_values = [user_vram_hours, average_vram_hours]
+
+# Plot
+plt.figure(figsize=(7, 4))
+bars = plt.bar(categories, vram_hours_values, color=['blue', 'orange'])
+
+# Add labels on top of bars
+for bar, value in zip(bars, vram_hours_values):
+    plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), f"{value:.1f}",
+             ha='center', va='bottom', fontsize=9)
+
+plt.ylabel('VRAM Hours')
+plt.title(f'Comparison of VRAM Hours: {user_id} vs Average of Other Users')
+plt.tight_layout()
+plt.show()
+```
+
+---
+
+
+### Performance Summary
+
+```{python}
+#| echo: false
+#| output: asis
+
+if len(summary_stats) > 0:
+    # Extract key metrics from summary_stats for narrative
+    try:
+        # Get efficiency category and metrics from the table
+        efficiency_row = summary_stats[summary_stats['Metric'].str.contains('efficiency category', case=False, na=False)]
+        vram_usage_row = summary_stats[summary_stats['Metric'].str.contains('Average VRAM efficiency', case=False, na=False)]
+        zero_usage_row = summary_stats[summary_stats['Metric'].str.contains('Zero usage jobs', case=False, na=False)]
+        time_estimate_row = summary_stats[summary_stats['Metric'].str.contains('Time estimation', case=False, na=False)]
+        cpu_gpu_ratio_row = summary_stats[summary_stats['Metric'].str.contains('CPU/GPU memory ratio', case=False, na=False)]
+        
+        # Generate narrative based on available data
+        if not efficiency_row.empty:
+            efficiency_category = efficiency_row.iloc[0]['Value']
+            print(f"Your overall job's efficiency in this period lies in the **{efficiency_category}** category.")
+        
+        if not vram_usage_row.empty:
+            vram_efficiency = vram_usage_row.iloc[0]['Value']
+            print(f" Your GPU jobs use **{vram_efficiency}** of the requested GPU memory on average.")
+        
+        if not zero_usage_row.empty:
+            zero_usage = zero_usage_row.iloc[0]['Value']
+            if "0" not in str(zero_usage):
+                print(f"\n⚠️ **{zero_usage}** of your jobs did not use any significant amount of GPU memory.")
+            else:
+                print("\n✓ All of your jobs are using GPU memory effectively.")
+        
+        if not time_estimate_row.empty:
+            time_estimate = time_estimate_row.iloc[0]['Value']
+            print(f"\nYou appear to have **{time_estimate}** the time limits for your jobs.")
+        
+        if not cpu_gpu_ratio_row.empty:
+            cpu_gpu_ratio = cpu_gpu_ratio_row.iloc[0]['Value']
+            try:
+                ratio_value = float(str(cpu_gpu_ratio).split()[0])
+                if ratio_value > 2.0:
+                    print(f"\n⚠️ Your CPU to GPU memory usage ratio is high ({cpu_gpu_ratio}). This might indicate that your jobs are more CPU-intensive than GPU-intensive.")
+            except:
+                pass
+                
+    except Exception as e:
+        print("Performance analysis data not available in expected format.")
+else:
+    print("No performance summary data provided.")
+```
+
+---
+
+<details>
+<summary><h3>📋 Additional Details</h3></summary>
+
+<details>
+<summary><h4>🎯 Individual Job Performance (Dot Plot)</h4></summary>
+
+```{python}
+#| echo: false
+#| fig-cap: "Individual Job Performance Over Time"
+#| fig-width: 10
+#| fig-height: 6
+
+# Always show the dot plot for individual job performance
+if len(user_jobs) > 0 and 'StartTime' in user_jobs.columns:
+    try:
+        from src.visualization.time_series import TimeSeriesVisualizer
+        
+        # Create time series visualizer with user job data
+        ts_visualizer = TimeSeriesVisualizer(user_jobs)
+        
+        # Plot individual job performance as dots
+        ts_visualizer.plot_vram_efficiency_per_job_dot(
+            users=[user_id],
+            efficiency_metric='alloc_vram_efficiency' if 'alloc_vram_efficiency' in user_jobs.columns else 'used_vram_gib',
+            vram_metric='vram_hours' if 'vram_hours' in user_jobs.columns else 'job_hours',
+            remove_zero_values=True
+        )
+        
+    except Exception as e:
+        print(f"Error creating dot plot: {e}")
+        # Fallback scatter plot
+        if 'alloc_vram_efficiency' in user_jobs.columns:
+            # Use consistent figure size with Quarto chunk options
+            fig, ax = plt.subplots(figsize=(10, 6))
+            ax.scatter(user_jobs['StartTime'], user_jobs['alloc_vram_efficiency'], 
+                      alpha=0.6, s=50)
+            ax.set_xlabel('Date')
+            ax.set_ylabel('VRAM Efficiency')
+            ax.set_title('Individual Job VRAM Efficiency Over Time')
+            
+            # Improve x-axis date handling to prevent scrolling
+            ax.tick_params(axis='x', rotation=45, labelsize=9)
+            # Auto-format date labels for better fit
+            fig.autofmt_xdate()
+            
+            ax.grid(True, alpha=0.3)
+            plt.tight_layout()
+            plt.show()
+
+else:
+    print("No job data with timestamps available for dot plot.")
+```
+
+</details>
+<details>
+<summary><h4>📊 Efficiency Threshold Curve</h4></summary>
+
+```{python}
+#| echo: false
+#| fig-cap: "Your Performance vs Other Users"
+#| fig-width: 8
+#| fig-height: 5
+
+# Advanced ROC analysis using the actual ROCVisualizer class
+all_users_job_metrics = data.get('all_users_job_metrics', None)
+
+if all_users_job_metrics is not None and len(all_users_job_metrics) > 100 and len(user_jobs) > 5:
+    try:
+        # Import the ROC analyzer for real-time analysis
+        import matplotlib.pyplot as plt
+        import pandas as pd
+        import numpy as np
+        from src.analysis.roc_plot import ROCVisualizer
+        from src.config.enum_constants import ProportionMetricsEnum, JobEfficiencyMetricsEnum, EfficiencyCategoryEnum
+
+        print("Your Performance vs Other Users")
+        print()
+
+        # Convert job metrics to DataFrame - this already has efficiency calculations
+        all_jobs_df = pd.DataFrame(all_users_job_metrics)
+
+        # Verify we have the required columns
+        required_cols = ['User', 'alloc_vram_efficiency']
+        missing_cols = [col for col in required_cols if col not in all_jobs_df.columns]
+
+        if missing_cols:
+            print(f"Error: Missing required columns: {missing_cols}")
+            print("ROC analysis requires job data with calculated efficiency metrics.")
+        else:
+            print(f"Your jobs: {len(user_jobs)}")
+            print()
+
+            # Get unique users for comparison
+            all_users = all_jobs_df['User'].unique()
+            other_users = [u for u in all_users if u != user_id]
+
+            if len(other_users) >= 5:
+                # Create a true aggregate for "All Other Users" by calculating percentiles
+                # This gives us a single representative curve for all other users combined
+                other_users_jobs = all_jobs_df[all_jobs_df['User'] != user_id].copy()
+
+                # Calculate efficiency percentiles across all other users' jobs
+                efficiency_values = other_users_jobs['alloc_vram_efficiency'].values
+
+                # Create synthetic aggregate data points representing the distribution
+                # We'll create data points at different efficiency levels to represent the aggregate
+                percentiles = np.arange(0, 101, 5)  # 0%, 5%, 10%, ..., 100%
+                efficiency_percentiles = np.percentile(efficiency_values, percentiles)
+
+                # Create aggregate data representing "All Other Users" performance distribution
+                n_synthetic_jobs = 100  # Number of synthetic jobs to represent the aggregate
+                synthetic_efficiencies = np.interp(
+                    np.linspace(0, 100, n_synthetic_jobs),
+                    percentiles,
+                    efficiency_percentiles
+                )
+
+                # Create aggregate dataset
+                aggregate_data = pd.DataFrame({
+                    'User': ['All Other Users'] * n_synthetic_jobs,
+                    'alloc_vram_efficiency': synthetic_efficiencies
+                })
+
+                # Combine user data with true aggregate representation
+                comparison_data = pd.concat([
+                    all_jobs_df[all_jobs_df['User'] == user_id][['User', 'alloc_vram_efficiency']],  # User's jobs
+                    aggregate_data  # Aggregate representation of all other users
+                ], ignore_index=True)
+
+                print(f"Comparing against aggregate of all other users ({len(other_users)} users)")
+                print()
+
+                # Initialize ROC analyzer with the comparison data
+                roc_instance = ROCVisualizer(jobs_df=comparison_data)
+
+                # Since the data already has calculated efficiency metrics, set it manually
+                roc_instance.jobs_with_efficiency_metrics = comparison_data
+
+                # Create the ROC plot with just 2 lines: user vs all others
+                fig, axes = roc_instance.multiple_line_roc_plot(
+                    plot_object_list=[user_id, 'All Other Users'],
+                    object_column_type=ProportionMetricsEnum.USERS,
+                    threshold_metric=JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY,
+                    proportion_metric=ProportionMetricsEnum.JOBS,
+                    min_threshold=0.0,
+                    max_threshold=1.0,
+                    threshold_step=0.01,
+                    plot_percentage=True,
+                    title=f"ROC Analysis: {user_id} vs Other Users"
+                )
+
+                plt.show()
+                print("ROC Curve Interpretation:")
+                print()
+                print("- Each line shows how a user's jobs perform across efficiency thresholds")
+                print("- Your line (should be highlighted) shows your efficiency distribution")
+                print("- Lines higher and to the left indicate better efficiency performance")
+                print("- Use this to see how you rank among system users")
+
+            else:
+                print(f"**Error**: Not enough users for comparison (need ≥5, have {len(other_users)})")
+
+    except Exception as e:
+        print(f"**Error generating analysis**: {e}")
+        print()
+        print("ROC analysis could not be completed.")
+        import traceback
+        print(f"**Details**: {traceback.format_exc()}")
+
+else:
+    print("### Analysis Not Available")
+    print()
+    if all_users_job_metrics is None:
+        print("**Reason**: No job metrics data available")
+    elif len(all_users_job_metrics) <= 100:
+        print(f"**Reason**: Insufficient job metrics data (need >100, have {len(all_users_job_metrics)})")
+    else:
+        print(f"**Reason**: Insufficient user jobs (need >5, have {len(user_jobs)})")
+
+    print()
+    print("*ROC analysis requires sufficient job data with calculated efficiency metrics.*")
+    print("*This analysis will become available as more GPU jobs are submitted to the system.*")
+```
+</details>
+
+<details>
+
+<summary><h4>A100 vs Other GPU Performance Comparison</h4></summary>
+
+```{python}
+#| echo: false
+#| fig-cap: "A100 vs Other GPU Performance"
+#| fig-width: 12
+#| fig-height: 8
+
+# Check if user has used A100 GPUs
+def extract_gpu_type(gpu_type_val):
+    """Extract GPU type from various data formats."""
+    if isinstance(gpu_type_val, list) and len(gpu_type_val) > 0:
+        return gpu_type_val[0]
+    elif isinstance(gpu_type_val, dict) and len(gpu_type_val) > 0:
+        return list(gpu_type_val.keys())[0]
+    elif isinstance(gpu_type_val, str):
+        return gpu_type_val
+    else:
+        return "unknown"
+user_jobs_a100 = user_jobs.copy()
+user_jobs_a100['primary_gpu_type'] = user_jobs_a100['GPUType'].apply(extract_gpu_type)
+
+# Filter for A100 jobs
+a100_jobs = user_jobs_a100[user_jobs_a100['primary_gpu_type'].str.contains('a100', case=False, na=False)]
+if len(a100_jobs) > 0 and len(user_jobs) > 0:
+    try:
+        # Create comparison between A100 and other GPUs
+        user_jobs_comparison = user_jobs.copy()
+        user_jobs_comparison['primary_gpu_type'] = user_jobs_comparison['GPUType'].apply(extract_gpu_type)
+        user_jobs_comparison['is_a100'] = user_jobs_comparison['primary_gpu_type'].str.contains('a100', case=False, na=False)
+        user_jobs_comparison['gpu_category'] = user_jobs_comparison['is_a100'].map({True: 'A100', False: 'Other GPUs'})
+        
+        # Calculate efficiency metrics by GPU category
+        # Calculate VRAM hours if not present
+        if 'vram_hours' not in user_jobs_comparison.columns and 'job_hours' in user_jobs_comparison.columns and 'allocated_vram' in user_jobs_comparison.columns:
+            user_jobs_comparison['vram_hours'] = user_jobs_comparison['job_hours'] * user_jobs_comparison['allocated_vram']
+        
+        efficiency_metrics = user_jobs_comparison.groupby('gpu_category').agg({
+            'alloc_vram_efficiency': 'mean' if 'alloc_vram_efficiency' in user_jobs_comparison.columns else lambda x: 0,
+            'used_vram_gib': 'mean',
+            'allocated_vram': 'mean',
+            'job_hours': 'mean',
+            'vram_hours': 'mean' if 'vram_hours' in user_jobs_comparison.columns else lambda x: 0,
+            'JobID': 'count'
+        }).reset_index()
+        
+        if len(efficiency_metrics) > 1:  # Both A100 and other GPUs present
+            fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 8))
+
+            # 1. VRAM Efficiency Comparison
+            ax1.bar(efficiency_metrics['gpu_category'], efficiency_metrics['alloc_vram_efficiency'],
+                   color=['#FF6B6B', '#4ECDC4'], alpha=0.8)
+            ax1.set_title('Average VRAM Efficiency')
+            ax1.set_ylabel('Efficiency')
+            # Set y-axis limit higher to show labels
+            # Set y-axis limit higher to show labels
+            max_val = max(efficiency_metrics['alloc_vram_efficiency'])
+            ax1.set_ylim(0, max_val * 1.15)
+            ax1.set_ylim(0, max_val * 1.15)
+            for i, v in enumerate(efficiency_metrics['alloc_vram_efficiency']):
+                ax1.text(i, v + max_val * 0.02, f'{v:.3f}',
+                        ha='center', va='bottom', fontweight='bold')
+
+            # 2. Memory Usage Comparison
+            ax2.bar(efficiency_metrics['gpu_category'], efficiency_metrics['used_vram_gib'],
+                   color=['#FF6B6B', '#4ECDC4'], alpha=0.8)
+            ax2.set_title('Average GPU Memory Used')
+            # Set y-axis limit higher to show labels
+            ax2.set_ylabel('Memory (GiB)')
+            ax2.set_ylim(0, max_val * 1.15)
+            max_val = max(efficiency_metrics['used_vram_gib'])
+            ax2.set_ylim(0, max_val * 1.15)
+            for i, v in enumerate(efficiency_metrics['used_vram_gib']):
+                ax2.text(i, v + max_val * 0.02, f'{v:.1f}',
+                        ha='center', va='bottom', fontweight='bold')
+
+            # 3. VRAM Hours Comparison
+            ax3.bar(efficiency_metrics['gpu_category'], efficiency_metrics['vram_hours'],
+                   color=['#FF6B6B', '#4ECDC4'], alpha=0.8)
+            # Set y-axis limit higher to show labels
+            ax3.set_title('Average VRAM Hours')
+            ax3.set_ylabel('VRAM Hours')
+            ax3.set_ylim(0, max_val * 1.15)
+            # Set y-axis limit higher to show labels
+            max_val = max(efficiency_metrics['vram_hours'])
+            ax3.set_ylim(0, max_val * 1.15)
+            for i, v in enumerate(efficiency_metrics['vram_hours']):
+                ax3.text(i, v + max_val * 0.02, f'{v:.1f}',
+                        ha='center', va='bottom', fontweight='bold')
+
+            # Calculate job percentages
+            total_jobs = efficiency_metrics['JobID'].sum()
+            efficiency_metrics['JobPercentage'] = (efficiency_metrics['JobID'] / total_jobs) * 100
+
+            # 4. Job Percentage
+            ax4.bar(efficiency_metrics['gpu_category'], efficiency_metrics['JobPercentage'],
+                   color=['#FF6B6B', '#4ECDC4'], alpha=0.8)
+
+            ax4.bar(efficiency_metrics['gpu_category'], efficiency_metrics['JobID'],
+            # Set y-axis limit higher to show labels
+                   color=['#FF6B6B', '#4ECDC4'], alpha=0.8)
+            ax4.set_title('Job Distribution by GPU Type')
+            ax4.set_ylabel('Job Percentage (%)')
+            max_val = max(efficiency_metrics['JobPercentage'])
+            ax4.set_ylim(0, 100 * 1.15)
+            for i, v in enumerate(efficiency_metrics['JobPercentage']):
+                ax4.text(i, v + max_val * 0.02, f'{v:.1f}%',
+                        ha='center', va='bottom', fontweight='bold')
+
+            plt.tight_layout()
+            plt.show()
+        else:
+            print("Only one GPU type category available - comparison not possible.")
+            
+    except Exception as e:
+        print(f"Error creating A100 comparison: {e}")
+else:
+    print("A100 comparison not available - insufficient A100 usage data.")
+```
+
+---
+
+<div style="margin: 30px 0; padding: 15px; background-color: #fff3cd; border-radius: 6px; border-left: 4px solid #ffc107;">
+<h5 style="color: #856404; margin-bottom: 8px;">📊 A100 Performance Analysis</h5>
+<p style="margin-bottom: 0;">A100 GPUs are high-performance resources. The following distribution analysis helps understand how effectively you're utilizing these premium GPUs.</p>
+
+<p style="margin-top: 10px;"><strong>A100 vs. Other GPUs Comparison:</strong> The charts below compare your resource utilization across different GPU types. Pay special attention to the <strong>VRAM Hours</strong> metric, which reflects the total GPU memory resources consumed over time. Lower VRAM hours with higher efficiency indicates optimal resource utilization.</p>
+</div>
+</details>
+
+---
+
+<details>
+<summary><h4>A100 Efficiency Distribution</h4></summary>
+
+```{python}
+#| echo: false
+#| fig-cap: "A100 VRAM Efficiency Distribution"
+#| fig-width: 10
+#| fig-height: 6
+
+if len(a100_jobs) > 0 and 'alloc_vram_efficiency' in a100_jobs.columns:
+    try:
+        # Use consistent figure size with Quarto chunk options
+        fig, ax1 = plt.subplots(figsize=(10, 6))
+        
+        # Histogram of A100 efficiency
+        ax1.hist(a100_jobs['alloc_vram_efficiency'], bins=20, alpha=0.7, color='#FF6B6B', edgecolor='black')
+        ax1.axvline(a100_jobs['alloc_vram_efficiency'].mean(), color='red', linestyle='--', 
+                   label=f'Mean: {a100_jobs["alloc_vram_efficiency"].mean():.3f}')
+        ax1.axvline(a100_jobs['alloc_vram_efficiency'].median(), color='orange', linestyle='--',
+                   label=f'Median: {a100_jobs["alloc_vram_efficiency"].median():.3f}')
+        ax1.set_xlabel('VRAM Efficiency')
+        ax1.set_ylabel('Number of A100 Jobs')
+        ax1.set_title('Distribution of A100 VRAM Efficiency')
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.show()
+        
+    except Exception as e:
+        print(f"Error creating A100 efficiency distribution: {e}")
+        # Simple fallback
+        print(f"A100 jobs summary:")
+        print(f"- Total A100 jobs: {len(a100_jobs)}")
+        if 'alloc_vram_efficiency' in a100_jobs.columns:
+            print(f"- Average efficiency: {a100_jobs['alloc_vram_efficiency'].mean():.3f}")
+            print(f"- Efficiency range: {a100_jobs['alloc_vram_efficiency'].min():.3f} - {a100_jobs['alloc_vram_efficiency'].max():.3f}")
+else:
+    print("A100 efficiency distribution not available - insufficient data.")
+```
+
+<h4>A100 Usage Insights</h4>
+
+```{python}
+#| echo: false
+
+if len(a100_jobs) > 0:
+    # Calculate A100-specific insights
+    try:
+        total_a100_hours = a100_jobs['job_hours'].sum() if 'job_hours' in a100_jobs.columns else 0
+        avg_a100_efficiency = a100_jobs['alloc_vram_efficiency'].mean() if 'alloc_vram_efficiency' in a100_jobs.columns else 0
+        avg_a100_memory = a100_jobs['used_vram_gib'].mean() if 'used_vram_gib' in a100_jobs.columns else 0
+        a100_allocated_memory = a100_jobs['allocated_vram'].mean() if 'allocated_vram' in a100_jobs.columns else 0
+        
+        # Build HTML content dynamically
+        html_content = """
+        <div style="padding: 15px; background-color: #f8f9fa; border-radius: 8px; margin: 10px 0;">
+        <h5 style="color: #495057; margin-bottom: 15px;">💾 A100 Resource Usage</h5>
+        """
+        
+        html_content += f"""
+        <ul style="margin-bottom: 15px;">
+        <li>Total A100 GPU hours consumed: <strong>{total_a100_hours:.1f} hours</strong></li>
+        <li>Average memory utilization: <strong>{avg_a100_memory:.1f} GiB</strong> out of <strong>{a100_allocated_memory:.1f} GiB</strong> allocated</li>
+        <li>Average VRAM efficiency: <strong>{avg_a100_efficiency:.1%}</strong></li>
+        </ul>
+        """
+        
+        # Efficiency assessment with conditional logic
+        if avg_a100_efficiency < 0.2:
+            efficiency_assessment = "<strong>Low</strong> - Consider if A100s are necessary for your workloads"
+            efficiency_color = "🔴"
+            efficiency_bg = "#ffe6e6"
+        elif avg_a100_efficiency < 0.5:
+            efficiency_assessment = "<strong>Moderate</strong> - Room for improvement in memory utilization"
+            efficiency_color = "🟡"
+            efficiency_bg = "#fff3cd"
+        else:
+            efficiency_assessment = "<strong>Good</strong> - Efficient use of A100 resources"
+            efficiency_color = "🟢"
+            efficiency_bg = "#d4edda"
+        
+        html_content += f"""
+        <div style="padding: 10px; background-color: {efficiency_bg}; border-radius: 6px; margin: 10px 0;">
+        <strong>A100 Efficiency Assessment:</strong> {efficiency_color} {efficiency_assessment}
+        </div>
+        """
+        
+        # Cost implications (approximate)
+        if total_a100_hours > 0:
+            other_jobs = user_jobs[~user_jobs.index.isin(a100_jobs.index)] if len(user_jobs) > len(a100_jobs) else pd.DataFrame()
+            if len(other_jobs) > 0:
+                other_hours = other_jobs['job_hours'].sum() if 'job_hours' in other_jobs.columns else 0
+                a100_ratio = total_a100_hours / (total_a100_hours + other_hours) if other_hours > 0 else 1
+                html_content += f"""
+                <h6 style="color: #495057; margin: 15px 0 10px 0;">📊 Resource Distribution</h6>
+                <ul>
+                <li>A100 hours: {total_a100_hours:.1f} ({a100_ratio:.1%} of total GPU hours)</li>
+                <li>Other GPU hours: {other_hours:.1f} ({1-a100_ratio:.1%} of total GPU hours)</li>
+                </ul>
+                """
+        
+        # Recommendations based on usage pattern
+        html_content += """
+        <h6 style="color: #495057; margin: 15px 0 10px 0;">💡 A100-Specific Recommendations</h6>
+        <ul>
+        """
+        
+        if avg_a100_efficiency < 0.3:
+            html_content += """
+            <li>🔧 <strong>Optimize Memory Usage</strong>: Your A100 efficiency is low. Consider using batch size optimization or mixed precision training.</li>
+            <li>🔄 <strong>Consider Alternatives</strong>: For jobs with low memory requirements, regular GPUs might be more cost-effective.</li>
+            """
+        
+        if avg_a100_memory < 20:  # Less than 20GB average usage
+            html_content += """
+            <li>📊 <strong>Memory Underutilization</strong>: You're using less than half of A100's memory capacity. Consider larger models or batch sizes.</li>
+            """
+        
+        if len(a100_jobs) < 5:
+            html_content += """
+            <li>📈 <strong>Limited A100 Experience</strong>: Consider experimenting with larger workloads that can fully utilize A100 capabilities.</li>
+            """
+        else:
+            html_content += """
+            <li>✅ <strong>Regular A100 User</strong>: You're making good use of A100 resources. Continue optimizing for better efficiency.</li>
+            """
+            
+        html_content += """
+        </ul>
+        </div>
+        """
+        
+        # Display the HTML content
+        from IPython.display import display, HTML
+        display(HTML(html_content))
+            
+    except Exception as e:
+        print(f"Error generating A100 insights: {e}")
+        print("A100 insights could not be generated due to data processing issues.")
+else:
+    print("No A100 usage insights available.")
+```
+
+</details>
+
+---
+
+## Summary Table
+
+```{python}
+#| echo: false
+
+# Display the summary statistics table at the bottom
+if len(summary_stats) > 0:
+    from IPython.display import display, HTML
+    
+    # Create a comprehensive summary table
+    table_html = summary_stats.to_html(
+        index=False,
+        escape=False,
+        classes='table table-striped table-hover',
+        table_id='bottom-summary-table',
+        border=0
+    )
+    
+    # Add custom CSS styling
+    styled_table = f"""
+    <style>
+    #bottom-summary-table {{
+        width: 100%;
+        margin: 20px 0;
+        border-collapse: collapse;
+        font-family: Arial, sans-serif;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border-radius: 8px;
+        overflow: hidden;
+    }}
+    #bottom-summary-table th {{
+        background-color: #2E8B57;
+        color: white;
+        font-weight: bold;
+        padding: 12px 15px;
+        text-align: left;
+        border: none;
+    }}
+    #bottom-summary-table td {{
+        padding: 12px 15px;
+        border-bottom: 1px solid #ddd;
+        background-color: #f9f9f9;
+    }}
+    #bottom-summary-table tr:nth-child(even) td {{
+        background-color: #f2f2f2;
+    }}
+    #bottom-summary-table tr:hover td {{
+        background-color: #e8f5e8;
+    }}
+    </style>
+    <h3>📋 Complete Performance Summary</h3>
+    {table_html}
+    """
+    
+    display(HTML(styled_table))
+else:
+    print("📋 **Complete Performance Summary**")
+    print("No summary statistics available.")
+```
+
+---
+
+## All Recommendations
+
+```{python}
+#| echo: false
+#| output: asis
+
+if recommendations and len(recommendations) > 0:
+    print("Based on your complete GPU usage analysis, here are all recommendations to improve efficiency:\n")
+    for i, rec in enumerate(recommendations, 1):
+        print(f"{i}. {rec}\n")
+else:
+    print("No specific recommendations provided. Generally, focus on optimizing GPU memory usage and time allocation for better efficiency.")
+```
+
+---
+
+## Additional Resources
+
+For more information on optimizing your GPU usage, please refer to these resources:
+
+1. [Unity HPC Documentation](https://docs.unity.rc.umass.edu/)
+2. [GPU Programming Best Practices](https://docs.unity.rc.umass.edu/documentation/tools/gpus/)
+3. [Contact Unity on Slack](https://docs.unity.rc.umass.edu/contact/community/)
+
+---
+
+*Report generated on `{python} datetime.now().strftime("%Y-%m-%d %H:%M:%S")`*

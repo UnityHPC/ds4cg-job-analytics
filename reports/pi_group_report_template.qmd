@@ -1,0 +1,654 @@
+---
+title: "Unity GPU Jobs Analytics Report - PI Group"
+format:
+  html:
+    theme: cosmo
+    css: styles.css
+    toc: true
+    toc-depth: 3
+    page-layout: article
+    self-contained: true
+params:
+  pickle_file: null
+---
+
+```{python}
+#| tags: [parameters]
+#| echo: false
+
+pickle_file = None
+```
+
+```{python}
+#| echo: false
+#| output: asis
+
+# Import required libraries
+import pandas as pd
+import numpy as np
+import pickle
+from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
+import seaborn as sns
+from pathlib import Path
+import sys
+
+# Add the project root to Python path so we can import from src
+project_root = Path.cwd().parent  # Go up from reports directory to project root
+sys.path.insert(0, str(project_root))
+
+# Set up plotting style
+plt.style.use('default')
+sns.set_palette("husl")
+
+# Load data from pickle file
+with open(pickle_file, "rb") as f:
+    data = pickle.load(f)
+
+# Extract data
+pi_account = data["pi_account"]
+pi_metrics = data["pi_metrics"]
+pi_users = data["pi_users"]
+worst_users = data["worst_users"]
+comparison_stats = data["comparison_stats"]
+size_stats = data["size_stats"]
+analysis_period = data["analysis_period"]
+summary_stats = data["summary_stats"]
+recommendations = data["recommendations"]
+
+print(f"Report generated for PI Group: **{pi_account}**")
+print()
+print(f"Analysis period: **{analysis_period}**")
+print()
+print(f"Total users in group: {len(pi_users)}")
+print(f"Total jobs analyzed: {pi_metrics.iloc[0]['job_count'] if len(pi_metrics) > 0 else 'N/A'}")
+```
+
+```{python}
+#| echo: false
+#| output: asis
+
+# Set the document title dynamically
+from IPython.display import display, HTML
+title_html = f"""
+<script>
+document.title = 'Unity GPU Jobs Analytics Report - PI Group {pi_account}';
+</script>
+"""
+display(HTML(title_html))
+```
+
+---
+
+## PI Group Performance Overview
+
+```{python}
+#| echo: false
+#| output: asis
+
+if len(pi_metrics) > 0:
+    metrics = pi_metrics.iloc[0]
+
+    # Calculate efficiency category
+    from src.config.enum_constants import EfficiencyCategoryEnum
+    efficiency = metrics['expected_value_alloc_vram_efficiency']
+    efficiency_category = EfficiencyCategoryEnum.get_efficiency_category(efficiency)
+
+    print(f"Your PI group's overall efficiency lies in the **{efficiency_category}** category.")
+    print(f"The group uses **{efficiency:.1%}** of allocated GPU memory on average.")
+    print()
+
+    # Group size assessment
+    if metrics['user_count'] <= 3:
+        size_assessment = "small"
+    elif metrics['user_count'] <= 10:
+        size_assessment = "medium-sized"
+    else:
+        size_assessment = "large"
+
+    print(f"This is a **{size_assessment}** research group with **{metrics['user_count']}** active GPU users.")
+    print(f"The group has consumed **{metrics['pi_acc_vram_hours']:.1f} VRAM-hours** and **{metrics['pi_acc_job_hours']:.1f} GPU-hours** in total.")
+
+    # Performance insights
+    if efficiency < 0.2:
+        performance_msg = "⚠️ **Significant optimization needed** - Your group's efficiency is well below average."
+    elif efficiency < 0.3:
+        performance_msg = "🟡 **Room for improvement** - Consider optimizing memory usage patterns."
+    elif efficiency < 0.5:
+        performance_msg = "📊 **Moderate performance** - Above critical thresholds but could be optimized."
+    else:
+        performance_msg = "🟢 **Good performance** - Your group is using GPU resources efficiently."
+
+    print()
+    print(performance_msg)
+else:
+    print("PI group metrics not available.")
+```
+
+---
+
+## Key Statistics Summary
+
+```{python}
+#| echo: false
+
+# Display the comprehensive summary table
+if len(summary_stats) > 0:
+    from IPython.display import display, HTML
+
+    # Create a styled summary table
+    table_html = summary_stats.to_html(
+        index=False,
+        escape=False,
+        classes='table table-striped table-hover',
+        table_id='pi-summary-table',
+        border=0
+    )
+
+    # Add custom CSS styling
+    styled_table = f"""
+    <style>
+    #pi-summary-table {{
+        width: 100%;
+        margin: 20px 0;
+        border-collapse: collapse;
+        font-family: Arial, sans-serif;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border-radius: 8px;
+        overflow: hidden;
+    }}
+    #pi-summary-table th {{
+        background-color: #1976D2;
+        color: white;
+        font-weight: bold;
+        padding: 12px 15px;
+        text-align: left;
+        border: none;
+    }}
+    #pi-summary-table td {{
+        padding: 12px 15px;
+        border-bottom: 1px solid #ddd;
+        background-color: #f9f9f9;
+    }}
+    #pi-summary-table tr:nth-child(even) td {{
+        background-color: #f2f2f2;
+    }}
+    #pi-summary-table tr:hover td {{
+        background-color: #e3f2fd;
+    }}
+    </style>
+    {table_html}
+    """
+
+    display(HTML(styled_table))
+else:
+    print("📋 **PI Group Summary Statistics**")
+    print("No summary statistics available.")
+```
+
+---
+
+## Group Size and Resource Usage Analysis
+
+```{python}
+#| echo: false
+#| output: asis
+
+if size_stats:
+    print("### How does your PI group compare in size?")
+    print()
+
+    # User count comparison
+    user_percentile = size_stats.get('user_count_percentile', 0)
+    if user_percentile >= 90:
+        user_size_msg = "🏆 **Top 10%** - One of the largest research groups"
+    elif user_percentile >= 75:
+        user_size_msg = "📈 **Top 25%** - Larger than most groups"
+    elif user_percentile >= 50:
+        user_size_msg = "📊 **Above median** - Medium-large sized group"
+    elif user_percentile >= 25:
+        user_size_msg = "📉 **Below median** - Smaller group"
+    else:
+        user_size_msg = "🔍 **Bottom 25%** - Small research group"
+
+    print(f"**Group Size**: {size_stats['user_count']} users ({user_percentile:.1f}th percentile)")
+    print(f"**Assessment**: {user_size_msg}")
+    print()
+
+    # Resource usage comparison
+    vram_percentile = size_stats.get('vram_hours_percentile', 0)
+    if vram_percentile >= 90:
+        resource_msg = "🔥 **Heaviest users** - Top 10% resource consumption"
+    elif vram_percentile >= 75:
+        resource_msg = "⚡ **Heavy users** - Top 25% resource consumption"
+    elif vram_percentile >= 50:
+        resource_msg = "📊 **Moderate usage** - Above average resource consumption"
+    else:
+        resource_msg = "💡 **Light usage** - Below average resource consumption"
+
+    print(f"**Resource Usage**: {size_stats['vram_hours']:.1f} VRAM-hours ({vram_percentile:.1f}th percentile)")
+    print(f"**Assessment**: {resource_msg}")
+    print()
+
+    # Jobs comparison
+    job_percentile = size_stats.get('job_count_percentile', 0)
+    print(f"**Job Activity**: {size_stats['job_count']} jobs ({job_percentile:.1f}th percentile)")
+```
+
+---
+
+## Performance Comparison with Other PI Groups
+
+```{python}
+#| echo: false
+#| fig-cap: "PI Group Performance vs System Average"
+#| fig-width: 14
+#| fig-height: 8
+
+if len(comparison_stats) > 0:
+    # Split metrics into two plots for better readability
+
+    # Efficiency and Score Metrics
+    efficiency_metrics = comparison_stats[
+        comparison_stats['Category'].str.contains('Efficiency|Score', case=False, na=False)
+    ]
+
+    # Resource and Count Metrics
+    resource_metrics = comparison_stats[
+        ~comparison_stats['Category'].str.contains('Efficiency|Score', case=False, na=False)
+    ]
+
+    if len(efficiency_metrics) > 0 and len(resource_metrics) > 0:
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+
+        # Plot 1: Efficiency Metrics
+        categories1 = efficiency_metrics['Category']
+        your_values1 = efficiency_metrics['Your_Value']
+        avg_values1 = efficiency_metrics['Average_Value']
+
+        x1 = np.arange(len(categories1))
+        width = 0.35
+
+        bars1 = ax1.bar(x1 - width/2, your_values1, width, label='Your PI Group',
+                       color='#1976D2', alpha=0.8)
+        bars2 = ax1.bar(x1 + width/2, avg_values1, width, label='System Average',
+                       color='#FFA726', alpha=0.8)
+
+        ax1.set_xlabel('Efficiency Metrics')
+        ax1.set_ylabel('Value')
+        ax1.set_title('Efficiency Performance Comparison')
+        ax1.set_xticks(x1)
+        ax1.set_xticklabels([cat.replace(' (%)', '') for cat in categories1], rotation=45, ha='right')
+        ax1.legend()
+        ax1.grid(True, alpha=0.3, axis='y')
+
+        # Add value labels
+        for bar, value in zip(bars1, your_values1):
+            height = bar.get_height()
+            if 'Efficiency' in categories1.iloc[list(bars1).index(bar)]:
+                label = f'{value:.1f}%'
+            else:
+                label = f'{value:.2f}'
+            ax1.text(bar.get_x() + bar.get_width()/2., height + max(your_values1) * 0.01,
+                   label, ha='center', va='bottom', fontsize=9, fontweight='bold')
+
+        for bar, value in zip(bars2, avg_values1):
+            height = bar.get_height()
+            if 'Efficiency' in categories1.iloc[list(bars2).index(bar)]:
+                label = f'{value:.1f}%'
+            else:
+                label = f'{value:.2f}'
+            ax1.text(bar.get_x() + bar.get_width()/2., height + max(avg_values1) * 0.01,
+                   label, ha='center', va='bottom', fontsize=9, fontweight='bold')
+
+        # Plot 2: Resource Metrics
+        categories2 = resource_metrics['Category']
+        your_values2 = resource_metrics['Your_Value']
+        avg_values2 = resource_metrics['Average_Value']
+
+        x2 = np.arange(len(categories2))
+
+        bars3 = ax2.bar(x2 - width/2, your_values2, width, label='Your PI Group',
+                       color='#1976D2', alpha=0.8)
+        bars4 = ax2.bar(x2 + width/2, avg_values2, width, label='System Average',
+                       color='#FFA726', alpha=0.8)
+
+        ax2.set_xlabel('Resource Metrics')
+        ax2.set_ylabel('Value')
+        ax2.set_title('Resource Usage Comparison')
+        ax2.set_xticks(x2)
+        ax2.set_xticklabels(categories2, rotation=45, ha='right')
+        ax2.legend()
+        ax2.grid(True, alpha=0.3, axis='y')
+
+        # Add value labels for resource metrics
+        for bar, value in zip(bars3, your_values2):
+            height = bar.get_height()
+            if value >= 1000:
+                label = f'{value:.0f}'
+            else:
+                label = f'{value:.1f}'
+            ax2.text(bar.get_x() + bar.get_width()/2., height + max(your_values2) * 0.01,
+                   label, ha='center', va='bottom', fontsize=9, fontweight='bold')
+
+        for bar, value in zip(bars4, avg_values2):
+            height = bar.get_height()
+            if value >= 1000:
+                label = f'{value:.0f}'
+            else:
+                label = f'{value:.1f}'
+            ax2.text(bar.get_x() + bar.get_width()/2., height + max(avg_values2) * 0.01,
+                   label, ha='center', va='bottom', fontsize=9, fontweight='bold')
+
+        plt.tight_layout()
+        plt.show()
+
+    else:
+        # Fallback single plot if categorization doesn't work
+        fig, ax = plt.subplots(figsize=(12, 6))
+
+        categories = comparison_stats['Category']
+        your_values = comparison_stats['Your_Value']
+        avg_values = comparison_stats['Average_Value']
+
+        x = np.arange(len(categories))
+        width = 0.35
+
+        bars1 = ax.bar(x - width/2, your_values, width, label='Your PI Group',
+                      color='#1976D2', alpha=0.8)
+        bars2 = ax.bar(x + width/2, avg_values, width, label='System Average',
+                      color='#FFA726', alpha=0.8)
+
+        ax.set_xlabel('Metrics')
+        ax.set_ylabel('Value')
+        ax.set_title('PI Group Performance Comparison')
+        ax.set_xticks(x)
+        ax.set_xticklabels(categories, rotation=45, ha='right')
+        ax.legend()
+        ax.grid(True, alpha=0.3, axis='y')
+
+        plt.tight_layout()
+        plt.show()
+
+else:
+    print("No comparison data available.")
+```
+
+---
+
+## Worst Performing Users in Your Group
+
+<div style="margin: 20px 0; padding: 15px; background-color: #fff3cd; border-radius: 6px; border-left: 4px solid #ffc107;">
+<h5 style="color: #856404; margin-bottom: 8px;">🎯 Focus Areas for Improvement</h5>
+<p>The following analysis identifies users in your PI group who might benefit from additional GPU optimization guidance. These users show lower efficiency patterns that could be improved with targeted recommendations.</p>
+</div>
+
+```{python}
+#| echo: false
+#| fig-cap: "Worst Performing Users - Efficiency and Resource Usage"
+#| fig-width: 14
+#| fig-height: 8
+
+if len(worst_users) > 0:
+    # Create a comprehensive view of worst users
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(14, 10))
+
+    # Prepare data
+    users = worst_users['User']
+    efficiencies = worst_users['expected_value_alloc_vram_efficiency'] * 100  # Convert to percentage
+    vram_hours = worst_users['vram_hours']
+    job_counts = worst_users['job_count']
+    job_hours = worst_users['user_job_hours']
+
+    # Colors for consistency
+    colors = plt.cm.Set3(np.linspace(0, 1, len(users)))
+
+    # Plot 1: VRAM Efficiency
+    bars1 = ax1.bar(range(len(users)), efficiencies, color=colors, alpha=0.8)
+    ax1.set_title('VRAM Efficiency by User', fontweight='bold')
+    ax1.set_ylabel('VRAM Efficiency (%)')
+    ax1.set_xticks(range(len(users)))
+    ax1.set_xticklabels(users, rotation=45, ha='right')
+    ax1.grid(True, alpha=0.3, axis='y')
+
+    # Add efficiency threshold line
+    ax1.axhline(y=30, color='red', linestyle='--', alpha=0.7, label='Good Efficiency Threshold (30%)')
+    ax1.legend()
+
+    # Add value labels
+    for i, (bar, eff) in enumerate(zip(bars1, efficiencies)):
+        ax1.text(bar.get_x() + bar.get_width()/2., bar.get_height() + 1,
+               f'{eff:.1f}%', ha='center', va='bottom', fontweight='bold')
+
+    # Plot 2: VRAM Hours
+    bars2 = ax2.bar(range(len(users)), vram_hours, color=colors, alpha=0.8)
+    ax2.set_title('Total VRAM Hours by User', fontweight='bold')
+    ax2.set_ylabel('VRAM Hours')
+    ax2.set_xticks(range(len(users)))
+    ax2.set_xticklabels(users, rotation=45, ha='right')
+    ax2.grid(True, alpha=0.3, axis='y')
+
+    # Add value labels
+    for i, (bar, hours) in enumerate(zip(bars2, vram_hours)):
+        ax2.text(bar.get_x() + bar.get_width()/2., bar.get_height() + max(vram_hours) * 0.01,
+               f'{hours:.0f}', ha='center', va='bottom', fontweight='bold')
+
+    # Plot 3: Job Count
+    bars3 = ax3.bar(range(len(users)), job_counts, color=colors, alpha=0.8)
+    ax3.set_title('Number of Jobs by User', fontweight='bold')
+    ax3.set_ylabel('Job Count')
+    ax3.set_xticks(range(len(users)))
+    ax3.set_xticklabels(users, rotation=45, ha='right')
+    ax3.grid(True, alpha=0.3, axis='y')
+
+    # Add value labels
+    for i, (bar, count) in enumerate(zip(bars3, job_counts)):
+        ax3.text(bar.get_x() + bar.get_width()/2., bar.get_height() + max(job_counts) * 0.01,
+               f'{count}', ha='center', va='bottom', fontweight='bold')
+
+    # Plot 4: GPU Hours
+    bars4 = ax4.bar(range(len(users)), job_hours, color=colors, alpha=0.8)
+    ax4.set_title('Total GPU Hours by User', fontweight='bold')
+    ax4.set_ylabel('GPU Hours')
+    ax4.set_xticks(range(len(users)))
+    ax4.set_xticklabels(users, rotation=45, ha='right')
+    ax4.grid(True, alpha=0.3, axis='y')
+
+    # Add value labels
+    for i, (bar, hours) in enumerate(zip(bars4, job_hours)):
+        ax4.text(bar.get_x() + bar.get_width()/2., bar.get_height() + max(job_hours) * 0.01,
+               f'{hours:.0f}', ha='center', va='bottom', fontweight='bold')
+
+    plt.tight_layout()
+    plt.show()
+
+    # Summary of worst users
+    print("### Users Needing Attention")
+    print()
+    for i, (_, user) in enumerate(worst_users.iterrows()):
+        efficiency = user['expected_value_alloc_vram_efficiency'] * 100
+        print(f"**{user['User']}**: {efficiency:.1f}% efficiency, {user['vram_hours']:.0f} VRAM-hours, {user['job_count']} jobs")
+
+else:
+    print("No user performance data available for analysis.")
+```
+
+---
+
+## Group User Distribution Analysis
+
+```{python}
+#| echo: false
+#| fig-cap: "User Performance Distribution in PI Group"
+#| fig-width: 12
+#| fig-height: 6
+
+if len(pi_users) > 0:
+    # Analyze user distribution within the PI group
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+
+    # Plot 1: Efficiency Distribution
+    efficiencies = pi_users['expected_value_alloc_vram_efficiency'] * 100
+    ax1.hist(efficiencies, bins=min(10, len(pi_users)), alpha=0.7, color='#1976D2', edgecolor='black')
+    ax1.axvline(efficiencies.mean(), color='red', linestyle='--',
+               label=f'Group Mean: {efficiencies.mean():.1f}%')
+    ax1.axvline(efficiencies.median(), color='orange', linestyle='--',
+               label=f'Group Median: {efficiencies.median():.1f}%')
+    ax1.axvline(30, color='green', linestyle='--', alpha=0.7,
+               label='Good Efficiency (30%)')
+    ax1.set_xlabel('VRAM Efficiency (%)')
+    ax1.set_ylabel('Number of Users')
+    ax1.set_title('Efficiency Distribution in PI Group')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+
+    # Plot 2: VRAM Hours vs Efficiency Scatter
+    ax2.scatter(pi_users['vram_hours'], efficiencies, alpha=0.7,
+               s=pi_users['job_count']*2, c=range(len(pi_users)), cmap='viridis')
+    ax2.set_xlabel('VRAM Hours')
+    ax2.set_ylabel('VRAM Efficiency (%)')
+    ax2.set_title('Efficiency vs Resource Usage\n(Bubble size = Job count)')
+    ax2.grid(True, alpha=0.3)
+
+    # Add efficiency threshold line
+    ax2.axhline(y=30, color='red', linestyle='--', alpha=0.7, label='Good Efficiency Threshold')
+    ax2.legend()
+
+    plt.tight_layout()
+    plt.show()
+
+    # User statistics
+    print("### Group User Statistics")
+    print()
+    high_eff_users = sum(efficiencies >= 30)
+    med_eff_users = sum((efficiencies >= 15) & (efficiencies < 30))
+    low_eff_users = sum(efficiencies < 15)
+
+    print(f"**High efficiency users** (≥30%): {high_eff_users} ({high_eff_users/len(pi_users)*100:.1f}%)")
+    print(f"**Medium efficiency users** (15-30%): {med_eff_users} ({med_eff_users/len(pi_users)*100:.1f}%)")
+    print(f"**Low efficiency users** (<15%): {low_eff_users} ({low_eff_users/len(pi_users)*100:.1f}%)")
+
+else:
+    print("No user data available for distribution analysis.")
+```
+
+---
+
+## Recommendations for PI Group
+
+```{python}
+#| echo: false
+#| output: asis
+
+if recommendations and len(recommendations) > 0:
+    print("### 🎯 Targeted Recommendations for Your PI Group")
+    print()
+    for i, rec in enumerate(recommendations, 1):
+        print(f"{i}. {rec}")
+        print()
+else:
+    # Generate default recommendations based on available data
+    print("### 💡 General Recommendations for PI Groups")
+    print()
+
+    if len(pi_metrics) > 0:
+        metrics = pi_metrics.iloc[0]
+        efficiency = metrics['expected_value_alloc_vram_efficiency']
+
+        if efficiency < 0.2:
+            print("1. **Critical Efficiency Issue**: Your group's efficiency is very low. Consider organizing GPU optimization workshops for your users.")
+            print()
+            print("2. **Resource Planning**: Review whether all jobs actually need GPUs, and consider CPU-only alternatives for some workloads.")
+            print()
+        elif efficiency < 0.3:
+            print("1. **Efficiency Improvement**: Focus on optimizing memory usage patterns across your group members.")
+            print()
+            print("2. **Best Practices Sharing**: Identify your most efficient users and have them share their optimization strategies.")
+            print()
+
+        if len(worst_users) > 0:
+            print(f"3. **Targeted Training**: Focus on helping {len(worst_users)} users who show the lowest efficiency patterns.")
+            print()
+
+        if metrics['user_count'] > 10:
+            print("4. **Group Coordination**: Consider implementing group-wide GPU usage guidelines due to your large group size.")
+            print()
+
+    print("5. **Regular Monitoring**: Set up periodic reviews of GPU usage patterns to maintain efficiency improvements.")
+    print()
+    print("6. **Resource Optimization**: Encourage batch size optimization and mixed precision training where applicable.")
+```
+
+---
+
+## Additional Resources
+
+For more information on optimizing your PI group's GPU usage:
+
+1. [Unity HPC Documentation](https://docs.unity.rc.umass.edu/)
+2. [GPU Programming Best Practices](https://docs.unity.rc.umass.edu/documentation/tools/gpus/)
+3. [Contact Unity on Slack](https://docs.unity.rc.umass.edu/contact/community/)
+4. **PI Group Training**: Contact Unity staff to arrange group training sessions on GPU optimization
+
+---
+
+## Detailed Performance Metrics
+
+```{python}
+#| echo: false
+
+# Display detailed comparison table
+if len(comparison_stats) > 0:
+    from IPython.display import display, HTML
+
+    # Create a comprehensive comparison table
+    table_html = comparison_stats.to_html(
+        index=False,
+        escape=False,
+        classes='table table-striped table-hover',
+        table_id='detailed-comparison-table',
+        border=0
+    )
+
+    # Add custom CSS styling
+    styled_table = f"""
+    <style>
+    #detailed-comparison-table {{
+        width: 100%;
+        margin: 20px 0;
+        border-collapse: collapse;
+        font-family: Arial, sans-serif;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border-radius: 8px;
+        overflow: hidden;
+    }}
+    #detailed-comparison-table th {{
+        background-color: #424242;
+        color: white;
+        font-weight: bold;
+        padding: 12px 15px;
+        text-align: left;
+        border: none;
+    }}
+    #detailed-comparison-table td {{
+        padding: 12px 15px;
+        border-bottom: 1px solid #ddd;
+        background-color: #f9f9f9;
+    }}
+    #detailed-comparison-table tr:nth-child(even) td {{
+        background-color: #f2f2f2;
+    }}
+    #detailed-comparison-table tr:hover td {{
+        background-color: #f5f5f5;
+    }}
+    </style>
+    <h3>📊 Detailed Performance Comparison</h3>
+    {table_html}
+    """
+
+    display(HTML(styled_table))
+```
+
+---
+
+*Report generated on `{python} datetime.now().strftime("%Y-%m-%d %H:%M:%S")` for PI Group: {pi_account}*

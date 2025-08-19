@@ -4,7 +4,10 @@ Tools to analyze efficiency of Jobs based on their VRAM usage.
 The aim is to identify potential inefficiencies in GPU usage and notify users or PIs about these issues.
 """
 
-from pathlib import Path
+import os
+import pickle
+import shutil
+import subprocess
 from typing import cast
 
 import numpy as np
@@ -12,45 +15,13 @@ import pandas as pd
 
 from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
 from src.config.enum_constants import FilterTypeEnum, MetricsDataFrameNameEnum
-from src.database import DatabaseConnection
-from src.preprocess.preprocess import preprocess_data
-
-
-def load_preprocessed_jobs_dataframe_from_duckdb(
-    db_path: str | Path,
-    table_name: str = "Jobs",
-    sample_size: int | None = None,
-    random_state: pd._typing.RandomState | None = None,
-) -> pd.DataFrame:
-    """
-    Load jobs DataFrame from a DuckDB database and preprocess it.
-
-    Args:
-        db_path (str or Path): Path to the DuckDB database.
-        table_name (str, optional): Table name to query. Defaults to 'Jobs'.
-        sample_size (int, optional): Number of rows to sample from the DataFrame. Defaults to None (no sampling).
-        random_state (pd._typing.RandomState, optional): Random state for reproducibility. Defaults to None.
-
-    Returns:
-        pd.DataFrame: DataFrame containing the table data.
-
-    Raises:
-        RuntimeError: If the jobs DataFrame cannot be loaded from the database.
-    """
-    if isinstance(db_path, Path):
-        db_path = db_path.resolve()
-    try:
-        db = DatabaseConnection(str(db_path))
-
-        jobs_df = db.fetch_all_jobs(table_name=table_name)
-        processed_data = preprocess_data(
-            jobs_df, min_elapsed_seconds=0, include_failed_cancelled_jobs=False, include_cpu_only_jobs=False
-        )
-        if sample_size is not None:
-            processed_data = processed_data.sample(n=sample_size, random_state=random_state)
-        return processed_data
-    except Exception as e:
-        raise RuntimeError(f"Failed to load jobs DataFrame: {e}") from e
+from src.utilities.report_generation import (
+    calculate_time_series_data,
+    calculate_gpu_type_data, 
+    calculate_summary_statistics,
+    calculate_comparison_statistics,
+    generate_recommendations,
+)
 
 
 class EfficiencyAnalysis:
@@ -171,6 +142,7 @@ class EfficiencyAnalysis:
         self,
         vram_constraint_filter: int | float | list | set | tuple | dict | pd.api.typing.NAType | None = None,
         gpu_mem_usage_filter: int | float | dict | None = None,
+        requested_vram_filter: int | float | list | set | tuple | dict | pd.api.typing.NAType | None = None,
         allocated_vram_filter: int | float | list | set | tuple | dict | None = None,
         gpu_count_filter: int | float | list | set | tuple | dict | None = None,
         elapsed_seconds_min: int | float = DEFAULT_MIN_ELAPSED_SECONDS,
@@ -188,6 +160,11 @@ class EfficiencyAnalysis:
             gpu_mem_usage_filter: the unit is bytes to match the GPUMemUsage column
                 - None: no filtering on GPUMemUsage
                 - int | float : select rows where GPUMemUsage == value
+                - dict with 'min'/'max' and required 'inclusive' (bool): select rows in the range
+            requested_vram_filter:
+                - None: no filtering on requested_vram
+                - int | float : select rows where requested_vram == value
+                - list/set/tuple: select rows where requested_vram is in the values provided
                 - dict with 'min'/'max' and required 'inclusive' (bool): select rows in the range
             allocated_vram_filter:
                 - None: no filtering on allocated_vram
@@ -209,7 +186,17 @@ class EfficiencyAnalysis:
         """
 
         mask = pd.Series([True] * len(self.jobs_df), index=self.jobs_df.index)
-
+        # requested_vram
+        if requested_vram_filter is not None:
+            try:
+                mask &= EfficiencyAnalysis.apply_numeric_filter(
+                    self.jobs_df["requested_vram"],
+                    requested_vram_filter,
+                    set(FilterTypeEnum.__members__.values()),
+                    "requested_vram_filter",
+                )
+            except ValueError as e:
+                raise ValueError("Invalid requested_vram_filter.") from e
         # vram_constraint
         if vram_constraint_filter is not None:
             try:
@@ -250,7 +237,7 @@ class EfficiencyAnalysis:
         if gpu_count_filter is not None:
             try:
                 mask &= EfficiencyAnalysis.apply_numeric_filter(
-                    self.jobs_df["GPUs"],
+                    self.jobs_df["gpu_count"],
                     gpu_count_filter,
                     set(FilterTypeEnum.__members__.values()).difference({FilterTypeEnum.PD_NA}),
                     "gpu_count_filter",
@@ -298,6 +285,10 @@ class EfficiencyAnalysis:
         filtered_jobs.loc[:, "vram_constraint_efficiency"] = (
             filtered_jobs["used_vram_gib"] / filtered_jobs["vram_constraint"]
         )
+        # Compute requested_vram_efficiency, a nullable float in the range [0, 1]. Set to NA if requested_vram is NA
+        filtered_jobs.loc[:, "requested_vram_efficiency"] = (
+            filtered_jobs["used_vram_gib"] / filtered_jobs["requested_vram"]
+        )
 
         # Calculate job allocated VRAM efficiency score
         # This is a log-transformed score that penalizes low efficiency and longer vram_hours
@@ -307,6 +298,15 @@ class EfficiencyAnalysis:
         ).where(alloc_vram_eff > 0, -np.inf)
 
         # Calculate vram_constraint_efficiency score
+        requested_vram_eff = filtered_jobs["requested_vram_efficiency"]
+        score = pd.Series(pd.NA, index=filtered_jobs.index, dtype=pd.Float64Dtype())
+        mask_valid = requested_vram_eff.notna() & (requested_vram_eff > 0)
+        mask_zero = requested_vram_eff.notna() & (requested_vram_eff == 0)
+        score[mask_valid] = np.log(requested_vram_eff[mask_valid]) * filtered_jobs.loc[mask_valid, "vram_hours"]
+        score[mask_zero] = -np.inf
+        filtered_jobs.loc[:, "requested_vram_efficiency_score"] = score
+
+        # Avoid log(0) and propagate pd.NA: if NA, score is NA; if 0, score is -np.inf
         vram_constraint_eff = filtered_jobs["vram_constraint_efficiency"]
         # Avoid log(0) and propagate pd.NA: if NA, score is NA; if 0, score is -np.inf
         score = pd.Series(pd.NA, index=filtered_jobs.index, dtype=pd.Float64Dtype())
@@ -355,7 +355,8 @@ class EfficiencyAnalysis:
                 x (pd.Series): Series to calculate the average from.
 
             Returns:
-                float: Average of the Series, ignoring -np.inf values. Returns pd.NA if no valid values.
+                float | pd.api.typing.NAType: Average of the Series, ignoring -np.inf values. 
+                    Returns pd.NA if no valid values.
             """
             valid = x[x != -np.inf]
             return valid.mean() if not valid.empty else pd.NA
@@ -368,6 +369,10 @@ class EfficiencyAnalysis:
                 pi_account=("Account", "first"),
                 avg_alloc_vram_efficiency_score=("alloc_vram_efficiency_score", avg_non_inf),
                 avg_vram_constraint_efficiency_score=("vram_constraint_efficiency_score", avg_non_inf),
+                avg_requested_vram_efficiency_score=(
+                    "requested_vram_efficiency_score",
+                    avg_non_inf,
+                ),
             )
             .reset_index()
         )
@@ -396,6 +401,18 @@ class EfficiencyAnalysis:
             .to_numpy()
         )
 
+        self.jobs_with_efficiency_metrics.loc[:, "weighted_requested_vram_efficiency"] = (
+            self.jobs_with_efficiency_metrics["requested_vram_efficiency"]
+            * self.jobs_with_efficiency_metrics["vram_hours"]
+            / user_vram_hours_per_job
+        ).astype(pd.Float64Dtype())
+
+        users_w_efficiency_metrics.loc[:, "expected_value_requested_vram_efficiency"] = (
+            self.jobs_with_efficiency_metrics.groupby("User", observed=True)["weighted_requested_vram_efficiency"]
+            .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
+            .to_numpy()
+        )
+
         self.jobs_with_efficiency_metrics.loc[:, "weighted_gpu_count"] = (
             self.jobs_with_efficiency_metrics["gpu_count"]
             * self.jobs_with_efficiency_metrics["vram_hours"]
@@ -417,7 +434,7 @@ class EfficiencyAnalysis:
         )
 
         self.jobs_with_efficiency_metrics = self.jobs_with_efficiency_metrics.drop(
-            columns=["weighted_alloc_vram_efficiency", "weighted_vram_constraint_efficiency", "weighted_gpu_count"]
+            columns=["weighted_alloc_vram_efficiency", "weighted_requested_vram_efficiency", "weighted_gpu_count"]
         )
 
         self.users_with_efficiency_metrics = users_w_efficiency_metrics
@@ -573,6 +590,7 @@ class EfficiencyAnalysis:
                 pi_acc_vram_hours=("vram_hours", "sum"),
                 avg_alloc_vram_efficiency_score=("avg_alloc_vram_efficiency_score", "mean"),
                 avg_vram_constraint_efficiency_score=("avg_vram_constraint_efficiency_score", "mean"),
+                avg_requested_vram_efficiency_score=("avg_requested_vram_efficiency_score", "mean"),
             )
             .reset_index()
         )
@@ -591,6 +609,20 @@ class EfficiencyAnalysis:
         pi_efficiency_metrics.loc[:, "expected_value_alloc_vram_efficiency"] = (
             self.users_with_efficiency_metrics.groupby("pi_account", observed=True)[
                 "weighted_ev_alloc_vram_efficiency"
+            ]
+            .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
+            .to_numpy()
+        )
+
+        self.users_with_efficiency_metrics.loc[:, "weighted_ev_requested_vram_efficiency"] = (
+            self.users_with_efficiency_metrics["expected_value_requested_vram_efficiency"]
+            * self.users_with_efficiency_metrics["vram_hours"]
+            / pi_acc_vram_hours
+        )
+
+        pi_efficiency_metrics.loc[:, "expected_value_requested_vram_efficiency"] = (
+            self.users_with_efficiency_metrics.groupby("pi_account", observed=True)[
+                "weighted_ev_requested_vram_efficiency"
             ]
             .apply(lambda series: series.sum() if not series.isna().all() else pd.NA)
             .to_numpy()
@@ -625,6 +657,8 @@ class EfficiencyAnalysis:
             columns=[
                 "weighted_ev_alloc_vram_efficiency",
                 "weighted_ev_vram_constraint_efficiency",
+                "weighted_ev_requested_vram_efficiency",
+
                 "weighted_ev_gpu_count",
             ]
         )
@@ -752,3 +786,300 @@ class EfficiencyAnalysis:
         filtered_records = filtered_records.sort_values(sorting_key, ascending=ascending)
 
         return filtered_records
+    
+    def find_inefficient_users_by_requested_vram_efficiency(
+        self, requested_vram_efficiency_filter: int | float | dict | None, min_jobs: int = 5
+    ) -> pd.DataFrame:
+        """
+        Identify users with low expected requested VRAM efficiency across their jobs compared to others.
+
+        Args:
+            requested_vram_efficiency_filter:
+                - int | float : select rows where expected_value_requested_vram_efficiency == value
+                - dict with 'min'/'max' and required 'inclusive' (bool): select rows in the range
+            min_jobs (int): Minimum number of jobs a user must have to be included in the analysis
+
+        Returns:
+            pd.DataFrame: DataFrame with users and their average requested VRAM efficiency
+
+        Raises:
+            ValueError: If the filter for expected_value_requested_vram_efficiency is invalid.
+        """
+        if self.users_with_efficiency_metrics is None:
+            self.calculate_user_efficiency_metrics()
+            print(
+                "Users DataFrame with efficiency metrics was not available. "
+                "Calculated it using the DataFrame of jobs with efficiency metrics."
+            )
+
+        mask = pd.Series(
+            [True] * len(self.users_with_efficiency_metrics), index=self.users_with_efficiency_metrics.index
+        )
+
+        if requested_vram_efficiency_filter is not None:
+            try:
+                mask &= EfficiencyAnalysis.apply_numeric_filter(
+                    self.users_with_efficiency_metrics["expected_value_requested_vram_efficiency"],
+                    requested_vram_efficiency_filter,
+                    {FilterTypeEnum.NUMERIC_SCALAR, FilterTypeEnum.DICTIONARY},
+                    filter_name="requested_vram_efficiency_filter",
+                )
+            except ValueError as e:
+                raise ValueError("Invalid filter for expected_value_requested_vram_efficiency.") from e
+
+        col = self.users_with_efficiency_metrics["job_count"]
+        mask &= col.ge(min_jobs)
+
+        inefficient_users = self.users_with_efficiency_metrics[mask]
+
+        # Sort by the metric ascending (lower is worse)
+        inefficient_users = inefficient_users.sort_values("expected_value_requested_vram_efficiency", ascending=True)
+        return inefficient_users
+
+    def generate_user_report(
+        self,
+        user_id: str,
+        output_dir: str = "./reports/user_reports",
+        template_path: str = "./reports/ppt_user_report_template.qmd",
+        output_format: str = "html"
+    ) -> str | None:
+        """
+        Generate a comprehensive report for a specific user using pre-calculated efficiency metrics.
+        
+        This method leverages the existing efficiency metrics calculated by this class to generate
+        a detailed user report without recalculating everything from scratch.
+        
+        Args:
+            user_id: User ID to generate report for
+            output_dir: Directory to save the report (default: "./reports/user_reports")
+            template_path: Path to the Quarto template file (default: "./reports/ppt_user_report_template.qmd")
+            output_format: Output format ('html' or 'pdf', default: 'html')
+        
+        Returns:
+            Path to the generated report file, or None if generation failed
+            
+        Raises:
+            ValueError: If required efficiency metrics have not been calculated yet
+            FileNotFoundError: If the template file doesn't exist
+        """
+        # Check if required metrics have been calculated
+        if self.jobs_with_efficiency_metrics is None:
+            raise ValueError(
+                "Job efficiency metrics have not been calculated yet. "
+                "Please run calculate_job_efficiency_metrics() first."
+            )
+        
+        if self.users_with_efficiency_metrics is None:
+            raise ValueError(
+                "User efficiency metrics have not been calculated yet. "
+                "Please run calculate_user_efficiency_metrics() first."
+            )
+        
+        # Check if template exists
+        if not os.path.exists(template_path):
+            raise FileNotFoundError(f"Template file not found: {template_path}")
+                
+        # Filter jobs for this specific user
+        user_jobs = self.jobs_with_efficiency_metrics[
+            self.jobs_with_efficiency_metrics["User"] == user_id
+        ].copy()
+        
+        if len(user_jobs) == 0:
+            print(f"No jobs found for user {user_id}")
+            return None
+        
+        # Get user-level metrics
+        user_metrics = self.users_with_efficiency_metrics[
+            self.users_with_efficiency_metrics["User"] == user_id
+        ]
+        if len(user_metrics) == 0:
+            print(f"No user metrics found for {user_id}")
+            return None
+        
+        user_data = user_metrics.iloc[0]
+        
+        # Create output directory structure: reports/user_reports/user_id/
+        user_output_dir = os.path.join(output_dir, user_id)
+        os.makedirs(user_output_dir, exist_ok=True)
+        
+        # Set final output path: reports/user_reports/user_id/user_id.format
+        output_filename = f"{user_id}.{output_format}"
+        final_output_path = os.path.join(user_output_dir, output_filename)
+        
+        # Calculate time series data
+        time_series_data = calculate_time_series_data(user_jobs)
+        
+        # Calculate GPU type data
+        gpu_type_data = calculate_gpu_type_data(user_jobs)
+        
+        # Calculate summary statistics
+        all_jobs_count = (
+            len(self.jobs_with_efficiency_metrics) 
+            if self.jobs_with_efficiency_metrics is not None 
+            else None
+        )
+        summary_stats = calculate_summary_statistics(
+            user_jobs=user_jobs,
+            all_jobs_count=all_jobs_count,
+            analysis_period=None  # Will be calculated automatically
+        )
+        
+        # Calculate comparison statistics
+        comparison_stats = calculate_comparison_statistics(
+            user_id=user_id,
+            user_jobs=user_jobs,
+            all_jobs_df=self.jobs_with_efficiency_metrics
+        )
+        
+        # Generate recommendations
+        recommendations = generate_recommendations(user_jobs, user_data)
+        
+        # Calculate analysis period as a descriptive string (same as in summary stats)
+        if "StartTime" in user_jobs.columns:
+            start_date = user_jobs["StartTime"].min()
+            end_date = user_jobs["StartTime"].max()
+            duration = end_date - start_date
+            
+            if duration.days > 365:
+                analysis_period = f"{duration.days // 365} year{'s' if duration.days // 365 > 1 else ''}"
+            elif duration.days > 30:
+                analysis_period = f"{duration.days // 30} month{'s' if duration.days // 30 > 1 else ''}"
+            else:
+                analysis_period = f"{duration.days} day{'s' if duration.days > 1 else ''}"
+        else:
+            analysis_period = "Unknown period"
+        
+        data_package = {
+            "user_id": user_id,
+            "user_data": user_data.to_dict(),
+            "user_jobs": user_jobs,
+            "summary_stats": summary_stats,
+            "comparison_stats": comparison_stats,
+            "time_series_data": time_series_data,
+            "gpu_type_data": gpu_type_data,
+            "all_users_job_metrics": self.jobs_with_efficiency_metrics,
+            "all_users_data": self.users_with_efficiency_metrics,
+            "recommendations": recommendations,
+            "start_date": user_jobs["StartTime"].min().strftime("%Y-%m-%d"),
+            "end_date": user_jobs["StartTime"].max().strftime("%Y-%m-%d"),
+            "analysis_period": analysis_period
+        }
+        
+        # Save data package in the user-specific directory
+        pickle_file = os.path.join(user_output_dir, f"{user_id}_data.pkl")
+        with open(pickle_file, "wb") as f:
+            pickle.dump(data_package, f)
+                
+        # Generate Quarto report
+        print("Generating Quarto report...")
+        return self._generate_quarto_report(
+            user_id, final_output_path, template_path, pickle_file, output_format
+        )
+    
+    def _generate_quarto_report(
+        self, 
+        user_id: str, 
+        final_output_path: str, 
+        template_path: str, 
+        pickle_file: str, 
+        output_format: str
+    ) -> str | None:
+        """
+        Generate the final Quarto report using subprocess to run quarto render.
+        
+        Args:
+            user_id: User ID for the report
+            final_output_path: Final path where the report should be saved
+            template_path: Path to the Quarto template file
+            pickle_file: Path to the pickle file containing report data
+            output_format: Output format ('html' or 'pdf')
+            
+        Returns:
+            str | None: Path to the generated report file, or None if generation failed
+            
+        Raises:
+            subprocess.CalledProcessError: If the Quarto rendering process fails
+        """
+        final_output_path = final_output_path.replace("\\", "/")
+        pickle_file = pickle_file.replace("\\", "/")
+        try:
+            # Create parameters file for Quarto (in same directory as output)
+            output_dir = os.path.dirname(final_output_path)
+            params_file = os.path.join(output_dir, f"{user_id}_params.yml")
+            with open(params_file, "w") as f:
+                yaml_str = "pickle_file: " + pickle_file
+                f.write(yaml_str)
+            params_file = params_file.replace("\\", "/")
+            
+            # Run Quarto to generate the report
+            output_filename = f"{user_id}.{output_format}"
+
+            # Convert all paths to absolute paths to avoid relative path issues
+            abs_template_path = os.path.abspath(template_path)
+            abs_params_file = os.path.abspath(params_file)
+            
+            cmd = [
+                "quarto", "render", abs_template_path,
+                "--to", output_format,
+                "--execute-params", abs_params_file,
+                "-o", output_filename  # Only filename, not full path
+            ]
+            
+            # Use the template directory as working directory
+            working_dir = os.path.dirname(abs_template_path)
+            
+            # print(f"Command: {' '.join(cmd)}")
+            
+            result = subprocess.run(
+                cmd, 
+                capture_output=True, 
+                text=True, 
+                cwd=working_dir
+            )
+            
+            if result.returncode != 0:
+                error_msg = f"Command failed with return code {result.returncode}\n"
+                error_msg += f"Command: {' '.join(cmd)}\n"
+                error_msg += f"Working dir: {working_dir}\n"
+                error_msg += f"STDOUT: {result.stdout}\n"
+                error_msg += f"STDERR: {result.stderr}"
+                print(error_msg)
+                raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
+
+            # Check multiple possible locations where Quarto might generate the file
+            possible_locations = [
+                os.path.join(working_dir, output_filename),  # Template directory
+                os.path.join(os.getcwd(), output_filename),   # Current working directory
+                os.path.join(working_dir, "reports", output_filename),  # Working dir + reports subdirectory
+                os.path.join(os.path.dirname(working_dir), "reports", "reports", output_filename)  # reports/reports/
+            ]
+            
+            generated_file = None
+            for location in possible_locations:
+                if os.path.exists(location):
+                    generated_file = location
+                    break
+            
+            if generated_file:
+                # Ensure the output directory exists
+                os.makedirs(os.path.dirname(final_output_path), exist_ok=True)
+                shutil.move(generated_file, final_output_path)
+                print(f"✅ Report generated successfully: {final_output_path}")
+                return final_output_path
+            else:
+                print("❌ Report generation failed.")
+                
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Quarto subprocess error: {e}")
+            print(f"   Return code: {e.returncode}")
+            print(f"   Command: {' '.join(e.cmd)}")
+            if e.stdout:
+                print(f"   STDOUT:\n{e.stdout}")
+            if e.stderr:
+                print(f"   STDERR:\n{e.stderr}")
+            return None
+        except Exception as e:
+            print(f"❌ Unexpected error running Quarto: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
