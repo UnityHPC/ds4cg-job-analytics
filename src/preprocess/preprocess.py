@@ -1,6 +1,8 @@
+from typing import TextIO
 import warnings
 from collections.abc import Callable
 
+import sys
 import numpy as np
 import pandas as pd
 from pandas.api.typing import NAType
@@ -25,7 +27,6 @@ from .errors import JobPreprocessingError
 
 processing_error_logs: list = []
 error_indices: set = set()
-anonymize: bool = False
 
 
 class Preprocess:
@@ -203,6 +204,37 @@ class Preprocess:
         """
         return prefix + column.rank(method="dense").astype(int).astype(str).str.zfill(2)
 
+    @staticmethod
+    def showwarning_preprocess(
+        message: Warning | str,
+        category: type[Warning],
+        filename: str,
+        lineno: int,
+        file: TextIO | None = None,
+        line: str | None = None,
+    ) -> None:
+        """
+        Custom warning formatter for preprocessing warnings to avoid printing the full traceback.
+
+        Args:
+            message (Warning | str): The warning message.
+            category (type[Warning]): The warning category.
+            filename (str): The name of the file where the warning occurred.
+            lineno (int): The line number where the warning occurred.
+            file (TextIO | None, optional): The file to write the warning message to.
+            line (str | None, optional): The line of code where the warning occurred.
+
+        Returns:
+            str: The formatted warning message as a string.
+        """
+        parts = warnings.formatwarning(message, category, filename, lineno, line).split(":")[2:]
+        msg = ":".join(parts).strip()
+        if file:
+            file.write(msg + "\n")
+        else:
+            sys.stderr.write(msg + "\n")
+        return
+
     @classmethod
     def preprocess_data(
         cls,
@@ -335,6 +367,9 @@ class Preprocess:
             all_categories = list(set(enum_values) | set(unique_values))
             data[col] = pd.Categorical(data[col], categories=all_categories, ordered=False)
 
+        old_sw = warnings.showwarning  # store previous function...
+        warnings.showwarning = cls.showwarning_preprocess  # override showwarning function
+
         # Raise warning if GPUMemUsage or CPUMemUsage having infinity values
         mem_usage_columns = ["CPUMemUsage", "GPUMemUsage"]
         for col_name in mem_usage_columns:
@@ -355,6 +390,9 @@ class Preprocess:
                 by="SubmitTime", ascending=False
             )  # Sort by SubmitTime to keep the latest entry
             data = data_sorted.drop_duplicates(subset=["JobID"], keep="first")  # Keep the latest entry for each JobID
+
+        # Restore the original showwarning function
+        warnings.showwarning = old_sw
 
         # Save preprocessing error logs to a file.
         cls._write_preprocessing_error_logs(processing_error_logs)
