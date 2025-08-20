@@ -15,7 +15,7 @@ from src.config.enum_constants import (
 )
 from pydantic import validate_call, AfterValidator, SkipValidation
 from src.database import DatabaseConnection
-from src.preprocess.preprocess import preprocess_data
+from src.preprocess import Preprocess
 
 
 def load_preprocessed_jobs_dataframe_from_duckdb(
@@ -44,10 +44,10 @@ def load_preprocessed_jobs_dataframe_from_duckdb(
     if isinstance(db_path, Path):
         db_path = db_path.resolve()
     try:
-        db = DatabaseConnection(str(db_path))
+        db = DatabaseConnection(str(db_path), anonymize=anonymize)
 
         jobs_df = db.fetch_all_jobs(table_name=table_name)
-        processed_data = preprocess_data(
+        processed_data = Preprocess().preprocess_data(
             jobs_df,
             min_elapsed_seconds=0,
             include_failed_cancelled_jobs=False,
