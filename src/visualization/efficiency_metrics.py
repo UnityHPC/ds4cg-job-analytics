@@ -3,6 +3,7 @@ Module with utilities for visualizing efficiency metrics.
 """
 
 from abc import ABC
+import math
 from pathlib import Path
 from typing import Any, cast
 
@@ -63,6 +64,73 @@ class EfficiencyMetricsVisualizer(DataVisualizer[EfficiencyMetricsKwargsModel], 
             self.validate_columns(col_kwargs.bar_label_columns, validated_jobs_df)
         self.validate_figsize(col_kwargs.figsize)
         return col_kwargs
+
+    @staticmethod
+    def _human_readable_value(val: object) -> str:
+        """Format numeric values human-readably.
+
+        Rules (assumptions where unspecified):
+        - "Small" numbers (abs(value) < 1_000) -> always show two decimals, rounding UP (toward +infinity)
+        e.g. 1.234 -> 1.24, 0.001 -> 0.01, -1.231 -> -1.23 (up toward +inf makes negative less negative)
+        - Thousands (>= 1_000 and < 1_000_000) -> comma separated with no decimals (123,456)
+        - Millions and above use suffix with two decimals: 12.35 M, 3.40 B, 1.00 T
+        - Handles ints, floats, numpy numeric types; returns original repr for non-numerics.
+        - NA/None -> 'NA'
+
+        Args:
+            val (object): The value to format.
+
+        Returns:
+            str: Human-readable formatted representation.
+        """
+        if val is None or (isinstance(val, float) and math.isnan(val)):
+            return "NA"
+        # numpy / pandas NA
+        try:
+            import pandas as _pd  # local import to avoid circular issues
+            try:
+                _tmp_val = val  # help type checkers
+                isna_func = getattr(_pd, "isna", None)
+                if callable(isna_func) and isna_func(_tmp_val):  # type: ignore[call-arg]
+                    return "NA"
+            except TypeError:  # Non-array-like objects may raise
+                pass
+        except Exception:  # pragma: no cover - defensive
+            pass
+        if not isinstance(val, (int, float, np.integer, np.floating)):
+            return str(val)
+        # Cast to float for magnitude / operations
+        fval = float(val)
+        abs_val = abs(fval)
+        # Small number branch
+        if abs_val < 1_000:
+            if fval >= 0:
+                up = math.ceil(fval * 100) / 100.0
+            else:
+                # Up toward +infinity for negatives makes value less negative
+                up = -math.ceil(-fval * 100) / 100.0
+            if abs(up - int(up)) < 1e-9:
+                return f"{int(up)}"
+            return f"{up:.2f}".rstrip("0").rstrip(".")
+        # Large number branches with suffixes
+        suffixes = [
+            (1_000_000_000_000, "T"),
+            (1_000_000_000, "B"),
+            (1_000_000, "M"),
+        ]
+        for threshold, suffix in suffixes:
+            if abs_val >= threshold:
+                scaled = fval / threshold
+                formatted = f"{scaled:.2f}"
+                if formatted.endswith(".00"):
+                    formatted = formatted[:-3]
+                else:
+                    # Trim a single trailing 0 if present (e.g., 1.50 -> 1.5) but keep at least one decimal
+                    if formatted.endswith("0"):
+                        formatted = formatted[:-1]
+                return f"{formatted} {suffix}"
+        # Thousands (no suffix) -> comma separated, no decimals
+        return f"{int(round(fval)):,}"
 
 
 class JobsWithMetricsVisualizer(EfficiencyMetricsVisualizer):
@@ -173,7 +241,7 @@ class JobsWithMetricsVisualizer(EfficiencyMetricsVisualizer):
                     return col
 
                 label_lines = [
-                    f"{_format_col(col)}: {val:.2f}"
+                    f"{_format_col(col)}: {EfficiencyMetricsVisualizer._human_readable_value(val)}"
                     for col, val in zip(
                         bar_label_columns,
                         label_values_columns,
@@ -282,7 +350,7 @@ class UsersWithMetricsVisualizer(EfficiencyMetricsVisualizer):
                     return col
 
                 label_lines = [
-                    f"{_format_col(col)}: {val:.2f}"
+                    f"{_format_col(col)}: {EfficiencyMetricsVisualizer._human_readable_value(val)}"
                     for col, val in zip(
                         bar_label_columns,
                         label_values_columns,
@@ -682,7 +750,7 @@ class PIGroupsWithMetricsVisualizer(EfficiencyMetricsVisualizer):
                     return col
 
                 label_lines = [
-                    f"{_format_col(col)}: {val:.2f}"
+                    f"{_format_col(col)}: {EfficiencyMetricsVisualizer._human_readable_value(val)}"
                     for col, val in zip(
                         bar_label_columns,
                         label_values_columns,

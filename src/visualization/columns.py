@@ -1148,9 +1148,10 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         vram_labels = [str(v) for v in VRAM_CATEGORIES]
 
         # Bin the data by closest category (floor to the largest category <= value)
-        bins = [-0.1] + VRAM_CATEGORIES  # -0.1 to include 0 exactly
-        binned = pd.cut(col_data, bins=bins, labels=vram_labels, right=True, include_lowest=True)
+        bins = [-0.1] + VRAM_CATEGORIES # -0.1 to include 0 exactly
+        binned = pd.cut(col_data, bins=bins, labels=vram_labels, right=False, include_lowest=True)
         binned[col_data == 0] = "0"
+        binned[col_data > max(VRAM_CATEGORIES)] = str(max(VRAM_CATEGORIES))
 
         bin_counts = binned.value_counts(sort=False, dropna=False)
         bin_percents = bin_counts / bin_counts.sum() * 100
@@ -1187,8 +1188,8 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         ax.set_xticks(x_ticks)
         ax.set_xticklabels(vram_labels)
         ax.set_xlabel("GPU Memory (GiB)")
-        ax.set_ylabel("Percent of Jobs")
-        ax.set_title(f"Histogram of GPU VRAM Usage ({col})")
+        ax.set_ylabel("Percentage of Jobs")
+        ax.set_title("Histogram of GPU VRAM Usage")
         plt.grid(axis="y", linestyle="--", alpha=0.5)
 
         # --- Bar labels with gap above tallest label ---
