@@ -580,9 +580,12 @@ class PIGroupsWithMetricsVisualizer(EfficiencyMetricsVisualizer):
         transform = blended_transform_factory(ax.transAxes, ax.transData)  # x in axes fraction, y in data coords
         x_outside = -0.02  # negative x fraction places text just left of spine; adjust if needed
         line_gap = 0.4  # vertical separation between the two lines
+        # Collect created text objects so we can measure their rendered widths and
+        # place the y-axis label far enough to the left dynamically.
+        label_text_objs: list[Any] = []
         for y_pos, (pi, uc) in enumerate(zip(plot_df["pi_account"], plot_df["user_count"], strict=True)):
             # First line (PI account) slightly above center
-            ax.text(
+            t1 = ax.text(
                 x_outside,
                 y_pos - line_gap / 2,
                 pi,
@@ -593,7 +596,7 @@ class PIGroupsWithMetricsVisualizer(EfficiencyMetricsVisualizer):
                 clip_on=False,
             )
             # Second line (Users) slightly below center
-            ax.text(
+            t2 = ax.text(
                 x_outside,
                 y_pos + line_gap / 2,
                 f"# of Users: {uc}",
@@ -604,11 +607,47 @@ class PIGroupsWithMetricsVisualizer(EfficiencyMetricsVisualizer):
                 color="dimgray",
                 clip_on=False,
             )
+            label_text_objs.extend([t1, t2])
 
         # Y-axis label: place further left than custom tick labels.
         ax.set_ylabel("PI Account", rotation=90, labelpad=20)
-        # Position the label using axes fraction (x< x_outside)
-        ax.yaxis.set_label_coords(x_outside - 0.30, 0.5)
+        # Dynamically determine how far left the ylabel should go based on the
+        # widest of the custom y-axis labels we just drew. We measure text in display
+        # coordinates then convert width to an axes-fraction offset.
+        try:
+            fig = ax.figure
+            # Ensure renderer exists (needed for text bounding boxes)
+            fig.canvas.draw()  # force a draw so extents are up-to-date
+            # Some backends expose get_renderer; otherwise use _get_renderer (Agg) or derive via draw
+            renderer = getattr(fig.canvas, "get_renderer", None)
+            if renderer is not None:
+                renderer = renderer()
+            else:
+                # Agg / fallback
+                renderer = getattr(fig.canvas, "_get_renderer", None)
+                if renderer is not None:
+                    renderer = renderer()
+                else:
+                    # Last resort: trigger draw which returns a renderer for some backends
+                    fig.canvas.draw()
+                    renderer = getattr(fig.canvas, "renderer", None)
+            min_left_axes = 0.0  # track furthest left (most negative) axes-fraction coordinate reached by labels
+            for txt in label_text_objs:
+                # Position given is in axes fraction for x (because of blended transform); get right edge in display
+                x_axes, _ = txt.get_position()
+                right_disp_x = ax.transAxes.transform((x_axes, 0))[0]
+                bbox = txt.get_window_extent(renderer=renderer)
+                left_disp_x = right_disp_x - bbox.width
+                left_axes = ax.transAxes.inverted().transform((left_disp_x, 0))[0]
+                if left_axes < min_left_axes:
+                    min_left_axes = left_axes
+            # Add a small margin (in axes fraction) beyond the furthest left label
+            margin = 0.04
+            ylabel_x = min_left_axes - margin
+            ax.yaxis.set_label_coords(ylabel_x, 0.5)
+        except Exception:
+            # Fallback to a reasonable static offset if measurement fails
+            ax.yaxis.set_label_coords(x_outside - 0.30, 0.5)
 
         # Hide y-axis tick labels (already blank) but keep small outward ticks if desired
         ax.tick_params(axis="y", which="both", direction="out", length=4, pad=2)
