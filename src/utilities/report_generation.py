@@ -10,6 +10,7 @@ import subprocess
 from typing import Any
 
 from ..config.enum_constants import EfficiencyCategoryEnum, TimeUnitEnum
+from src.database import DatabaseConnection
 
 
 def extract_gpu_type(gpu_type_val: str | list | dict) -> str:
@@ -73,8 +74,12 @@ def calculate_time_usage_metrics(user_jobs: pd.DataFrame) -> tuple[float, str]:
     Returns:
         Tuple of (time_usage_percentage, time_estimate_category)
     """
-    avg_elapsed_time = user_jobs["Elapsed"].mean()
-    avg_time_limit = user_jobs["TimeLimit"].mean() if "TimeLimit" in user_jobs.columns else pd.Timedelta(0)
+    avg_elapsed_time = pd.Timedelta(user_jobs["Elapsed"].mean())
+    avg_time_limit = (
+        pd.Timedelta(user_jobs["TimeLimit"].mean())
+        if "TimeLimit" in user_jobs.columns
+        else pd.Timedelta(0)
+    )
 
     if avg_time_limit.total_seconds() > 0:
         time_usage_pct = (avg_elapsed_time.total_seconds() / avg_time_limit.total_seconds()) * 100
@@ -156,8 +161,8 @@ def calculate_zero_usage_metrics(user_jobs: pd.DataFrame) -> tuple[int, float]:
 
 def calculate_summary_statistics(
     user_jobs: pd.DataFrame,
-    all_jobs_count: int = None,
-    analysis_period: str = None
+    all_jobs_count: int = 0,
+    analysis_period: str = ''
 ) -> pd.DataFrame:
     """
     Calculate comprehensive summary statistics for a user.
@@ -181,13 +186,13 @@ def calculate_summary_statistics(
     )
 
     # Calculate job percentage
-    if all_jobs_count is None:
+    if all_jobs_count == 0:
         job_percentage = 0.0  # Cannot calculate without total
     else:
         job_percentage = (total_jobs / all_jobs_count) * 100 if all_jobs_count > 0 else 0
 
     # Calculate analysis period if not provided
-    if analysis_period is None:
+    if analysis_period == '':
         analysis_period = calculate_analysis_period(user_jobs)
 
     # Time metrics
@@ -443,7 +448,8 @@ def generate_recommendations(user_jobs: pd.DataFrame, user_data: pd.Series = Non
         )
 
     # Requested VRAM efficiency (if user_data is provided)
-    if user_data is not None and user_data.get("requested_vram_efficiency", 0) < 0.5:
+    eff = user_data["requested_vram_efficiency"]
+    if user_data is not None and (eff.mean() if hasattr(eff, 'mean') else float(eff)) < 0.5:
         recommendations.append(
             "📊 **Resource Planning**: You consistently request more VRAM than you use. "
             "Consider reducing your VRAM requests."
@@ -460,7 +466,7 @@ def run_quarto_report(
     output_file: str,
     pickle_file: str,
     output_format: str = "html",
-    working_directory: str = None
+    working_directory: str = "reports"
 ) -> tuple[bool, str]:
     """
     Run Quarto to generate a report.
@@ -500,3 +506,30 @@ def run_quarto_report(
         return False, f"Quarto execution failed: {e}"
     except Exception as e:
         return False, f"Unexpected error during Quarto rendering: {e}"
+
+
+def get_total_job_count(db: DatabaseConnection, analysis_period: tuple[str, str] = None) -> int:
+    """
+    Get the total count of all jobs in the database, optionally filtered by analysis period.
+
+    Args:
+        db (DatabaseConnection): Database connection object
+        analysis_period (tuple[str, str]): Optional tuple (start_date, end_date) as strings 'YYYY-MM-DD'
+
+    Returns:
+        int: total number of jobs in the database (optionally within the period)
+    """
+    try:
+        if analysis_period and isinstance(analysis_period, tuple) and len(analysis_period) == 2:
+            start_date, end_date = analysis_period
+            query = """
+                SELECT COUNT(*) as total_jobs FROM Jobs
+                WHERE StartTime >= ? AND StartTime <= ?;
+            """
+            result = db.fetch_query(query, (start_date, end_date))
+        else:
+            result = db.fetch_query("SELECT COUNT(*) as total_jobs FROM Jobs;")
+        return result.iloc[0]['total_jobs'] if len(result) > 0 else 0
+    except Exception as e:
+        print(f"Error getting total job count: {e}")
+        return 0

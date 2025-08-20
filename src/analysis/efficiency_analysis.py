@@ -658,7 +658,6 @@ class EfficiencyAnalysis:
                 "weighted_ev_alloc_vram_efficiency",
                 "weighted_ev_vram_constraint_efficiency",
                 "weighted_ev_requested_vram_efficiency",
-
                 "weighted_ev_gpu_count",
             ]
         )
@@ -921,7 +920,6 @@ class EfficiencyAnalysis:
         summary_stats = calculate_summary_statistics(
             user_jobs=user_jobs,
             all_jobs_count=all_jobs_count,
-            analysis_period=None  # Will be calculated automatically
         )
         
         # Calculate comparison statistics
@@ -1043,7 +1041,6 @@ class EfficiencyAnalysis:
                 error_msg += f"Working dir: {working_dir}\n"
                 error_msg += f"STDOUT: {result.stdout}\n"
                 error_msg += f"STDERR: {result.stderr}"
-                print(error_msg)
                 raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
 
             # Check multiple possible locations where Quarto might generate the file
@@ -1083,3 +1080,5 @@ class EfficiencyAnalysis:
             import traceback
             traceback.print_exc()
             return None
+        
+        return None

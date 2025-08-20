@@ -50,3 +50,4 @@ reports/user_reports/*
 reports/user_report_template_files/*
 *.pkl
 reports/*.yml
+/.quarto/

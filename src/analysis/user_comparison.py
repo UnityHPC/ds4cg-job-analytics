@@ -217,7 +217,7 @@ class UserComparison:
         return other_users_metrics
 
     def get_user_comparison_statistics(
-        self, user_id: str, user_jobs: pd.DataFrame | None = None, metrics: list[str] | None = None
+        self, user_id: str, user_jobs: pd.DataFrame | None = None, metrics: list[tuple[str, str]] | None = None
     ) -> pd.DataFrame:
         """
         Calculate comparison statistics between the specified user and all other users.
@@ -247,7 +247,7 @@ class UserComparison:
             user_jobs = self.get_user_metrics(user_id)
 
         if len(user_jobs) == 0:
-            return self._create_fallback_comparison(metrics)
+            return self._create_fallback_comparison(metrics=metrics)
 
         # Get other users' metrics
         other_users = self.get_other_users_metrics(user_id)
@@ -304,7 +304,7 @@ class UserComparison:
         return comparison_stats
 
     def _create_fallback_comparison(
-        self, user_jobs: pd.DataFrame | None = None, metrics: list[str] | None = None
+        self, user_jobs: pd.DataFrame | None = None, metrics: list[tuple[str, str]] | None = None
     ) -> pd.DataFrame:
         """
         Create fallback comparison statistics when database query fails.

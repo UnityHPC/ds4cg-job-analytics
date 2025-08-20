@@ -9,11 +9,9 @@ import argparse
 import os
 import subprocess
 import sys
-import shutil
 import tempfile
 import pickle
 
-import numpy as np
 import pandas as pd
 
 # Add the project root directory to Python path
@@ -22,7 +20,6 @@ project_root = os.path.dirname(script_dir)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from src.database.database_connection import DatabaseConnection  # noqa: E402
 from src.analysis.pi_group_analysis import PIGroupAnalysis  # noqa: E402
 from src.config.enum_constants import EfficiencyCategoryEnum  # noqa: E402
 
@@ -68,13 +65,11 @@ def generate_pi_group_report(
 
     # Get size comparison
     size_stats = pi_analyzer.get_pi_group_size_comparison(pi_account)
-
-    # Calculate analysis period
     analysis_period = pi_analyzer.calculate_analysis_period()
 
     # Create summary statistics
     metrics_row = pi_metrics.iloc[0]
-    efficiency = metrics_row["expected_value_alloc_vram_efficiency"]
+    efficiency = metrics_row["expected_value_requested_vram_efficiency"]
     efficiency_category = EfficiencyCategoryEnum.get_efficiency_category(efficiency)
 
     summary_stats = pd.DataFrame({
@@ -86,7 +81,6 @@ def generate_pi_group_report(
             "Total VRAM Hours",
             "Average VRAM Efficiency",
             "Efficiency Category",
-            "Efficiency Score",
             "Analysis Period",
         ],
         "Value": [
@@ -97,21 +91,20 @@ def generate_pi_group_report(
             f"{metrics_row['pi_acc_vram_hours']:.1f}",
             f"{efficiency:.1%}",
             efficiency_category,
-            f"{metrics_row['avg_alloc_vram_efficiency_score']:.2f}"
-            if pd.notna(metrics_row["avg_alloc_vram_efficiency_score"])
-            and metrics_row["avg_alloc_vram_efficiency_score"] != -np.inf
-            else "Very Low",
             analysis_period,
         ],
     })
 
     # Generate recommendations
-    recommendations = generate_pi_group_recommendations(pi_account, metrics_row, pi_users, worst_users)
+    recommendations = generate_pi_group_recommendations(metrics_row, pi_users, worst_users)
 
-    # Create output filename
-    safe_pi_name = pi_account.replace("/", "_").replace("\\", "_").replace(" ", "_")
-    output_filename = f"{safe_pi_name}_report.{output_format}"
-    final_output_path = os.path.join(output_dir, output_filename)
+    # Create output directory structure: <root>/reports/pi_reports/<pi_account>/
+    pi_output_dir = os.path.join(project_root, "reports", "pi_reports", pi_account)
+    os.makedirs(pi_output_dir, exist_ok=True)
+
+    output_filename = f"{pi_account}_report.{output_format}"
+    final_output_path = os.path.join(pi_output_dir, output_filename)
+    final_output_path = os.path.abspath(final_output_path).replace("\\", "/")
 
     # Check that the template exists
     if not os.path.exists(template_path):
@@ -126,6 +119,7 @@ def generate_pi_group_report(
     template_data = {
         "pi_account": pi_account,
         "pi_metrics": pi_metrics,
+        "all_pi_metrics": pi_analyzer.get_all_pi_groups(),
         "pi_users": pi_users,
         "worst_users": worst_users,
         "comparison_stats": comparison_stats,
@@ -143,16 +137,13 @@ def generate_pi_group_report(
         pickle.dump(template_data, f, protocol=pickle.HIGHEST_PROTOCOL)
         temp_pickle_path = f.name
 
-    # Simple output filename for quarto
-    simple_output_filename = f"report.{output_format}"
-
     # Run quarto render command
-    cmd = ["quarto", "render", template_file, "--to", output_format, "-o", simple_output_filename, "--execute"]
+    cmd = ["quarto", "render", template_file, "--to", output_format, "-o", output_filename, "--execute"]
     cmd.extend(["-P", f"pickle_file:{temp_pickle_path}"])
 
     try:
-        # Run Quarto in the reports directory
-        reports_dir = os.path.dirname(template_path)
+        # Get the reports directory for running Quarto
+        reports_dir = os.path.dirname(template_file)
         print("      🔧 Starting Quarto rendering...")
         result = subprocess.run(
             cmd,
@@ -168,17 +159,8 @@ def generate_pi_group_report(
                 print(f"         Error: {result.stderr.strip()}")
             return None
 
-        # Check if output file was created
-        reports_dir = os.path.dirname(template_path)
-        output_file_path = os.path.join(reports_dir, simple_output_filename)
-        if not os.path.exists(output_file_path):
-            print("      ❌ Output file not created")
-            return None
-
-        # Copy the generated report to final location
-        os.makedirs(os.path.dirname(final_output_path), exist_ok=True)
-        shutil.copy2(output_file_path, final_output_path)
-        print(f"      ✅ Report saved: {os.path.basename(final_output_path)}")
+        # Move the generated report to final location
+        print(f"      ✅ Report saved: {final_output_path}")
 
         # Clean up temporary files
         os.unlink(temp_pickle_path)
@@ -194,13 +176,12 @@ def generate_pi_group_report(
 
 
 def generate_pi_group_recommendations(
-    pi_account: str, metrics: pd.Series, pi_users: pd.DataFrame, worst_users: pd.DataFrame
+    metrics: pd.Series, pi_users: pd.DataFrame, worst_users: pd.DataFrame
 ) -> list[str]:
     """
     Generate targeted recommendations for a PI group.
 
     Args:
-        pi_account: PI account name
         metrics: PI group metrics
         pi_users: All users in the PI group
         worst_users: Worst performing users in the group
@@ -210,7 +191,7 @@ def generate_pi_group_recommendations(
     """
     recommendations = []
 
-    efficiency = metrics["expected_value_alloc_vram_efficiency"]
+    efficiency = metrics["expected_value_requested_vram_efficiency"]
     user_count = metrics["user_count"]
 
     # Efficiency-based recommendations
@@ -243,13 +224,12 @@ def generate_pi_group_recommendations(
 
     # User-specific recommendations
     if len(worst_users) > 0:
-        low_eff_count = len(worst_users[worst_users["expected_value_alloc_vram_efficiency"] < 0.15])
+        low_eff_count = len(worst_users[worst_users["expected_value_requested_vram_efficiency"] < 0.15])
         if low_eff_count > 0:
             recommendations.append(
-                f"**Targeted User Training**: {low_eff_count} users in your group show very low efficiency patterns. "(
+                f"**Targeted User Training**: {low_eff_count} users in your group show very low efficiency patterns. "
                     "Consider providing targeted GPU optimization guidance to: "
                     f"{', '.join(worst_users.head(3)['User'].tolist())}."
-                )
             )
 
     # Resource usage recommendations
@@ -262,8 +242,8 @@ def generate_pi_group_recommendations(
 
     # Best practices sharing
     if len(pi_users) > 3:
-        best_users = pi_users.nlargest(2, "expected_value_alloc_vram_efficiency")
-        if len(best_users) > 0 and best_users.iloc[0]["expected_value_alloc_vram_efficiency"] > 0.4:
+        best_users = pi_users.nlargest(2, "expected_value_requested_vram_efficiency")
+        if len(best_users) > 0 and best_users.iloc[0]["expected_value_requested_vram_efficiency"] > 0.4:
             recommendations.append(
                 f"**Best Practices Sharing**: Your most efficient users ({', '.join(best_users['User'].tolist())}) "
                 f"achieve good GPU utilization. Have them share optimization strategies with the rest of the group."
@@ -282,7 +262,7 @@ def generate_pi_group_recommendations(
 def generate_reports_for_specific_pi_groups(
     pi_list: list,
     db_path: str = "./slurm_data.db",
-    output_dir: str = "./reports/pi_group_reports",
+    output_dir: str = "./pi_reports",
     template_path: str = "./reports/pi_group_report_template.qmd",
     min_jobs: int = 10,
     output_format: str = "html",
@@ -318,9 +298,8 @@ def generate_reports_for_specific_pi_groups(
         print(f"Error: Output directory is not writable: {output_dir}")
         return []
 
-    # Initialize database connection and PI group analyzer
-    db = DatabaseConnection(db_path)
-    pi_analyzer = PIGroupAnalysis(db)
+    # Initialize PI group analyzer with database path
+    pi_analyzer = PIGroupAnalysis(db_path)
 
     print("\n🏛️ ANALYZING PI GROUPS")
 
@@ -366,7 +345,7 @@ def generate_all_pi_group_reports(
     min_jobs: int = 50,
     min_users: int = 1,
     db_path: str = "./slurm_data.db",
-    output_dir: str = "./reports/pi_group_reports",
+    output_dir: str = "./reports/pi_reports",
     template_path: str = "./reports/pi_group_report_template.qmd",
     output_format: str = "html",
 ) -> list[str]:
@@ -399,9 +378,8 @@ def generate_all_pi_group_reports(
         print(f"Error: Output directory is not writable: {output_dir}")
         return []
 
-    # Initialize database connection and PI group analyzer
-    db = DatabaseConnection(db_path)
-    pi_analyzer = PIGroupAnalysis(db)
+    # Initialize PI group analyzer with database path
+    pi_analyzer = PIGroupAnalysis(db_path)
 
     # Identify inefficient PI groups
     inefficient_pis = pi_analyzer.identify_inefficient_pi_groups(
@@ -478,8 +456,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="./reports/pi_group_reports",
-        help="Directory to save the reports (default: ./reports/pi_group_reports)",
+        default="./reports/pi_reports",
+        help="Directory to save the reports (default: ./reports/pi_reports)",
     )
     parser.add_argument(
         "--template",

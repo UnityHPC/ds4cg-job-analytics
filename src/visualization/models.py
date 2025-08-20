@@ -10,6 +10,7 @@ class ColumnVisualizationKwargsModel(BaseModel):
     random_seed: int | None = None
     summary_file_name: str = "columns_stats_summary.txt"
     figsize: tuple[int | float, int | float] = (7, 4)
+    generate_statistics: bool = True
 
 
 class EfficiencyMetricsKwargsModel(BaseModel):
