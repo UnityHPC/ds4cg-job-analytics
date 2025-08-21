@@ -414,7 +414,6 @@ class ETCVisualizer(EfficiencyAnalysis):
                         proportion_metric
                     ](filtered_jobs_df)
                     metric_values = plot_data_frame[new_proportion_metric_col].to_numpy()
-                    print("Reached here")
                 total_sum = metric_values.sum()
 
                 if total_sum == 0:
