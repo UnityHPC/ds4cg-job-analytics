@@ -594,14 +594,14 @@ class ETCVisualizer(EfficiencyAnalysis):
         self,
         plot_object_list: list[str],
         object_column_type: Literal[ETCPlotTypes.USER, ETCPlotTypes.PI_GROUP],
-        title: str | None = None,
-        min_threshold: float = 0.0,
-        max_threshold: float = 100.0,
-        threshold_step: float = 1.0,
         threshold_metric: JobEfficiencyMetricsEnum = JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY,
         proportion_metric: Literal[
             ProportionMetricsEnum.JOB_HOURS, ProportionMetricsEnum.JOBS, ProportionMetricsEnum.VRAM_HOURS
         ] = ProportionMetricsEnum.JOBS,
+        title: str | None = None,
+        min_threshold: float = 0.0,
+        max_threshold: float = 100.0,
+        threshold_step: float = 1.0,
         plot_percentage: bool = True,
         clip_threshold_metric: tuple[bool, float] = (False, 0.0),
     ) -> tuple[Figure, list[Axes]]:
@@ -640,12 +640,23 @@ class ETCVisualizer(EfficiencyAnalysis):
 
         Raises:
             ValueError: if dataframe jobs_with_efficiency_metrics is not calculated yet.
+            ValueError: if object_column_type is neither User nor PI Group.
         """
         if self.jobs_with_efficiency_metrics is None:
             raise ValueError(
                 "Attribute jobs_with_efficiency_metrics is not calculated, "
                 "use calculate_all_efficiency_metrics() to calculate the dataframe before plotting."
             )
+
+        etc_type_to_column = {
+            ETCPlotTypes.USER: ProportionMetricsEnum.USERS.value,
+            ETCPlotTypes.PI_GROUP: ProportionMetricsEnum.PI_GROUPS.value,
+        }
+
+        if object_column_type not in etc_type_to_column:
+            raise ValueError("Can only accept plots for user or pi groups.")
+
+        object_column = etc_type_to_column[object_column_type]
 
         data = self.jobs_with_efficiency_metrics
         plot_data, remain_percentage, total_raw_value, min_threshold = self._validate_and_filter_inputs(
@@ -663,7 +674,7 @@ class ETCVisualizer(EfficiencyAnalysis):
         thresholds_arr: np.ndarray = np.arange(min_threshold, max_threshold + threshold_step, threshold_step)
         fig, axe = plt.subplots(1, 1, figsize=(16, 6))
         for target in plot_object_list:
-            filtered = plot_data[plot_data[object_column_type.value] == target].copy()
+            filtered = plot_data[plot_data[object_column] == target].copy()
             proportion_data = self._etc_calculate_proportion(
                 filtered,
                 thresholds_arr,
