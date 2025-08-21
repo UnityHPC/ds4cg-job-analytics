@@ -25,9 +25,6 @@ from ..config.remote_config import PartitionInfoFetcher
 from ..config.paths import PREPROCESSING_ERRORS_LOG_FILE
 from .errors import JobPreprocessingError
 
-processing_error_logs: list = []
-error_indices: set = set()
-
 
 class Preprocess:
     """Preprocessing class for job data.
@@ -36,6 +33,8 @@ class Preprocess:
     """
 
     anonymize: bool = False
+    error_indices: set = set()
+    processing_error_logs: list = []
 
     @classmethod
     def _validate_gpu_type(
@@ -105,8 +104,8 @@ class Preprocess:
             return func(*args)
         except JobPreprocessingError as e:
             if idx is not None:
-                error_indices.add(idx)
-            processing_error_logs.append({
+                cls.error_indices.add(idx)
+            cls.processing_error_logs.append({
                 "job_id": job_id,
                 "index": idx,
                 "error_type": e.error_type,
@@ -348,8 +347,8 @@ class Preprocess:
             axis=1,
         )
 
-        if error_indices:
-            data = data.drop(index=list(error_indices)).reset_index(drop=True)
+        if cls.error_indices:
+            data = data.drop(index=list(cls.error_indices)).reset_index(drop=True)
 
         # TODO (Tan): remove these two columns as they are calculated during analysis
         data.loc[:, "user_jobs"] = data.groupby("User")["User"].transform("size")
@@ -395,10 +394,10 @@ class Preprocess:
         warnings.showwarning = old_sw
 
         # Save preprocessing error logs to a file.
-        cls._write_preprocessing_error_logs(processing_error_logs)
+        cls._write_preprocessing_error_logs(cls.processing_error_logs)
 
         # Reset the error logs after writing to file
-        processing_error_logs.clear()
-        error_indices.clear()
+        cls.processing_error_logs.clear()
+        cls.error_indices.clear()
 
         return data
