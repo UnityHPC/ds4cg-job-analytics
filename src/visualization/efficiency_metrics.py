@@ -88,6 +88,7 @@ class EfficiencyMetricsVisualizer(DataVisualizer[EfficiencyMetricsKwargsModel], 
         # numpy / pandas NA
         try:
             import pandas as _pd  # local import to avoid circular issues
+
             try:
                 _tmp_val = val  # help type checkers
                 isna_func = getattr(_pd, "isna", None)
