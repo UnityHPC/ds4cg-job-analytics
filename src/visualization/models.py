@@ -31,7 +31,7 @@ class UsersWithMetricsKwargsModel(EfficiencyMetricsKwargsModel):
 
 
 class ROCVisualizationKwargsModel(BaseModel):
-    """Model for ROC visualization parameters."""
+    """Model for ETC visualization parameters."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
     title: str | None = None

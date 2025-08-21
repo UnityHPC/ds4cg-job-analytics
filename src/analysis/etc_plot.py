@@ -14,32 +14,32 @@ from src.config.enum_constants import (
     JobEfficiencyMetricsEnum,
     UserEfficiencyMetricsEnum,
     PIEfficiencyMetricsEnum,
-    ROCPlotTypes,
+    ETCPlotTypes,
 )
 import warnings
 
 
 class ETCVisualizer(EfficiencyAnalysis):
     """
-    A class for visualizing ROC plots, inheriting from EfficiencyAnalysis.
+    A class for visualizing ETC plots, inheriting from EfficiencyAnalysis.
     """
 
     # map types to the its associate proportion metric
-    TYPE_TO_ASSOCIATE_METRIC: dict[ROCPlotTypes, ProportionMetricsEnum] = {
-        ROCPlotTypes.JOB: ProportionMetricsEnum.JOBS,
-        ROCPlotTypes.USER: ProportionMetricsEnum.USERS,
-        ROCPlotTypes.PI_GROUP: ProportionMetricsEnum.PI_GROUPS,
+    TYPE_TO_ASSOCIATE_METRIC: dict[ETCPlotTypes, ProportionMetricsEnum] = {
+        ETCPlotTypes.JOB: ProportionMetricsEnum.JOBS,
+        ETCPlotTypes.USER: ProportionMetricsEnum.USERS,
+        ETCPlotTypes.PI_GROUP: ProportionMetricsEnum.PI_GROUPS,
     }
 
     # For counting user/ pi group that has at least 1 job/user that falls under threshold
-    TYPE_TO_COUNT_UNIQUE_METRIC: dict[ROCPlotTypes, set[ProportionMetricsEnum]] = {
-        ROCPlotTypes.JOB: {
+    TYPE_TO_COUNT_UNIQUE_METRIC: dict[ETCPlotTypes, set[ProportionMetricsEnum]] = {
+        ETCPlotTypes.JOB: {
             ProportionMetricsEnum.USERS,
             ProportionMetricsEnum.PI_GROUPS,
         },  # JOB can have unique count of User/ pi_group that has at least 1 job under thresholds
-        ROCPlotTypes.USER: {ProportionMetricsEnum.PI_GROUPS},
+        ETCPlotTypes.USER: {ProportionMetricsEnum.PI_GROUPS},
         # User can have unique count of pi_group that has at least 1 user under thresholds
-        ROCPlotTypes.PI_GROUP: cast(set[ProportionMetricsEnum], {}),
+        ETCPlotTypes.PI_GROUP: cast(set[ProportionMetricsEnum], {}),
     }
 
     # metrics that may contain NULL or -inf values
@@ -129,24 +129,24 @@ class ETCVisualizer(EfficiencyAnalysis):
         threshold_step: float,
         threshold_metric: JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum | PIEfficiencyMetricsEnum,
         proportion_metric: ProportionMetricsEnum,
-        plot_type: ROCPlotTypes = ROCPlotTypes.JOB,
+        plot_type: ETCPlotTypes = ETCPlotTypes.JOB,
     ) -> tuple[pd.DataFrame, float, float | int, float]:
         """
-        Validate input parameters and filter invalid records for ROC plot generation.
+        Validate input parameters and filter invalid records for ETC plot generation.
 
-        This method performs comprehensive validation of ROC plot parameters, filters out records
+        This method performs comprehensive validation of ETC plot parameters, filters out records
         with invalid threshold metric values (NaN or -inf), and calculates summary statistics.
 
         Args:
             input_df (pd.DataFrame): The input DataFrame containing efficiency metrics data.
-            min_threshold (float): Minimum threshold value for the ROC curve. For efficiency
+            min_threshold (float): Minimum threshold value for the ETC curve. For efficiency
                 score metrics, this may be automatically adjusted to the data minimum.
-            max_threshold (float): Maximum threshold value for the ROC curve.
+            max_threshold (float): Maximum threshold value for the ETC curve.
             threshold_step (float): Step size between threshold values. Must be positive.
             threshold_metric (JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum | PIEfficiencyMetricsEnum):
                 The efficiency metric to use for threshold calculations (x-axis).
             proportion_metric (ProportionMetricsEnum): The metric for calculating proportions (y-axis).
-            plot_type (ROCPlotTypes, optional): Type of ROC plot being generated. Defaults to JOB.
+            plot_type (ROCPlotTypes, optional): Type of ETC plot being generated. Defaults to JOB.
 
         Returns:
             tuple[pd.DataFrame, float, float | int, float]: A tuple containing:
@@ -243,7 +243,7 @@ class ETCVisualizer(EfficiencyAnalysis):
         num_markers: int,
     ) -> None:
         """
-        Generate markers on the ROC plot at specified intervals.
+        Generate markers on the ETC plot at specified intervals.
 
         Args:
             axe (Axes): The axes on which to plot the markers.
@@ -332,10 +332,10 @@ class ETCVisualizer(EfficiencyAnalysis):
         proportion_metric: ProportionMetricsEnum,
         threshold_metric: JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum | PIEfficiencyMetricsEnum,
         plot_percentage: bool = True,
-        plot_type: ROCPlotTypes = ROCPlotTypes.JOB,
+        plot_type: ETCPlotTypes = ETCPlotTypes.JOB,
     ) -> np.ndarray:
         """
-        Calculate proportions of data meeting threshold criteria for ROC curve generation.
+        Calculate proportions of data meeting threshold criteria for ETC curve generation.
 
         Args:
             plot_data_frame (pd.DataFrame): DataFrame containing the efficiency metrics data.
@@ -346,7 +346,7 @@ class ETCVisualizer(EfficiencyAnalysis):
                 The efficiency metric used as the threshold criteria for filtering.
             plot_percentage (bool, optional): Whether to return proportions as percentages (0-100)
                 or raw values. Defaults to True.
-            plot_type (ROCPlotTypes, optional): Type of ROC plot being generated, which determines
+            plot_type (ROCPlotTypes, optional): Type of ETC plot being generated, which determines
                 how proportion calculations are performed. Defaults to JOB.
 
         Returns:
@@ -383,7 +383,7 @@ class ETCVisualizer(EfficiencyAnalysis):
                     proportions.append(proportion)
             else:
                 # add temporary handle for user graphs to handle vram_hours, job_count, job_hours plotting
-                if plot_type == ROCPlotTypes.USER and isinstance(threshold_metric, UserEfficiencyMetricsEnum):
+                if plot_type == ETCPlotTypes.USER and isinstance(threshold_metric, UserEfficiencyMetricsEnum):
                     proportion_metric_to_new_calculation = {
                         ProportionMetricsEnum.JOB_HOURS: lambda jobs_df: (
                             jobs_df[JobEfficiencyMetricsEnum.JOB_HOURS.value]
@@ -430,7 +430,7 @@ class ETCVisualizer(EfficiencyAnalysis):
 
     def plot_etc(
         self,
-        plot_type: ROCPlotTypes,
+        plot_type: ETCPlotTypes,
         title: str | None = None,
         threshold_metric: JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum | PIEfficiencyMetricsEnum | None = None,
         min_threshold: float = 0.0,
@@ -442,9 +442,9 @@ class ETCVisualizer(EfficiencyAnalysis):
         clip_threshold_metric: tuple[bool, float] = (False, 0.0),
     ) -> tuple[Figure, list[Axes]]:
         """
-        Generate an ROC (Receiver Operating Characteristic) plot for efficiency analysis.
+        Generate an ETC (Receiver Operating Characteristic) plot for efficiency analysis.
 
-        This function creates a single-line ROC plot showing the proportion of data below
+        This function creates a single-line ETC plot showing the proportion of data below
         various threshold values for the specified efficiency metric. The plot can be
         configured for different analysis levels (jobs, users, or PI groups) and various
         proportion metrics.
@@ -488,41 +488,41 @@ class ETCVisualizer(EfficiencyAnalysis):
         """
         # Configuration mappings for different plot types
         data_source_map = {
-            ROCPlotTypes.JOB: self.jobs_with_efficiency_metrics,
-            ROCPlotTypes.USER: self.users_with_efficiency_metrics,
-            ROCPlotTypes.PI_GROUP: self.pi_accounts_with_efficiency_metrics,
+            ETCPlotTypes.JOB: self.jobs_with_efficiency_metrics,
+            ETCPlotTypes.USER: self.users_with_efficiency_metrics,
+            ETCPlotTypes.PI_GROUP: self.pi_accounts_with_efficiency_metrics,
         }
 
         default_threshold_metrics: dict[
-            ROCPlotTypes, JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum | PIEfficiencyMetricsEnum
+            ETCPlotTypes, JobEfficiencyMetricsEnum | UserEfficiencyMetricsEnum | PIEfficiencyMetricsEnum
         ] = {
-            ROCPlotTypes.JOB: JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY,
-            ROCPlotTypes.USER: UserEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY,
-            ROCPlotTypes.PI_GROUP: PIEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY,
+            ETCPlotTypes.JOB: JobEfficiencyMetricsEnum.ALLOC_VRAM_EFFICIENCY,
+            ETCPlotTypes.USER: UserEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY,
+            ETCPlotTypes.PI_GROUP: PIEfficiencyMetricsEnum.EXPECTED_VALUE_ALLOC_VRAM_EFFICIENCY,
         }
 
-        default_proportion_metrics: dict[ROCPlotTypes, ProportionMetricsEnum] = {
-            ROCPlotTypes.JOB: ProportionMetricsEnum.JOBS,
-            ROCPlotTypes.USER: ProportionMetricsEnum.JOBS,
-            ROCPlotTypes.PI_GROUP: ProportionMetricsEnum.JOBS,
+        default_proportion_metrics: dict[ETCPlotTypes, ProportionMetricsEnum] = {
+            ETCPlotTypes.JOB: ProportionMetricsEnum.JOBS,
+            ETCPlotTypes.USER: ProportionMetricsEnum.JOBS,
+            ETCPlotTypes.PI_GROUP: ProportionMetricsEnum.JOBS,
         }
 
         attribute_names = {
-            ROCPlotTypes.JOB: "jobs_with_efficiency_metrics",
-            ROCPlotTypes.USER: "users_with_efficiency_metrics",
-            ROCPlotTypes.PI_GROUP: "pi_accounts_with_efficiency_metrics",
+            ETCPlotTypes.JOB: "jobs_with_efficiency_metrics",
+            ETCPlotTypes.USER: "users_with_efficiency_metrics",
+            ETCPlotTypes.PI_GROUP: "pi_accounts_with_efficiency_metrics",
         }
 
         plot_type_labels = {
-            ROCPlotTypes.JOB: "Jobs",
-            ROCPlotTypes.USER: "Users",
-            ROCPlotTypes.PI_GROUP: "PI Group",
+            ETCPlotTypes.JOB: "Jobs",
+            ETCPlotTypes.USER: "Users",
+            ETCPlotTypes.PI_GROUP: "PI Group",
         }
 
         dataset_descriptions = {
-            ROCPlotTypes.JOB: "dataset",
-            ROCPlotTypes.USER: "aggregated User dataset",
-            ROCPlotTypes.PI_GROUP: "aggregated PI Group dataset",
+            ETCPlotTypes.JOB: "dataset",
+            ETCPlotTypes.USER: "aggregated User dataset",
+            ETCPlotTypes.PI_GROUP: "aggregated PI Group dataset",
         }
 
         # Get data source and validate
@@ -593,7 +593,7 @@ class ETCVisualizer(EfficiencyAnalysis):
     def multiple_line_etc_plot(
         self,
         plot_object_list: list[str],
-        object_column_type: Literal[ProportionMetricsEnum.USERS, ProportionMetricsEnum.PI_GROUPS],
+        object_column_type: Literal[ETCPlotTypes.USER, ETCPlotTypes.PI_GROUP],
         title: str | None = None,
         min_threshold: float = 0.0,
         max_threshold: float = 100.0,
@@ -606,9 +606,9 @@ class ETCVisualizer(EfficiencyAnalysis):
         clip_threshold_metric: tuple[bool, float] = (False, 0.0),
     ) -> tuple[Figure, list[Axes]]:
         """
-        Plot ROC curve for User/ Pi group given threshold_metrics.
+        Plot ETC curve for User/ Pi group given threshold_metrics.
 
-        This function will plot an ROC curve for each object, with proportion metrics is count of jobs.
+        This function will plot an ETC curve for each object, with proportion metrics is count of jobs.
 
         Before plotting, this will filter out entries whose threshold_metric is NaN.
 

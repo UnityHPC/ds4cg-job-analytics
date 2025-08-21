@@ -264,9 +264,9 @@ class ExcludedColumnsEnum(Enum):
 @unique
 class ProportionMetricsEnum(Enum):
     """
-    Contains metrics for calculating proportion of data on ROC plot (y-axis).
+    Contains metrics for calculating proportion of data on ETC plot (y-axis).
 
-    JOB_HOURS and JOBS elements are both used for y-axis ROC plot and as metrics in EfficiencyAnalysis class.
+    JOB_HOURS and JOBS elements are both used for y-axis ETC plot and as metrics in EfficiencyAnalysis class.
     """
 
     JOB_HOURS = "job_hours"
@@ -281,10 +281,10 @@ class JobEfficiencyMetricsEnum(Enum):
     """
     Contains efficiency metrics for calculating efficiency of jobs.
 
-    These are used as jobs metrics (in EfficiencyAnalysis class) and also metrics for x-axis in ROC Plot.
+    These are used as jobs metrics (in EfficiencyAnalysis class) and also metrics for x-axis in ETC Plot.
 
     For all members, if it is similar to a member in ProportionMetricsEnum (the member can be both
-        x-axis and y-axis in ROC), it must have the same value to that member in ProportionMetricsEnum.
+        x-axis and y-axis in ETC), it must have the same value to that member in ProportionMetricsEnum.
     """
 
     JOB_HOURS = "job_hours"
@@ -306,10 +306,10 @@ class UserEfficiencyMetricsEnum(Enum):
     """
     Contains efficiency metrics for calculating efficiency of users.
 
-    These are used as users metrics (in EfficiencyAnalysis class) and also metrics for x-axis in ROC Plot (for users).
+    These are used as users metrics (in EfficiencyAnalysis class) and also metrics for x-axis in ETC Plot (for users).
 
     For all members, if it is similar to a member in ProportionMetricsEnum (the member can be both
-        x-axis and y-axis in ROC), it must have the same value to that member in ProportionMetricsEnum.
+        x-axis and y-axis in ETC), it must have the same value to that member in ProportionMetricsEnum.
     """
 
     JOB_HOURS = "job_hours"
@@ -328,10 +328,10 @@ class PIEfficiencyMetricsEnum(Enum):
     Contains efficiency metrics for calculating efficiency of pi groups.
 
     These are used as pi groups metrics (in EfficiencyAnalysis class) and also metrics for x-axis
-        in ROC Plot (for pi groups).
+        in ETC Plot (for pi groups).
 
     For all members, if it is similar to a member in ProportionMetricsEnum (the member can be both
-        x-axis and y-axis in ROC), it must have the same value to that member in ProportionMetricsEnum.
+        x-axis and y-axis in ETC), it must have the same value to that member in ProportionMetricsEnum.
     """
 
     JOB_HOURS = "job_hours"
@@ -346,9 +346,9 @@ class PIEfficiencyMetricsEnum(Enum):
 
 
 @unique
-class ROCPlotTypes(Enum):
+class ETCPlotTypes(Enum):
     """
-    Contain different plot types for ROC
+    Contain different plot types for ETC
     """
 
     JOB = "JOB"
