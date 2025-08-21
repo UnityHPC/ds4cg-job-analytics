@@ -28,13 +28,3 @@ class UsersWithMetricsKwargsModel(EfficiencyMetricsKwargsModel):
     column: str
     bar_label_columns: list[str] | None
     figsize: tuple[int | float, int | float] = Field(default=(8, 8))
-
-
-class ROCVisualizationKwargsModel(BaseModel):
-    """Model for ETC visualization parameters."""
-
-    model_config = ConfigDict(strict=True, extra="forbid")
-    title: str | None = None
-    plot_percentage: bool = True
-    num_markers: int = Field(default=10, ge=0)
-    figsize: tuple[int | float, int | float] = Field(default=(16, 7))
