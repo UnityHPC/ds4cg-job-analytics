@@ -84,6 +84,9 @@ def preprocess_mock_data(
         return mem_db.fetch_query(query=query)
     except Exception as e:
         raise Exception("Exception at helper_filter_irrelevant_records") from e
+    finally:
+        if mem_db is not None:
+            mem_db.disconnect()
 
 
 # Get path to the temporary mock database file
@@ -114,4 +117,3 @@ def mock_data_frame(mock_data_path: str) -> Generator[pd.DataFrame]:
     finally:
         if mem_db is not None:
             mem_db.disconnect()
-            del mem_db
