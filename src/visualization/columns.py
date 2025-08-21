@@ -1148,7 +1148,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         vram_labels = [str(v) for v in VRAM_CATEGORIES]
 
         # Bin the data by closest category (floor to the largest category <= value)
-        bins = [-0.1] + VRAM_CATEGORIES # -0.1 to include 0 exactly
+        bins = [-0.1] + VRAM_CATEGORIES  # -0.1 to include 0 exactly
         binned = pd.cut(col_data, bins=bins, labels=vram_labels, right=False, include_lowest=True)
         binned[col_data == 0] = "0"
         binned[col_data > max(VRAM_CATEGORIES)] = str(max(VRAM_CATEGORIES))
