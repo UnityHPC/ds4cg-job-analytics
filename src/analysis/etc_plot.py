@@ -1,17 +1,3 @@
-"""
-Actions item:
-
-- refactor roc_plot to use less arguments, consider printing out statistics info of thresholds
-- Maybe put own threshold metrics into a single dictionary parameter and validate_and_filter will modify min_threshold
-- Multiple line plot, but with proportion metrics as User for PI_Group.
-
-- Issue: some new metric of user (user_job_hours, user_vram_hours) will be also on both x-axis and y-axis
- -> Need to add a bunch more to ProportionMetrics Enum, maybe best if we let it as jobs and vram_hours
-    -> discuss with Arda
-
-
-"""
-
 from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -339,7 +325,7 @@ class ETCVisualizer(EfficiencyAnalysis):
         if to_clip:
             plot_data_frame[threshold_metric.value] = plot_data_frame[threshold_metric.value].clip(upper=upper_bound)
 
-    def _roc_calculate_proportion(
+    def _etc_calculate_proportion(
         self,
         plot_data_frame: pd.DataFrame,
         thresholds_arr: np.ndarray,
@@ -442,7 +428,7 @@ class ETCVisualizer(EfficiencyAnalysis):
                     proportions.append(proportion)
         return np.array(proportions, dtype=float)
 
-    def plot_roc(
+    def plot_etc(
         self,
         plot_type: ROCPlotTypes,
         title: str | None = None,
@@ -572,7 +558,7 @@ class ETCVisualizer(EfficiencyAnalysis):
         axe_list = [axe]
 
         # Calculate proportion for each threshold
-        proportions_data = self._roc_calculate_proportion(
+        proportions_data = self._etc_calculate_proportion(
             plot_data, thresholds_arr, proportion_metric, threshold_metric, plot_percentage, plot_type=plot_type
         )
 
@@ -604,7 +590,7 @@ class ETCVisualizer(EfficiencyAnalysis):
 
         return fig, axe_list
 
-    def multiple_line_roc_plot(
+    def multiple_line_etc_plot(
         self,
         plot_object_list: list[str],
         object_column_type: Literal[ProportionMetricsEnum.USERS, ProportionMetricsEnum.PI_GROUPS],
@@ -672,18 +658,21 @@ class ETCVisualizer(EfficiencyAnalysis):
         )
 
         self._clip_upper_threshold_metric(clip_threshold_metric, plot_data, threshold_metric)
+        y_min, y_max = float("inf"), float("-inf")
 
         thresholds_arr: np.ndarray = np.arange(min_threshold, max_threshold + threshold_step, threshold_step)
         fig, axe = plt.subplots(1, 1, figsize=(16, 6))
         for target in plot_object_list:
             filtered = plot_data[plot_data[object_column_type.value] == target].copy()
-            proportion_data = self._roc_calculate_proportion(
+            proportion_data = self._etc_calculate_proportion(
                 filtered,
                 thresholds_arr,
                 proportion_metric,
                 threshold_metric,
                 plot_percentage,
             )
+            y_min = min(y_min, proportion_data.min())
+            y_max = max(y_max, proportion_data.max())
             axe.plot(thresholds_arr, proportion_data, label=f"{target}")
 
         if title is None:
@@ -701,4 +690,8 @@ class ETCVisualizer(EfficiencyAnalysis):
         axe.set_ylabel(y_label)
         axe.set_xlabel(f"Threshold values ({threshold_metric.value})")
         axe.legend()
+        y_range = y_max - y_min
+        padding = max(y_range * 0.09, 1.0)  # 9% of range or minimum 1 unit
+        axe.set_ylim(top=y_max + padding)
+
         return fig, [axe]
