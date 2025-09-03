@@ -27,7 +27,7 @@ vram_cutoffs = [-1, 1e-6, 8, 11, 12, 16, 23, 32, 40, 48, 80]
 vram_labels = [0] + vram_cutoffs[2:]
 
 
-def get_requested_vram(constraints):
+def get_requested_vram(constraints) -> int:
     """Get the minimum requested VRAM from job constraints.
 
     Args:

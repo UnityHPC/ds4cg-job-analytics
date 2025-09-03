@@ -8,13 +8,12 @@ import os
 import pickle
 import shutil
 import subprocess
-from typing import cast
 
 import numpy as np
+from typing import Generic, TypeVar, Annotated, cast
 import pandas as pd
-
+from pathlib import Path
 from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
-from src.config.enum_constants import FilterTypeEnum, MetricsDataFrameNameEnum
 from src.utilities.report_generation import (
     calculate_time_series_data,
     calculate_gpu_type_data, 
@@ -22,9 +21,75 @@ from src.utilities.report_generation import (
     calculate_comparison_statistics,
     generate_recommendations,
 )
+from src.config.enum_constants import FilterTypeEnum, MetricsDataFrameNameBase, MetricsDataFrameNameEnum
+from pydantic import validate_call, AfterValidator, SkipValidation
+from src.database import DatabaseConnection
+from src.preprocess.preprocess import preprocess_data
 
 
-class EfficiencyAnalysis:
+def load_preprocessed_jobs_dataframe_from_duckdb(
+    db_path: str | Path,
+    table_name: str = "Jobs",
+    sample_size: int | None = None,
+    random_state: pd._typing.RandomState | None = None,
+) -> pd.DataFrame:
+    """
+    Load jobs DataFrame from a DuckDB database and preprocess it.
+
+    Args:
+        db_path (str or Path): Path to the DuckDB database.
+        table_name (str, optional): Table name to query. Defaults to 'Jobs'.
+        sample_size (int, optional): Number of rows to sample from the DataFrame. Defaults to None (no sampling).
+        random_state (pd._typing.RandomState, optional): Random state for reproducibility. Defaults to None.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the table data.
+
+    Raises:
+        RuntimeError: If the jobs DataFrame cannot be loaded from the database.
+    """
+    if isinstance(db_path, Path):
+        db_path = db_path.resolve()
+    try:
+        db = DatabaseConnection(str(db_path))
+
+        jobs_df = db.fetch_all_jobs(table_name=table_name)
+        processed_data = preprocess_data(
+            jobs_df, min_elapsed_seconds=0, include_failed_cancelled_jobs=False, include_cpu_only_jobs=False
+        )
+        if sample_size is not None:
+            processed_data = processed_data.sample(n=sample_size, random_state=random_state)
+        return processed_data
+    except Exception as e:
+        raise RuntimeError(f"Failed to load jobs DataFrame: {e}") from e
+
+
+# Generic type for metrics enums constrained to our abstract base Enum class
+MetricsDFNameEnumT = TypeVar("MetricsDFNameEnumT", bound=MetricsDataFrameNameBase)
+
+
+def _ensure_concrete_metrics_enum(
+    cls: type[MetricsDFNameEnumT],
+) -> type[MetricsDFNameEnumT]:
+    """Validate that the provided class is a concrete subclass of MetricsDataFrameNameBase.
+
+    Used by Pydantic to validate the enum argument to the constructor.
+
+    Raises:
+        TypeError: If the type is not a subclass of the base, or is the abstract base itself.
+
+    Returns:
+        type[MetricsDFNameEnumT]: The validated enum class.
+    """
+    # Ensure it's a subclass of our abstract base (defensive; helps type checkers and runtime safety)
+    if not isinstance(cls, type) or not issubclass(cls, MetricsDataFrameNameBase):
+        raise TypeError("metrics_df_name_enum must be a subclass of MetricsDataFrameNameBase")
+    if cls is MetricsDataFrameNameBase:
+        raise TypeError("metrics_df_name_enum must be a concrete Enum subclass, not the abstract base")
+    return cls
+
+
+class EfficiencyAnalysis(Generic[MetricsDFNameEnumT]):
     """
     Class to encapsulate the efficiency analysis of jobs based on various metrics.
 
@@ -33,15 +98,20 @@ class EfficiencyAnalysis:
     The metrics are generated in separate DataFrames for each category in MetricsDataFrameNameEnum.
     """
 
+    # Apply Pydantic runtime validation for constructor arguments
+    @validate_call(config={"arbitrary_types_allowed": True})
     def __init__(
         self,
-        jobs_df: pd.DataFrame,
+        jobs_df: Annotated[pd.DataFrame, SkipValidation()],
+        metrics_df_name_enum: Annotated[type[MetricsDFNameEnumT], AfterValidator(_ensure_concrete_metrics_enum)],
     ) -> None:
         """
         Initialize the EfficiencyAnalysis class.
 
         Args:
             jobs_df (pd.DataFrame): DataFrame containing job data.
+            metrics_df_name_enum (type[MetricsDFNameEnumT]): Enum class whose members'
+                .value names map to attributes on this instance.
 
         Raises:
             ValueError: If the jobs DataFrame is empty.
@@ -49,9 +119,10 @@ class EfficiencyAnalysis:
         if jobs_df.empty:
             raise ValueError("The jobs DataFrame is empty. Please provide a valid DataFrame with job data.")
         self.jobs_df = jobs_df
+        self.metrics_df_name_enum: type[MetricsDFNameEnumT] = metrics_df_name_enum
         # Initialize efficiency metric class attributes to None
-        for var in MetricsDataFrameNameEnum:
-            setattr(self, var.value, None)
+        for names in self.metrics_df_name_enum:
+            setattr(self, names.value, None)
         self.analysis_results: dict | None = None
 
     @staticmethod
@@ -67,6 +138,20 @@ class EfficiencyAnalysis:
             bool: True if the value is numeric, False otherwise.
         """
         return pd.api.types.is_integer_dtype(type(val)) or pd.api.types.is_float_dtype(type(val))
+
+    @staticmethod
+    def avg_non_inf(x: pd.Series) -> float | pd.api.typing.NAType:
+        """
+        Helper function to calculate the average of a Series, ignoring -np.inf values.
+
+        Args:
+            x (pd.Series): Series to calculate the average from.
+
+        Returns:
+            float: Average of the Series, ignoring -np.inf values. Returns pd.NA if no valid values.
+        """
+        valid = x[x != -np.inf]
+        return valid.mean() if not valid.empty else pd.NA
 
     @staticmethod
     def apply_numeric_filter(
@@ -317,13 +402,16 @@ class EfficiencyAnalysis:
         filtered_jobs.loc[:, "vram_constraint_efficiency_score"] = score
 
         # Add CPU memory metrics if available
-        if "CPUMemUsage" in self.jobs_df.columns and "Memory" in self.jobs_df.columns:
+        if {"CPUMemUsage", "Memory", "CPUs"}.issubset(self.jobs_df.columns):
             filtered_jobs.loc[:, "used_cpu_mem_gib"] = filtered_jobs["CPUMemUsage"] / (2**30)
-            filtered_jobs.loc[:, "allocated_cpu_mem_gib"] = filtered_jobs["Memory"] / (2**10)  # Memory is in MiB
+            filtered_jobs.loc[:, "allocated_cpu_mem_gib"] = (
+                filtered_jobs["Memory"] / (2**10) * filtered_jobs["NodeList"].apply(len)
+            )  # Memory is in MiB
             filtered_jobs.loc[:, "cpu_mem_efficiency"] = (
                 filtered_jobs["used_cpu_mem_gib"] / filtered_jobs["allocated_cpu_mem_gib"]
             )
-            filtered_jobs = filtered_jobs.drop(columns=["CPUMemUsage", "Memory"])
+            filtered_jobs.loc[:, "cpu_core_count"] = filtered_jobs["CPUs"]
+            filtered_jobs = filtered_jobs.drop(columns=["CPUMemUsage", "Memory", "CPUs"])
 
         self.jobs_with_efficiency_metrics = filtered_jobs
         return self.jobs_with_efficiency_metrics
@@ -347,31 +435,20 @@ class EfficiencyAnalysis:
             "vram_hours"
         ].transform("sum")
 
-        def avg_non_inf(x: pd.Series) -> float | pd.api.typing.NAType:
-            """
-            Helper function to calculate the average of a Series, ignoring -np.inf values.
-
-            Args:
-                x (pd.Series): Series to calculate the average from.
-
-            Returns:
-                float | pd.api.typing.NAType: Average of the Series, ignoring -np.inf values. 
-                    Returns pd.NA if no valid values.
-            """
-            valid = x[x != -np.inf]
-            return valid.mean() if not valid.empty else pd.NA
-
         users_w_efficiency_metrics = (
             self.jobs_with_efficiency_metrics.groupby("User", observed=True)
             .agg(
                 job_count=("JobID", "count"),
                 user_job_hours=("job_hours", "sum"),
                 pi_account=("Account", "first"),
-                avg_alloc_vram_efficiency_score=("alloc_vram_efficiency_score", avg_non_inf),
-                avg_vram_constraint_efficiency_score=("vram_constraint_efficiency_score", avg_non_inf),
                 avg_requested_vram_efficiency_score=(
                     "requested_vram_efficiency_score",
-                    avg_non_inf,
+                    EfficiencyAnalysis.avg_non_inf,
+                ),
+                avg_alloc_vram_efficiency_score=("alloc_vram_efficiency_score", EfficiencyAnalysis.avg_non_inf),
+                avg_vram_constraint_efficiency_score=(
+                    "vram_constraint_efficiency_score",
+                    EfficiencyAnalysis.avg_non_inf,
                 ),
             )
             .reset_index()
@@ -539,7 +616,10 @@ class EfficiencyAnalysis:
         inefficient_users = inefficient_users.sort_values("vram_hours", ascending=False)
         return inefficient_users
 
-    def calculate_all_efficiency_metrics(self, filtered_jobs: pd.DataFrame) -> dict:
+    def calculate_all_efficiency_metrics(
+        self,
+        filtered_jobs: pd.DataFrame,
+    ) -> dict:
         """
         Calculate all efficiency metrics for jobs, users, and PI accounts.
 
@@ -559,7 +639,10 @@ class EfficiencyAnalysis:
             self.calculate_job_efficiency_metrics(filtered_jobs)
             self.calculate_user_efficiency_metrics()
             self.calculate_pi_account_efficiency_metrics()
-            return {var.value: getattr(self, var.value) for var in MetricsDataFrameNameEnum}
+            result = {}
+            for var in self.metrics_df_name_enum:
+                result[var.value] = getattr(self, var.value)
+            return result
 
         except (KeyError, ValueError, TypeError, AttributeError) as e:
             raise RuntimeError(f"Failed to calculate all efficiency metrics: {e}") from e
@@ -743,7 +826,7 @@ class EfficiencyAnalysis:
             ValueError: If the sorting key is not valid or if ascending is not a boolean value
             ValueError: If the filter criteria are invalid
         """
-        if not isinstance(metrics_df_name_enum, MetricsDataFrameNameEnum):
+        if not isinstance(metrics_df_name_enum, self.metrics_df_name_enum):
             raise ValueError(
                 f"Invalid efficiency metric type: {metrics_df_name_enum}. "
                 f"Must be a member of MetricsDataFrameNameEnum."
@@ -781,7 +864,6 @@ class EfficiencyAnalysis:
         filtered_records = getattr(self, metrics_df_name_enum.value)[mask]
 
         # Sort by the specified key and order
-
         filtered_records = filtered_records.sort_values(sorting_key, ascending=ascending)
 
         return filtered_records

@@ -14,9 +14,18 @@ class DatabaseConnection:
     """
 
     def __init__(self, db_url: str, read_only: bool = True) -> None:
+        """
+        Initialize the DatabaseConnection object.
+
+        Args:
+            db_url (str): The URL of the DuckDB database.
+            read_only (bool): If True, the connection will be read-only. Defaults to True.
+
+        Returns:
+            None
+        """
         self.db_url = db_url
-        self.connection = None
-        self.connection = self._connect(read_only=read_only)
+        self.connection: duckdb.DuckDBPyConnection | None = self._connect(read_only=read_only)
         print(f"Connected to {self.db_url}")
 
     def _connect(self, read_only: bool) -> duckdb.DuckDBPyConnection:
@@ -36,12 +45,8 @@ class DatabaseConnection:
         if self.connection is not None:
             self.connection.close()
             self.connection = None
-
-    def __del__(self) -> None:
-        """Ensure the connection is closed when the object is deleted."""
-        self.disconnect()
-        if os.getenv("RUN_ENV") != "TEST":
-            print(f"Disconnected from {self.db_url}")
+            if os.getenv("RUN_ENV") != "TEST":
+                print(f"Disconnected from {self.db_url}")
 
     def is_connected(self) -> bool:
         """

@@ -2,9 +2,31 @@ site_name: "Unity Job Analytics"
 
 theme:
   name: "material"
+  features:
+    - navigation.tabs          # Enables horizontal top nav tabs
+    - navigation.tabs.sticky   # Keeps tabs visible when scrolling
+    - navigation.sections      # Groups subsections under tabs
+    - toc.integrate            # Puts table of contents in main pane
+  palette:
+    # Palette toggle for light mode
+    - scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
 
 plugins:
   - search
+  - mkdocs-jupyter:
+      include_source: true
+      allow_errors: true 
+      ignore_h1_titles: true
+
   - mkdocstrings:
         handlers:
           python:
@@ -21,20 +43,47 @@ plugins:
               # render Parameters/Returns as a table
               docstring_section_style: list
 
+# Configure markdown extensions
+markdown_extensions:
+  - attr_list
+  - md_in_html
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  # - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+# Suppress warnings for external links to notebooks
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+
+docs_dir: docs
+
 nav:
   - Home: 'index.md'
-  - About: 'about.md'
-  - Data:
-    - 'preprocess.md'
-  - Analysis:
-    - 'analysis/efficiency_analysis.md'
-  - Visualization:
-    - 'visualization/visualization.md'
-    - 'visualization/columns.md'
-    - 'visualization/efficiency_metrics.md'
-    - 'visualization/models.md'
-  - MVP Scripts:
-    - 'mvp_scripts/cpu_metrics.md'
-    - 'mvp_scripts/gpu_metrics.md'
-    - 'mvp_scripts/zero_gpu_usage.md'
-
+  - Getting Started: 'getting-started.md'
+  - Data and Efficiency Metrics: 'data-and-metrics.md'
+  - Demo: 'demo.md'
+  - Notebooks:
+    - Efficiency Analysis: 'notebooks/Efficiency Analysis.ipynb'
+    - Visualization: 'notebooks/Basic Visualization.ipynb'
+    # - Frequency Analysis: 'notebooks/Frequency Analysis.ipynb'
+  - Technical Documentation:
+    - Data Processing: 'preprocess.md'
+    - Analysis:
+      - 'analysis/efficiency_analysis.md'
+      - 'analysis/frequency_analysis.md'
+    - Visualization:
+      - 'visualization/visualization.md'
+      - 'visualization/columns.md'
+      - 'visualization/efficiency_metrics.md'
+      - 'visualization/models.md'
+    - MVP Scripts:
+      - 'mvp_scripts/cpu_metrics.md'
+      - 'mvp_scripts/gpu_metrics.md'
+      - 'mvp_scripts/zero_gpu_usage.md'
+  - FAQ: 'faq.md'
+  - Contact: 'contact.md'

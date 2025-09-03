@@ -510,7 +510,7 @@ class RequiredColumnsEnum(Enum):
 class ExcludedColumnsEnum(Enum):
     """
     An enumeration representing columns that should be omitted during preprocessing.
-    
+
     Attributes:
         UUID: Unique identifier column.
         END_TIME: Job end time column.
