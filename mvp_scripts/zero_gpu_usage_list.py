@@ -23,7 +23,7 @@ INTRO = (
 HOURS = "{hours} unused GPU hours. The most recent jobs are the following:"
 
 
-def get_job_type_breakdown(interactive, jobs):
+def get_job_type_breakdown(interactive, jobs) -> str:
     """Generate a summary string describing the breakdown of interactive and batch jobs.
 
     Args:
@@ -45,7 +45,7 @@ def get_job_type_breakdown(interactive, jobs):
     )
 
 
-def pi_report(account, days_back=60):
+def pi_report(account, days_back=60) -> None:
     """Create an efficiency report for a given PI group, summarizing GPU usage and waste.
 
     Args:
@@ -74,7 +74,7 @@ def pi_report(account, days_back=60):
 
 def main(
     dbfile="./modules/admin-resources/reporting/slurm_data.db", userlist="./users.csv", sendEmail=False, days_back=60
-):
+) -> None:
     """Print out a list of users who habitually waste GPU hours, and optionally email them a report.
 
     Args:
