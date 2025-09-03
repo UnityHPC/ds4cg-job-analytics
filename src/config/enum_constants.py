@@ -2,7 +2,8 @@
 Declaration of some enum class such as constants values of categorical types.
 """
 
-from enum import Enum, unique, auto
+from enum import Enum, EnumMeta, unique, auto
+from typing import Any
 
 
 @unique
@@ -142,7 +143,80 @@ class PartitionTypeEnum(Enum):
 
 
 @unique
-class MetricsDataFrameNameEnum(Enum):
+class RequiredHoardingAnalysisColumnsEnum(Enum):
+    """
+    An enumeration representing required columns for hoarding analysis.
+
+    Attributes:
+        USED_CPU_MEM_GIB: Represents the used CPU memory in GiB.
+        ALLOCATED_CPU_MEM_GIB: Represents the allocated CPU memory in GiB.
+        CPU_MEM_EFFICIENCY: Represents the CPU memory efficiency.
+    """
+
+    USED_CPU_MEM_GIB = "used_cpu_mem_gib"
+    ALLOCATED_CPU_MEM_GIB = "allocated_cpu_mem_gib"
+    CPU_MEM_EFFICIENCY = "cpu_mem_efficiency"
+    CPU_CORE_COUNT = "cpu_core_count"
+
+
+@unique
+class NodeInfoKeyEnum(Enum):
+    """
+    An enumeration representing important keys in node information configuration.
+
+    Attributes:
+        NAME: Represents the name of the node.
+        TYPE: Represents the type of the node (e.g., CPU, GPU).
+        RAM: Represents the total RAM available on the node.
+        COUNT: Represents the number of nodes of this type.
+        GPU_COUNT: Represents the number of GPUs available on the node.
+    """
+
+    NODES = "nodes"
+    RAM = "ram"
+    COUNT = "count"
+    GPU_COUNT = "gpu_count"
+    CORE_COUNT_PER_NODE = "cores"
+
+
+class MetricsDataFrameNameMeta(EnumMeta):
+    """Metaclass enforcing required members and their values on concrete metrics enums."""
+
+    _required_values: dict[str, str] = {
+        "JOBS": "jobs_with_efficiency_metrics",
+        "USERS": "users_with_efficiency_metrics",
+        "PI_GROUPS": "pi_accounts_with_efficiency_metrics",
+    }
+    _required_members: set[str] = set(_required_values.keys())
+
+    def __init__(cls, name: str, bases: tuple, namespace: dict, **kwargs: dict[str, Any]) -> None:
+        """Finalize Enum subclass creation and enforce required members and values.
+
+        Raises:
+            TypeError: If required members are missing or have unexpected values.
+        """
+        super().__init__(name, bases, namespace, **kwargs)
+        # Skip enforcement for the abstract base itself
+        if name != "MetricsDataFrameNameBase":
+            member_names: set[str] = set(cls.__members__.keys())
+            missing = cls._required_members - member_names
+            if missing:
+                raise TypeError(f"{name} must define members: {cls._required_members}; missing: {sorted(missing)}")
+            # Enforce exact expected string values for required members
+            for req_name, expected_value in cls._required_values.items():
+                actual_value = getattr(cls, req_name).value
+                if actual_value != expected_value:
+                    raise TypeError(f"{name}.{req_name} must equal {expected_value!r}, got {actual_value!r}")
+
+
+class MetricsDataFrameNameBase(Enum, metaclass=MetricsDataFrameNameMeta):
+    """Base class for all metrics DataFrame name enums."""
+
+    pass
+
+
+@unique
+class MetricsDataFrameNameEnum(MetricsDataFrameNameBase):
     """
     An enumeration representing the names of DataFrames containing efficiency metrics.
 
@@ -155,6 +229,29 @@ class MetricsDataFrameNameEnum(Enum):
     JOBS = "jobs_with_efficiency_metrics"
     USERS = "users_with_efficiency_metrics"
     PI_GROUPS = "pi_accounts_with_efficiency_metrics"
+
+
+@unique
+class ResourceHoardingDataFrameNameEnum(MetricsDataFrameNameBase):
+    """
+    An enumeration representing the names of DataFrames containing resource hoarding metrics.
+
+    Attributes:
+        JOBS: DataFrame name for jobs with efficiency metrics.
+        USERS: DataFrame name for users with efficiency metrics.
+        PI_GROUPS: DataFrame name for PI accounts/groups with efficiency metrics.
+        JOBS_WITH_RESOURCE_HOARDING_METRICS: DataFrame name for jobs with resource hoarding metrics.
+        USERS_WITH_RESOURCE_HOARDING_METRICS: DataFrame name for users with resource hoarding metrics.
+        PI_GROUPS_WITH_RESOURCE_HOARDING_METRICS: DataFrame name for PI accounts/groups with resource hoarding metrics.
+    """
+
+    # Reuse canonical values to avoid duplicate string literals
+    JOBS = MetricsDataFrameNameEnum.JOBS.value
+    USERS = MetricsDataFrameNameEnum.USERS.value
+    PI_GROUPS = MetricsDataFrameNameEnum.PI_GROUPS.value
+    JOBS_WITH_RESOURCE_HOARDING_METRICS = "jobs_with_resource_hoarding_metrics"
+    USERS_WITH_RESOURCE_HOARDING_METRICS = "users_with_resource_hoarding_metrics"
+    PI_GROUPS_WITH_RESOURCE_HOARDING_METRICS = "pi_accounts_with_resource_hoarding_metrics"
 
 
 @unique
@@ -172,3 +269,90 @@ class PreprocessingErrorTypeEnum(Enum):
     UNKNOWN_GPU_TYPE = "Unknown GPU Type"
     NO_VALID_NODES = "No Valid Nodes"
     GPU_TYPE_NULL = "GPU Type is Null"
+
+
+@unique
+class OptionalColumnsEnum(Enum):
+    """
+    An enumeration representing optional columns used for filtering in preprocess code.
+
+    Attributes:
+        STATUS: Job status column.
+        ACCOUNT: Account column.
+        QOS: Quality of Service column.
+        ARRAY_ID: Position in job array.
+        JOB_NAME: Name of job.
+        IS_ARRAY: Indicator if job is part of an array.
+        INTERACTIVE: Indicator if job was interactive.
+        USER: Unity user.
+        EXIT_CODE: Job exit code.
+        TIME_LIMIT: Job time limit (seconds).
+        GPU_COMPUTE_USAGE: GPU compute usage (pct).
+        CPUS: Number of CPUs.
+        MEMORY: Job allocated memory (bytes).
+        CPU_MEM_USAGE: CPU memory usage column.
+        CPU_COMPUTE_USAGE: CPU compute usage (pct).
+    """
+
+    STATUS = "Status"
+    ACCOUNT = "Account"
+    QOS = "QOS"
+    ARRAY_ID = "ArrayID"
+    JOB_NAME = "JobName"
+    IS_ARRAY = "IsArray"
+    INTERACTIVE = "Interactive"
+    USER = "User"
+    EXIT_CODE = "ExitCode"
+    TIME_LIMIT = "TimeLimit"
+    GPU_COMPUTE_USAGE = "GPUComputeUsage"
+    CPUS = "CPUs"
+    MEMORY = "Memory"
+    CPU_MEM_USAGE = "CPUMemUsage"
+    CPU_COMPUTE_USAGE = "CPUComputeUsage"
+
+
+@unique
+class RequiredColumnsEnum(Enum):
+    """
+    An enumeration representing required columns that must be present in the dataframe.
+
+    Attributes:
+        GPU_TYPE: GPU type column.
+        CONSTRAINTS: Job constraints column.
+        START_TIME: Job start time column.
+        SUBMIT_TIME: Job submit time column.
+        NODE_LIST: Node list column.
+        GPUS: Number of GPUs column.
+        GPU_MEM_USAGE: GPU memory usage column.
+        PARTITION: Partition column.
+        ELAPSED: Job elapsed time column.
+    """
+
+    JOB_ID = "JobID"
+    GPU_TYPE = "GPUType"
+    CONSTRAINTS = "Constraints"
+    START_TIME = "StartTime"
+    SUBMIT_TIME = "SubmitTime"
+    NODE_LIST = "NodeList"
+    GPUS = "GPUs"
+    GPU_MEM_USAGE = "GPUMemUsage"
+    ELAPSED = "Elapsed"
+    PARTITION = "Partition"
+
+
+@unique
+class ExcludedColumnsEnum(Enum):
+    """
+    An enumeration representing columns that should be omitted during preprocessing.
+
+    Attributes:
+        UUID: Unique identifier column.
+        END_TIME: Job end time column.
+        NODES: Number of nodes column.
+        PREEMPTED: Job preemption status column.
+    """
+
+    UUID = "UUID"
+    END_TIME = "EndTime"
+    NODES = "Nodes"
+    PREEMPTED = "Preempted"
