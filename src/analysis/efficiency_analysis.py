@@ -4,53 +4,12 @@ Tools to analyze efficiency of Jobs based on their VRAM usage.
 The aim is to identify potential inefficiencies in GPU usage and notify users or PIs about these issues.
 """
 
-from pathlib import Path
 from typing import cast
 
 import numpy as np
 import pandas as pd
-
 from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
 from src.config.enum_constants import FilterTypeEnum, MetricsDataFrameNameEnum
-from src.database import DatabaseConnection
-from src.preprocess.preprocess import preprocess_data
-
-
-def load_preprocessed_jobs_dataframe_from_duckdb(
-    db_path: str | Path,
-    table_name: str = "Jobs",
-    sample_size: int | None = None,
-    random_state: pd._typing.RandomState | None = None,
-) -> pd.DataFrame:
-    """
-    Load jobs DataFrame from a DuckDB database and preprocess it.
-
-    Args:
-        db_path (str or Path): Path to the DuckDB database.
-        table_name (str, optional): Table name to query. Defaults to 'Jobs'.
-        sample_size (int, optional): Number of rows to sample from the DataFrame. Defaults to None (no sampling).
-        random_state (pd._typing.RandomState, optional): Random state for reproducibility. Defaults to None.
-
-    Returns:
-        pd.DataFrame: DataFrame containing the table data.
-
-    Raises:
-        RuntimeError: If the jobs DataFrame cannot be loaded from the database.
-    """
-    if isinstance(db_path, Path):
-        db_path = db_path.resolve()
-    try:
-        db = DatabaseConnection(str(db_path))
-
-        jobs_df = db.fetch_all_jobs(table_name=table_name)
-        processed_data = preprocess_data(
-            jobs_df, min_elapsed_seconds=0, include_failed_cancelled_jobs=False, include_cpu_only_jobs=False
-        )
-        if sample_size is not None:
-            processed_data = processed_data.sample(n=sample_size, random_state=random_state)
-        return processed_data
-    except Exception as e:
-        raise RuntimeError(f"Failed to load jobs DataFrame: {e}") from e
 
 
 class EfficiencyAnalysis:

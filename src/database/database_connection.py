@@ -36,12 +36,8 @@ class DatabaseConnection:
         if self.connection is not None:
             self.connection.close()
             self.connection = None
-
-    def __del__(self) -> None:
-        """Ensure the connection is closed when the object is deleted."""
-        self.disconnect()
-        if os.getenv("RUN_ENV") != "TEST":
-            print(f"Disconnected from {self.db_url}")
+            if os.getenv("RUN_ENV") != "TEST":
+                print(f"Disconnected from {self.db_url}")
 
     def is_connected(self) -> bool:
         """
