@@ -44,9 +44,9 @@ ATTRIBUTE_CATEGORIES = {
 MULTIVALENT_GPUS = {"a100": [40, 80], "v100": [16, 32]}
 
 # TODO (Ayush): Refactor to obtain partitions that have one GPUType from `src/config/remote_config.py` instead.
-# Mapping partitions to GPU types for specific constraints to calculate requested VRAM
+# Mapping partitions to GPU types for partition constraint used to calculate requested VRAM
 # Update this map as new partitions are added or existing ones change
-PARTITION_TO_GPU_MAP = {
+MONO_GPU_PARTITION_GPU_TYPE = {
     "superpod-a100": "a100-80g",
     "umd-cscdr-gpu": "a100-80g",
     "uri-gpu": "a100-80g",

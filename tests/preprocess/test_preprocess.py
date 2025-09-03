@@ -16,7 +16,7 @@ from src.config.enum_constants import (
 )
 from src.preprocess import preprocess_data
 from src.preprocess.preprocess import _get_partition_constraint, _get_requested_vram, _get_vram_constraint
-from .conftest import preprocess_mock_data
+from ..conftest import preprocess_mock_data
 
 
 @pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
