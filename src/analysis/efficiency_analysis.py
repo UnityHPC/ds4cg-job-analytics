@@ -12,6 +12,7 @@ from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
 from src.config.enum_constants import (
     FilterTypeEnum,
     MetricsDataFrameNameBase,
+    MetricsDataFrameNameEnum
 )
 from pydantic import validate_call, AfterValidator, SkipValidation
 from src.database import DatabaseConnection
@@ -53,7 +54,6 @@ def load_preprocessed_jobs_dataframe_from_duckdb(
         return processed_data
     except Exception as e:
         raise RuntimeError(f"Failed to load jobs DataFrame: {e}") from e
-
 
 # Generic type for metrics enums constrained to our abstract base Enum class
 MetricsDFNameEnumT = TypeVar("MetricsDFNameEnumT", bound=MetricsDataFrameNameBase)
@@ -731,7 +731,7 @@ class EfficiencyAnalysis(Generic[MetricsDFNameEnumT]):
 
     def sort_and_filter_records_with_metrics(
         self,
-        metrics_df_name_enum: MetricsDFNameEnumT,
+        metrics_df_name_enum: MetricsDataFrameNameEnum,
         sorting_key: str,
         ascending: bool,
         filter_criteria: dict[str, int | float | dict | pd.api.typing.NAType],
