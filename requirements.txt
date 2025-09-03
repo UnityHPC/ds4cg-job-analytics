@@ -1,6 +1,7 @@
 duckdb
 python-dateutil
 pandas
+plotly
 fire
 tabulate
 matplotlib
