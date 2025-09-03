@@ -126,7 +126,7 @@ def _fill_missing(res: pd.DataFrame, include_cpu_only_jobs: bool) -> None:
         "Interactive": lambda col: col.fillna("non-interactive"),
         "Constraints": lambda col: col.fillna("").apply(lambda x: [] if isinstance(x, str) and x == "" else list(x)),
         "GPUs": lambda col: col.fillna(0),
-        "NodeList": : col.fillna("").apply(lambda x: [] if isinstance(x, str) and x == "" else list(x)),
+        "NodeList": lambda col:  col.fillna("").apply(lambda x: [] if isinstance(x, str) and x == "" else list(x)),
     }
 
     res.loc[:, "GPUType"] = res.apply(
