@@ -25,6 +25,7 @@ def load_and_preprocess_jobs(
     min_elapsed_seconds: int = DEFAULT_MIN_ELAPSED_SECONDS,
     random_state: pd._typing.RandomState | None = None,
     sample_size: int | None = None,
+    anonymize: bool = False,
 ) -> pd.DataFrame:
     """
     Load jobs DataFrame from a DuckDB database with standard filtering and preprocess it.
@@ -46,6 +47,8 @@ def load_and_preprocess_jobs(
             Defaults to DEFAULT_MIN_ELAPSED_SECONDS.
         random_state (pd._typing.RandomState, optional): Random state for reproducibility. Defaults to None.
         sample_size (int, optional): Number of rows to sample from the DataFrame. Defaults to None (no sampling).
+        anonymize (bool, optional): Whether to anonymize the DataFrame. Defaults to False.
+
 
     Returns:
         pd.DataFrame: Preprocessed DataFrame containing the filtered job data.
@@ -59,7 +62,7 @@ def load_and_preprocess_jobs(
     if isinstance(db_path, Path):
         db_path = db_path.resolve()
     try:
-        db = DatabaseConnection(str(db_path))
+        db = DatabaseConnection(str(db_path), anonymize=anonymize)
         qos_values = "(" + ",".join(f"'{obj.value}'" for obj in QOSEnum) + ")"
         excluded_columns = "(" + ", ".join(f"{obj.value}" for obj in ExcludedColumnsEnum) + ")"
 
@@ -87,7 +90,7 @@ def load_and_preprocess_jobs(
 
         query = f"SELECT * EXCLUDE {excluded_columns} FROM {table_name} WHERE {' AND '.join(conditions_arr)}"
         jobs_df = db.fetch_query(query=query)
-        processed_data = Preprocess().preprocess_data(jobs_df, apply_filter=False)
+        processed_data = Preprocess().preprocess_data(jobs_df, apply_filter=False, anonymize=anonymize)
         if sample_size is not None:
             processed_data = processed_data.sample(n=sample_size, random_state=random_state)
         return processed_data
@@ -101,6 +104,7 @@ def load_and_preprocess_jobs_custom_query(
     custom_query: str | None = None,
     random_state: pd._typing.RandomState | None = None,
     sample_size: int | None = None,
+    anonymize: bool = False,
 ) -> pd.DataFrame:
     """
     Load jobs DataFrame from a DuckDB database using a custom SQL query and preprocess it.
@@ -115,6 +119,7 @@ def load_and_preprocess_jobs_custom_query(
         custom_query (str, optional): Custom SQL query to execute. If None, defaults to "SELECT * FROM {table_name}".
         random_state (pd._typing.RandomState, optional): Random state for reproducibility. Defaults to None.
         sample_size (int, optional): Number of rows to sample from the DataFrame. Defaults to None (no sampling).
+        anonymize (bool, optional): Whether to anonymize the DataFrame. Defaults to False.
 
     Returns:
         pd.DataFrame: Preprocessed DataFrame containing the data returned by the custom query.
@@ -135,7 +140,7 @@ def load_and_preprocess_jobs_custom_query(
     if isinstance(db_path, Path):
         db_path = db_path.resolve()
     try:
-        db = DatabaseConnection(str(db_path))
+        db = DatabaseConnection(str(db_path), anonymize=anonymize)
 
         if custom_query is None:
             custom_query = f"SELECT * FROM {table_name}"
@@ -149,6 +154,7 @@ def load_and_preprocess_jobs_custom_query(
             include_failed_cancelled_jobs=True,
             include_cpu_only_jobs=True,
             include_custom_qos_jobs=True,
+            anonymize=anonymize,
         )
         if sample_size is not None:
             processed_data = processed_data.sample(n=sample_size, random_state=random_state)
