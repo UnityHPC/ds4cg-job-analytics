@@ -22,7 +22,6 @@ from src.utilities.report_generation import (
     generate_recommendations,
 )
 from src.config.enum_constants import FilterTypeEnum, MetricsDataFrameNameBase, MetricsDataFrameNameEnum
-from pydantic import validate_call, AfterValidator, SkipValidation
 from src.database import DatabaseConnection
 from src.preprocess.preprocess import preprocess_data
 
@@ -67,28 +66,6 @@ def load_preprocessed_jobs_dataframe_from_duckdb(
 # Generic type for metrics enums constrained to our abstract base Enum class
 MetricsDFNameEnumT = TypeVar("MetricsDFNameEnumT", bound=MetricsDataFrameNameBase)
 
-
-def _ensure_concrete_metrics_enum(
-    cls: type[MetricsDFNameEnumT],
-) -> type[MetricsDFNameEnumT]:
-    """Validate that the provided class is a concrete subclass of MetricsDataFrameNameBase.
-
-    Used by Pydantic to validate the enum argument to the constructor.
-
-    Raises:
-        TypeError: If the type is not a subclass of the base, or is the abstract base itself.
-
-    Returns:
-        type[MetricsDFNameEnumT]: The validated enum class.
-    """
-    # Ensure it's a subclass of our abstract base (defensive; helps type checkers and runtime safety)
-    if not isinstance(cls, type) or not issubclass(cls, MetricsDataFrameNameBase):
-        raise TypeError("metrics_df_name_enum must be a subclass of MetricsDataFrameNameBase")
-    if cls is MetricsDataFrameNameBase:
-        raise TypeError("metrics_df_name_enum must be a concrete Enum subclass, not the abstract base")
-    return cls
-
-
 class EfficiencyAnalysis(Generic[MetricsDFNameEnumT]):
     """
     Class to encapsulate the efficiency analysis of jobs based on various metrics.
@@ -98,12 +75,10 @@ class EfficiencyAnalysis(Generic[MetricsDFNameEnumT]):
     The metrics are generated in separate DataFrames for each category in MetricsDataFrameNameEnum.
     """
 
-    # Apply Pydantic runtime validation for constructor arguments
-    @validate_call(config={"arbitrary_types_allowed": True})
     def __init__(
         self,
-        jobs_df: Annotated[pd.DataFrame, SkipValidation()],
-        metrics_df_name_enum: Annotated[type[MetricsDFNameEnumT], AfterValidator(_ensure_concrete_metrics_enum)],
+        jobs_df: pd.DataFrame,
+        metrics_df_name_enum: type[MetricsDFNameEnumT] = MetricsDataFrameNameEnum
     ) -> None:
         """
         Initialize the EfficiencyAnalysis class.

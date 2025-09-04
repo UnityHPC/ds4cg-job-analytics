@@ -9,6 +9,7 @@ seaborn
 jupyterlab
 jq
 pydantic
+papermill
 requests
 requests-cache
 ipykernel

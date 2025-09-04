@@ -218,7 +218,7 @@ def generate_user_report(
             text=True,
             cwd=reports_dir,
         )
-
+        output_path = os.path.join(reports_dir, output_file)
         # Check if command was successful
         if result.returncode != 0:
             print(f"      ❌ Quarto rendering failed (code {result.returncode})")
@@ -229,7 +229,7 @@ def generate_user_report(
             return None
 
         # Check if output file was created
-        if not os.path.exists(output_file_abs):
+        if not os.path.exists(output_path):
             print("      ❌ Output file not created")
             print(f"         Expected at: {output_file_abs}")
             return None

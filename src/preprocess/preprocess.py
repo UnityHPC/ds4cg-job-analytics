@@ -466,17 +466,6 @@ def preprocess_data(
     # Check for infinity values in memory usage columns
     _check_for_infinity_values(data)
 
-    # Identify and handle duplicate JobIDs
-    duplicate_rows = data[data["JobID"].duplicated(keep=False)]
-    if not duplicate_rows.empty:
-        duplicate_message = (
-            f"{len(duplicate_rows['JobID'].unique().tolist())} duplicate JobIDs detected. "
-            "Keeping only the latest entry for each JobID."
-        )
-        warnings.warn(message=duplicate_message, stacklevel=2, category=UserWarning)
-        data_sorted = data.sort_values(by="SubmitTime", ascending=False)  # Sort by SubmitTime to keep the latest entry
-        data = data_sorted.drop_duplicates(subset=["JobID"], keep="first")  # Keep the latest entry for each JobID
-
     # Save preprocessing error logs to a file.
     _write_preprocessing_error_logs(processing_error_logs)
 

@@ -448,7 +448,8 @@ def generate_recommendations(user_jobs: pd.DataFrame, user_data: pd.Series = Non
         )
 
     # Requested VRAM efficiency (if user_data is provided)
-    eff = user_data["requested_vram_efficiency"]
+    eff = user_data['expected_value_requested_vram_efficiency']
+    #eff = user_data["requested_vram_efficiency"]
     if user_data is not None and (eff.mean() if hasattr(eff, 'mean') else float(eff)) < 0.5:
         recommendations.append(
             "📊 **Resource Planning**: You consistently request more VRAM than you use. "
