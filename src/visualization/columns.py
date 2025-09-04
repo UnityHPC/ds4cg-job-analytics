@@ -114,7 +114,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             return f"{(n / total_count * 100):.1f}%" if total_count > 0 else "0.0%"
 
         # Helper to reduce xticks and rotate if width is small
-        def choose_ticks_and_rotation(ticks: list[int], width: float, max_labels: int = 3) -> tuple[list[int], int]:
+        def choose_ticks_and_rotation(ticks: list[Any], width: float, max_labels: int = 3) -> tuple[list[int], int]:
             # Always include first and last tick, and always have at least 4 ticks
             if width < min_width and len(ticks) > max_labels:
                 # Always include first and last, and evenly space the rest
@@ -416,7 +416,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         # Define threshold for small slices
         threshold_pct = 5
         total = counts.sum()
-        pct_values = counts.div(total).multiply(100)
+        pct_values = counts.div(total) * 100
 
         # Explode small slices to separate them visually
         explode = [max(0.15 - p / 100 * 4, 0.1) if p < threshold_pct else 0 for p in pct_values]
@@ -503,7 +503,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
 
         # Prepare labels and explode small slices
         threshold_pct = 5
-        pct_values = exit_code_counts.div(total_count).multiply(100)
+        pct_values = exit_code_counts.div(total_count) * 100
         explode = [max(0.15 - p / 100 * 4, 0.1) if p < threshold_pct else 0 for p in pct_values]
 
         # Prepare labels: only show label on pie if above threshold
@@ -658,7 +658,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
 
         # Prepare labels and explode small slices
         threshold_pct = 5
-        pct_values = qos_counts.div(total_count).multiply(100)
+        pct_values = qos_counts.div(total_count) * 100
         explode = [max(0.15 - p / 100 * 4, 0.1) if p < threshold_pct else 0 for p in pct_values]
 
         # Prepare labels: only show label on pie if above threshold
@@ -752,7 +752,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             raise ValueError(f"No valid GPU counts in {col}. Skipping visualization.")
 
         threshold_pct = 5
-        pct_values = gpu_counts.div(total_count).multiply(100)
+        pct_values = gpu_counts.div(total_count) * 100
         # Explode values increase with index: first group (0), second (small), ..., last (largest)
         explode = [i * 0.04 for i in range(len(gpu_counts))]
 
@@ -1327,7 +1327,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
 
         # Prepare labels and explode small slices
         threshold_pct = 5
-        pct_values = exit_code_counts.div(total_count).multiply(100)
+        pct_values = exit_code_counts.div(total_count) * 100
         explode = [max(0.15 - p / 100 * 4, 0.2) if p < threshold_pct else 0 for p in pct_values]
 
         # Prepare labels: only show label on pie if above threshold

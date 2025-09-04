@@ -42,3 +42,4 @@ data/
 *.diff
 /docs/build
 /site
+.quarto
