@@ -2,3 +2,4 @@ SlurmGPU.ipynb
 Requested and Used VRAM.ipynb
 No VRAM Use Analysis.ipynb
 Efficiency Analysis.ipynb
+Attribute Visualization.ipynb
