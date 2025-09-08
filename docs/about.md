@@ -1,8 +1,12 @@
 # About DS4CG Unity Job Analytics
 
+
 ## Project Background
 
 The DS4CG Unity Job Analytics project was initiated as part of the DS4CG 2025 summer internship program in collaboration with the Unity HPC cluster at UMass. The goal is to provide robust tools and documentation for analyzing job data, improving resource utilization, and supporting research and operations on the Unity cluster.
+
+### Motivation
+High-performance GPUs are a critical resource on shared clusters, but they are often underutilized due to inefficient job scheduling, over-allocation, or lack of user awareness. Many jobs request more GPU memory or compute than they actually use, leading to wasted resources and longer queue times for others. This project aims to address these issues by providing analytics and reporting tools that help users and administrators understand GPU usage patterns, identify inefficiencies, and make data-driven decisions to improve overall cluster utilization.
 
 ## Team & Contributors
 - Project Lead: Benjamin Pachev

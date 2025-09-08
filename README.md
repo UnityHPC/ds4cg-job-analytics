@@ -3,6 +3,31 @@
 This repository is a place to contain the tools developed over the course of the DS4CG 2025 summer
 internship project with Unity.
 
+## DS4CG Job Analytics
+
+
+DS4CG Job Analytics is a data analytics and reporting platform developed during the DS4CG 2025 summer internship with Unity. It provides tools for analyzing HPC job data, generating interactive reports, and visualizing resource usage and efficiency.
+
+## Motivation
+High-performance GPUs are a critical resource on shared clusters, but they are often underutilized due to inefficient job scheduling, over-allocation, or lack of user awareness. Many jobs request more GPU memory or compute than they actually use, leading to wasted resources and longer queue times for others. This project aims to address these issues by providing analytics and reporting tools that help users and administrators understand GPU usage patterns, identify inefficiencies, and make data-driven decisions to improve overall cluster utilization.
+
+## Project Overview
+This project includes:
+- Python scripts and modules for data preprocessing, analysis, and report generation
+- Jupyter notebooks for interactive exploration and visualization
+- Automated report generation scripts (see the `feature/reports` branch for the latest versions)
+- Documentation built with MkDocs and Quarto
+
+## Example Notebooks
+The following notebooks demonstrate key analyses and visualizations:
+
+- `notebooks/Basic Visualization.ipynb`: Basic plots and metrics
+- `notebooks/Efficiency Analysis.ipynb`: Efficiency metrics and user comparisons
+- `notebooks/Resource Hoarding.ipynb`: Analysis of resource hoarding
+- `notebooks/SlurmGPU.ipynb`: GPU job analysis
+
+See the `notebooks/` directory for more examples.
+
 ## Contributing to this repository
 
 The following guidelines may prove helpful in maximizing the utility of this repository:
