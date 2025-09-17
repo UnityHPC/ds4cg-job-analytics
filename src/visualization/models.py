@@ -15,6 +15,15 @@ class ColumnVisualizationKwargsModel(BaseModel):
 class EfficiencyMetricsKwargsModel(BaseModel):
     """Model for keyword arguments used in efficiency metrics visualizations."""
 
+    model_config = ConfigDict(strict=True, extra="allow")
+    column: str
+    figsize: tuple[int | float, int | float] = Field(default=(8, 10))
+    anonymize: bool = Field(default=False)
+
+
+class JobsWithMetricsKwargsModel(EfficiencyMetricsKwargsModel):
+    """Model for keyword arguments used in jobs with metrics visualizations."""
+
     model_config = ConfigDict(strict=True, extra="forbid")
     column: str
     bar_label_columns: list[str] | None
@@ -23,6 +32,23 @@ class EfficiencyMetricsKwargsModel(BaseModel):
 
 class UsersWithMetricsKwargsModel(EfficiencyMetricsKwargsModel):
     """Model for keyword arguments used in user metrics visualizations."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+    column: str
+    bar_label_columns: list[str] | None
+    figsize: tuple[int | float, int | float] = Field(default=(8, 8))
+
+
+class UsersWithMetricsHistKwargsModel(EfficiencyMetricsKwargsModel):
+    """Model for keyword arguments used in user metrics histogram visualizations."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+    column: str
+    figsize: tuple[int | float, int | float] = Field(default=(8, 5))
+
+
+class PIGroupsWithMetricsKwargsModel(EfficiencyMetricsKwargsModel):
+    """Model for keyword arguments used in PI group metrics visualizations."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
     column: str

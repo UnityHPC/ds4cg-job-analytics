@@ -1,12 +1,7 @@
-## Introduction
-
-This repository is a place to contain the tools developed over the course of the DS4CG 2025 summer
-internship project with Unity.
-
-## DS4CG Job Analytics
+# Unity GPU Efficiency Analytics Suite
 
 
-DS4CG Job Analytics is a data analytics and reporting platform developed during the DS4CG 2025 summer internship with Unity. It provides tools for analyzing HPC job data, generating interactive reports, and visualizing resource usage and efficiency.
+This repository is a data analytics and reporting platform developed as part of the [Summer 2025 Data Science for the Common Good (DS4CG) program](https://ds.cs.umass.edu/programs/ds4cg/ds4cg-team-2025) in partnership with the Unity Research Computing Platform. It provides tools for analyzing HPC job data, generating interactive reports, and visualizing resource usage and efficiency.
 
 ## Motivation
 High-performance GPUs are a critical resource on shared clusters, but they are often underutilized due to inefficient job scheduling, over-allocation, or lack of user awareness. Many jobs request more GPU memory or compute than they actually use, leading to wasted resources and longer queue times for others. This project aims to address these issues by providing analytics and reporting tools that help users and administrators understand GPU usage patterns, identify inefficiencies, and make data-driven decisions to improve overall cluster utilization.
@@ -14,32 +9,109 @@ High-performance GPUs are a critical resource on shared clusters, but they are o
 ## Project Overview
 This project includes:
 - Python scripts and modules for data preprocessing, analysis, and report generation
-- Jupyter notebooks for interactive exploration and visualization
+- Jupyter notebooks for interactive analysis and visualization
 - Automated report generation scripts (see the `feature/reports` branch for the latest versions)
 - Documentation built with MkDocs and Quarto
 
 ## Example Notebooks
-The following notebooks demonstrate key analyses and visualizations:
+The following notebooks generate comprehensive analysis for two subsets of the data:
 
-- `notebooks/Basic Visualization.ipynb`: Basic plots and metrics
-- `notebooks/Efficiency Analysis.ipynb`: Efficiency metrics and user comparisons
-- `notebooks/Resource Hoarding.ipynb`: Analysis of resource hoarding
-- `notebooks/SlurmGPU.ipynb`: GPU job analysis
+- [`notebooks/analysis/No VRAM Use Analysis.ipynb`](notebooks/analysis/No%20VRAM%20Use%20Analysis.ipynb): Analysis of GPU jobs that end up using no VRAM.
+- [`notebooks/analysis/Requested and Used VRAM.ipynb`](notebooks/analysis/Requested%20and%20Used%20VRAM.ipynb): Analysis of GPU jobs that request a specific amount of VRAM.
 
-See the `notebooks/` directory for more examples.
+The following notebooks generate demonstrate key analyses, visualizations:
 
-## Contributing to this repository
+- [`notebooks/module_demos/Basic Visualization.ipynb`](notebooks/module_demos/Basic%20Visualization.ipynb): Basic plots and metrics
+- [`notebooks/module_demos/Efficiency Analysis.ipynb`](notebooks/module_demos/Efficiency%20Analysis.ipynb): Calculation of efficiency metrics and user comparisons
+- [`notebooks/module_demos/Resource Hoarding.ipynb`](notebooks/module_demos/Resource%20Hoarding.ipynb`): Analysis of CPU core and RAM overallocation 
 
-The following guidelines may prove helpful in maximizing the utility of this repository:
-
-- Please avoid committing code unless it is meant to be used by the rest of the team.
-- New code should first be committed in a dedicated branch (```feature/newanalysis``` or ```bugfix/typo```), and later merged into ```main``` following a code review.
-- Shared datasets should usually be managed with a shared folder on Unity, not committed to Git.
-- Prefer committing Python modules with plotting routines like ```scripts/gpu_metrics.py``` instead of Jupyter notebooks, when possible. 
+The [`notebooks`](notebooks) directory contains all Jupyter notebooks.
   
-## Getting started on Unity
 
-You'll need to first install a few dependencies, which include DuckDB, Pandas, and some plotting libraries. More details for running the project will need be added here later.
+## Documentation
+
+This repository uses [MkDocs](https://www.mkdocs.org/) for project documentation. The documentation source files are located in the `docs/` directory and the configuration is in `mkdocs.yml`.
+
+To build and serve the documentation locally:
+
+    pip install -r dev-requirements.txt
+    mkdocs serve
+
+To build the static site:
+
+    mkdocs build
+
+To deploy the documentation (e.g., to GitHub Pages):
+
+    mkdocs gh-deploy
+
+See the [MkDocs documentation](https://www.mkdocs.org/user-guide/) for more details and advanced usage.
+
+### Documenting New Features
+
+For any new features, modules, or major changes, please add a corresponding `.md` file under the `docs/` directory. This helps keep the project documentation up to date and useful for all users and contributors.
+
+## Dataset
+
+The primary dataset for this project is a DuckDB database that contains information about jobs on
+Unity. It is located under ```unity.rc.umass.edu:/modules/admin-resources/reporting/slurm_data.db``` and is updated daily.
+The schema is provided below. In addition to the columns in the DuckDB file, this repository contains tools to add a number of useful derived columns for visualization and analysis.
+
+| Column | Type | Description |
+| :---    | :--- | :------------ |
+| UUID   | VARCHAR | Unique identifier | 
+| JobID  | INTEGER | Slurm job ID |
+| ArrayID | INTEGER | Position in job array |
+|ArrayJobID| INTEGER | Slurm job ID within array|
+| JobName |  VARCHAR | Name of job |
+| IsArray |  BOOLEAN | Indicator if job is part of an array |
+| Interactive |  VARCHAR | Indicator if job was interactive
+| Preempted |  BOOLEAN |  Was job preempted |
+| Account |  VARCHAR |  Slurm account (PI group) |
+| User |  VARCHAR |  Unity user |
+| Constraints |  VARCHAR[] | Job constraints |
+| QOS |  VARCHAR | Job QOS |
+| Status |  VARCHAR | Job status on termination |
+| ExitCode |  VARCHAR | Job exit code |
+| SubmitTime |  TIMESTAMP_NS |  Job submission time |
+| StartTime |  TIMESTAMP_NS | Job start time
+| EndTime |  TIMESTAMP_NS | Job end time |
+| Elapsed |  INTEGER | Job runtime (seconds) |
+| TimeLimit |  INTEGER | Job time limit (seconds) |
+| Partition |  VARCHAR | Job partition |
+| Nodes |  VARCHAR | Job nodes as compact string |
+| NodeList |  VARCHAR[] | List of job nodes |
+| CPUs |  SMALLINT | Number of CPU cores |
+| Memory |  INTEGER | Job allocated memory (bytes) |
+| GPUs |  SMALLINT | Number of GPUs requested |
+| GPUType |  DICT | Dictionary with keys as type of GPU (str) and the values as number of GPUs corresponding to that type (int) |
+| GPUMemUsage |  FLOAT | GPU memory usage (bytes) |
+| GPUComputeUsage |  FLOAT | GPU compute usage (pct) |
+| CPUMemUsage |  FLOAT | GPU memory usage (bytes) |
+| CPUComputeUsage |  FLOAT | CPU compute usage (pct) |
+
+
+## Development Environment
+
+To set up your development environment, use the provided [`dev-requirements.txt`](dev-requirements.txt) for all development dependencies (including linting, testing, and documentation tools).
+
+This project requires **Python 3.11**. Make sure you have Python 3.11 installed before creating the virtual environment.
+
+### Windows (PowerShell)
+
+    python -m venv duckdb
+    .\duckdb\Scripts\Activate.ps1
+    pip install -r requirements.txt
+    pip install -r dev-requirements.txt
+
+### Linux / macOS (bash/zsh)
+
+    python -m venv duckdb
+    source duckdb/bin/activate
+    pip install -r requirements.txt
+    pip install -r dev-requirements.txt
+
+If you need to reset your environment, you can delete the `duckdb` directory and recreate it as above.
 
 ### Version Control
 To provide the path of the git configuration file of this project to git, run:
@@ -59,32 +131,7 @@ visible in Jupyter, run
 
 from within the environment. This will add "Duck DB" as a kernel option in the dropdown.
 
-By default, Jupyter Notebook outoputs are removed via a git filter before the notebook is committed to git. To add an exception and keep the output of a notebook, add the following line to [notebooks/.gitattributes](```notebooks/.gitattributes```):
-
-    <NOTEBOOK_NAME>.ipynb !filter=strip-notebook-output
-
-
-## Development Environment
-
-To set up your development environment, use the provided `dev-requirements.txt` for all development dependencies (including linting, testing, and documentation tools).
-
-This project requires **Python 3.11**. Make sure you have Python 3.11 installed before creating the virtual environment.
-
-### Windows (PowerShell)
-
-    python -m venv duckdb
-    .\duckdb\Scripts\Activate.ps1
-    pip install -r requirements.txt
-    pip install -r dev-requirements.txt
-
-### Linux / macOS (bash/zsh)
-
-    python -m venv duckdb
-    source duckdb/bin/activate
-    pip install -r requirements.txt
-    pip install -r dev-requirements.txt
-
-If you need to reset your environment, you can delete the `duckdb` folder and recreate it as above.
+By default, Jupyter Notebook outputs are removed via a git filter before the notebook is committed to git. To add an exception and keep the output of a notebook, add the file name of the notebook to [`scripts/strip_notebook_exclude.txt`](```scripts/.strip_notebook_exclude```).
 
 ## Code Style & Linting
 
@@ -142,29 +189,6 @@ All Python code should use [**Google-style docstrings**](https://google.github.i
         """
         # ...function code...
 
-## Documentation
-
-This repository uses [MkDocs](https://www.mkdocs.org/) for project documentation. The documentation source files are located in the `docs/` directory and the configuration is in `mkdocs.yml`.
-
-To build and serve the documentation locally:
-
-    pip install -r dev-requirements.txt
-    mkdocs serve
-
-To build the static site:
-
-    mkdocs build
-
-To deploy the documentation (e.g., to GitHub Pages):
-
-    mkdocs gh-deploy
-
-See the [MkDocs documentation](https://www.mkdocs.org/user-guide/) for more details and advanced usage.
-
-### Documenting New Features
-
-For any new features, modules, or major changes, please add a corresponding `.md` file under the `docs/` directory. This helps keep the project documentation up to date and useful for all users and contributors.
-
 ## Testing
 
 To run tests, use the provided test scripts or `pytest` (if available):
@@ -172,50 +196,7 @@ To run tests, use the provided test scripts or `pytest` (if available):
     pytest
 
 
-### Support
+## Support
 
-The Unity documentation (https://docs.unity.rc.umass.edu/) has a lot of useful
-background information about Unity in particular and HPC in general. It will help explain a lot of
-the terms used in the dataset schema below. For specific issues with the code in this repo or the
-DuckDB dataset, feel free to reach out to Benjamin Pachev on the Unity Slack.
-
-## The dataset
-
-The primary dataset for this project is a DuckDB database that contains information about jobs on
-Unity. It is contained under ```/modules/admin-resources/reporting/slurm_data.db``` and is updated daily.
-A schema is provided below. In addition to the columns in the DuckDB file, ```scripts/gpu_metrics.py```
-contains tools to add a number of useful derived columns for plotting and analysis.
-
-| Column | Type | Description |
-| :---    | :--- | :------------ |
-| UUID   | VARCHAR | Unique identifier | 
-| JobID  | INTEGER | Slurm job ID |
-| ArrayID | INTEGER | Position in job array |
-|ArrayJobID| INTEGER | Slurm job ID within array|
-| JobName |  VARCHAR | Name of job |
-| IsArray |  BOOLEAN | Indicator if job is part of an array |
-| Interactive |  VARCHAR | Indicator if job was interactive
-| Preempted |  BOOLEAN |  Was job preempted |
-| Account |  VARCHAR |  Slurm account (PI group) |
-| User |  VARCHAR |  Unity user |
-| Constraints |  VARCHAR[] | Job constraints |
-| QOS |  VARCHAR | Job QOS |
-| Status |  VARCHAR | Job status on termination |
-| ExitCode |  VARCHAR | Job exit code |
-| SubmitTime |  TIMESTAMP_NS |  Job submission time |
-| StartTime |  TIMESTAMP_NS | Job start time
-| EndTime |  TIMESTAMP_NS | Job end time |
-| Elapsed |  INTEGER | Job runtime (seconds) |
-| TimeLimit |  INTEGER | Job time limit (seconds) |
-| Partition |  VARCHAR | Job partition |
-| Nodes |  VARCHAR | Job nodes as compact string |
-| NodeList |  VARCHAR[] | List of job nodes |
-| CPUs |  SMALLINT | Number of CPU cores |
-| Memory |  INTEGER | Job allocated memory (bytes) |
-| GPUs |  SMALLINT | Number of GPUs requested |
-| GPUType |  DICT | Dictionary with keys as type of GPU (str) and the values as number of GPUs corresponding to that type (int) |
-| GPUMemUsage |  FLOAT | GPU memory usage (bytes) |
-| GPUComputeUsage |  FLOAT | GPU compute usage (pct) |
-| CPUMemUsage |  FLOAT | GPU memory usage (bytes) |
-| CPUComputeUsage |  FLOAT | CPU compute usage (pct) |
+The Unity documentation (https://docs.unity.rc.umass.edu/) has plenty of useful information about Unity and Slurm which would be helpful in understanding the data. For specific issues with the code in this repo or the DuckDB dataset, feel free to reach out to Benjamin Pachev on the Unity Slack.
 

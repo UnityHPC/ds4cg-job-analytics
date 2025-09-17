@@ -2,7 +2,6 @@ import pandas as pd
 import pytest
 from pandas.api.typing import NAType
 
-
 from src.config.enum_constants import (
     AdminsAccountEnum,
     ExitCodeEnum,
@@ -14,18 +13,18 @@ from src.config.enum_constants import (
     RequiredColumnsEnum,
     OptionalColumnsEnum,
 )
-from src.preprocess import preprocess_data
+from src.preprocess import Preprocess
 from src.preprocess.preprocess import _get_partition_constraint, _get_requested_vram, _get_vram_constraint
 from ..conftest import preprocess_mock_data
 
 
 @pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
 @pytest.mark.parametrize("column", [member.value for member in ExcludedColumnsEnum])
-def test_preprocess_data_filtred_columns(mock_data_frame: pd.DataFrame, column: str) -> None:
+def test_preprocess_data_filtered_columns(mock_data_frame: pd.DataFrame, column: str) -> None:
     """
     Test that the preprocessed data does not contain irrelevant columns.
     """
-    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
+    data = Preprocess().preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
     assert column not in data.columns
 
 
@@ -34,7 +33,7 @@ def test_preprocess_data_filtered_gpu(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data does not contain null GPUType and GPUs.
     """
-    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
+    data = Preprocess().preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
     is_gpu_type_null = data["GPUType"].isna()
     is_gpu_null = data["GPUs"].isna()
     assert not any(is_gpu_type_null)
@@ -46,7 +45,7 @@ def test_preprocess_data_filtered_status(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the preprocessed data does not contain FAILED or CANCELLED jobs.
     """
-    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
+    data = Preprocess().preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
     status_failed = data["Status"] == StatusEnum.FAILED.value
     status_cancelled = data["Status"] == StatusEnum.CANCELLED.value
     assert not any(status_failed)
@@ -58,7 +57,7 @@ def test_preprocess_data_filtered_min_elapsed_1(mock_data_frame: pd.DataFrame) -
     """
     Test that the preprocessed data does not contain jobs with elapsed time below the threshold (300 seconds).
     """
-    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=300)
+    data = Preprocess().preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=300)
     elapsed_below_threshold = data["Elapsed"] < pd.to_timedelta(
         300, unit="s"
     )  # final version of Elapsed column is timedelta so convert for comparison
@@ -70,7 +69,7 @@ def test_preprocess_data_filter_min_elapsed_2(mock_data_path: str, mock_data_fra
     """
     Test that the preprocessed data contains only jobs with elapsed time above the threshold (700 seconds).
     """
-    data = preprocess_data(
+    data = Preprocess().preprocess_data(
         input_df=mock_data_frame,
         min_elapsed_seconds=700,
         include_cpu_only_jobs=True,
@@ -92,7 +91,7 @@ def test_preprocess_data_filtered_root_account(mock_data_frame: pd.DataFrame) ->
     """
     Test that the preprocessed data does not contain jobs with root account, partition building, or qos updates.
     """
-    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
+    data = Preprocess().preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
     partition_building = data["Partition"] == AdminPartitionEnum.BUILDING.value
     qos_updates = data["QOS"] == QOSEnum.UPDATES.value
     account_root = data["Account"] == AdminsAccountEnum.ROOT.value
@@ -106,7 +105,7 @@ def test_preprocess_data_include_cpu_job(mock_data_path: str, mock_data_frame: p
     """
     Test that the preprocessed data includes CPU-only jobs when specified.
     """
-    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_cpu_only_jobs=True)
+    data = Preprocess().preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_cpu_only_jobs=True)
     ground_truth = preprocess_mock_data(mock_data_path, include_cpu_only_jobs=True)
     expected_cpu_type = len(ground_truth[ground_truth["GPUType"].isna()])
     expected_gpus_count_0 = len(ground_truth[ground_truth["GPUs"].isna()])
@@ -122,7 +121,9 @@ def test_preprocess_data_include_failed_cancelled_job(mock_data_path: str, mock_
     """
     Test that the preprocessed data includes FAILED and CANCELLED jobs when specified.
     """
-    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_failed_cancelled_jobs=True)
+    data = Preprocess().preprocess_data(
+        input_df=mock_data_frame, min_elapsed_seconds=600, include_failed_cancelled_jobs=True
+    )
     ground_truth = preprocess_mock_data(mock_data_path, min_elapsed_seconds=600, include_failed_cancelled_jobs=True)
     expect_failed_status = len(ground_truth[(ground_truth["Status"] == StatusEnum.FAILED.value)])
     expect_cancelled_status = len(ground_truth[(ground_truth["Status"] == StatusEnum.CANCELLED.value)])
@@ -132,7 +133,9 @@ def test_preprocess_data_include_failed_cancelled_job(mock_data_path: str, mock_
 
 @pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
 def test_preprocess_data_include_custom_qos_values(mock_data_path: str, mock_data_frame: pd.DataFrame) -> None:
-    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600, include_custom_qos_jobs=True)
+    data = Preprocess().preprocess_data(
+        input_df=mock_data_frame, min_elapsed_seconds=600, include_custom_qos_jobs=True
+    )
     ground_truth = preprocess_mock_data(mock_data_path, min_elapsed_seconds=600, include_custom_qos_jobs=True)
     filtered_ground_truth = ground_truth[
         (ground_truth["Status"] != "CANCELLED") & (ground_truth["Status"] != "FAILED")
@@ -150,7 +153,7 @@ def test_all_boolean_args_being_true(mock_data_path: str, mock_data_frame: pd.Da
     """
     Test that the preprocessed data includes all jobs when both CPU-only and FAILED/CANCELLED jobs are specified.
     """
-    data = preprocess_data(
+    data = Preprocess().preprocess_data(
         input_df=mock_data_frame,
         min_elapsed_seconds=600,
         include_failed_cancelled_jobs=True,
@@ -185,7 +188,7 @@ def test_preprocess_data_fill_missing_interactive(mock_data_path: str, mock_data
     """
     Test that the preprocessed data fills missing interactive job types with 'non-interactive' correctly.
     """
-    data = preprocess_data(
+    data = Preprocess().preprocess_data(
         input_df=mock_data_frame,
         min_elapsed_seconds=100,
         include_cpu_only_jobs=True,
@@ -208,7 +211,7 @@ def test_preprocess_data_fill_missing_array_id(mock_data_path: str, mock_data_fr
     """
     Test that the preprocessed data fills missing ArrayID with -1 correctly.
     """
-    data = preprocess_data(
+    data = Preprocess().preprocess_data(
         input_df=mock_data_frame,
         min_elapsed_seconds=100,
         include_cpu_only_jobs=True,
@@ -229,7 +232,7 @@ def test_preprocess_data_fill_missing_gpu_type(mock_data_path: str, mock_data_fr
     """
     Test that the preprocessed data fills missing GPUType with pd.NA correctly.
     """
-    data = preprocess_data(
+    data = Preprocess().preprocess_data(
         input_df=mock_data_frame,
         min_elapsed_seconds=100,
         include_cpu_only_jobs=True,
@@ -256,7 +259,7 @@ def test_preprocess_data_fill_missing_constraints(mock_data_path: str, mock_data
     """
     Test that the preprocessed data fills missing Constraints with empty numpy array correctly.
     """
-    data = preprocess_data(
+    data = Preprocess().preprocess_data(
         input_df=mock_data_frame,
         min_elapsed_seconds=100,
         include_cpu_only_jobs=True,
@@ -279,7 +282,7 @@ def test_category_interactive(mock_data_path: str, mock_data_frame: pd.DataFrame
     Test that the preprocessed data has 'Interactive' as a categorical variable and check values contained within it.
     """
 
-    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
+    data = Preprocess().preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
     ground_truth = preprocess_mock_data(mock_data_path, min_elapsed_seconds=600)
     expected = set(ground_truth["Interactive"].dropna().to_numpy()) | set([e.value for e in InteractiveEnum])
 
@@ -292,7 +295,7 @@ def test_category_qos(mock_data_path: str, mock_data_frame: pd.DataFrame) -> Non
     """
     Test that the preprocessed data has 'QOS' as a categorical variable and check values contained within it.
     """
-    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
+    data = Preprocess().preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
     ground_truth = preprocess_mock_data(mock_data_path, min_elapsed_seconds=600)
     expected = set(ground_truth["QOS"].dropna().to_numpy()) | set([e.value for e in QOSEnum])
 
@@ -305,7 +308,7 @@ def test_category_exit_code(mock_data_path: str, mock_data_frame: pd.DataFrame) 
     """
     Test that the preprocessed data has 'ExitCode' as a categorical variable and check values contained within it.
     """
-    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
+    data = Preprocess().preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
 
     ground_truth = preprocess_mock_data(mock_data_path, min_elapsed_seconds=600)
     expected = set(ground_truth["ExitCode"].dropna().to_numpy()) | set([e.value for e in ExitCodeEnum])
@@ -319,7 +322,7 @@ def test_category_partition(mock_data_path: str, mock_data_frame: pd.DataFrame) 
     """
     Test that the preprocessed data has 'Partition' as a categorical variable and check values contained within it.
     """
-    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
+    data = Preprocess().preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
 
     ground_truth = preprocess_mock_data(mock_data_path, min_elapsed_seconds=600)
     expected = set(ground_truth["Partition"].dropna().to_numpy()) | set([e.value for e in AdminPartitionEnum])
@@ -333,7 +336,7 @@ def test_category_account(mock_data_path: str, mock_data_frame: pd.DataFrame) ->
     """
     Test that the preprocessed data has 'Account' as a categorical variable and check values contained within it.
     """
-    data = preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
+    data = Preprocess().preprocess_data(input_df=mock_data_frame, min_elapsed_seconds=600)
 
     ground_truth = preprocess_mock_data(mock_data_path, min_elapsed_seconds=600)
     expected = set(ground_truth["Account"].dropna().to_numpy()) | set([e.value for e in AdminsAccountEnum])
@@ -347,7 +350,7 @@ def test_preprocess_timedelta_conversion(mock_data_path: str, mock_data_frame: p
     """
     Test that the preprocessed data converts elapsed time to timedelta.
     """
-    data = preprocess_data(
+    data = Preprocess().preprocess_data(
         input_df=mock_data_frame,
         min_elapsed_seconds=600,
         include_cpu_only_jobs=True,
@@ -370,7 +373,7 @@ def test_preprocess_gpu_type(mock_data_frame: pd.DataFrame) -> None:
     """
     Test that the GPUType column is correctly filled and transformed during preprocessing.
     """
-    data = preprocess_data(
+    data = Preprocess().preprocess_data(
         input_df=mock_data_frame,
         include_cpu_only_jobs=True,
     )
@@ -419,7 +422,7 @@ def test_partition_constraint_and_requested_vram_on_mock_data(mock_data_frame: p
     Test that the partition_constraint and requested_vram columns are correctly computed in the preprocessed data.
     """
     # Run preprocess_data on the mock data
-    processed = preprocess_data(
+    processed = Preprocess().preprocess_data(
         mock_data_frame, min_elapsed_seconds=0, include_cpu_only_jobs=True, include_failed_cancelled_jobs=True
     )
 
@@ -456,7 +459,7 @@ def test_preprocess_missing_required_columns(mock_data_frame: pd.DataFrame, miss
     """
     cur_df = mock_data_frame.drop(missing_col, axis=1, inplace=False)
     with pytest.raises(KeyError, match=f"Column {missing_col} does not exist in dataframe."):
-        _res = preprocess_data(cur_df)
+        _res = Preprocess().preprocess_data(cur_df)
 
 
 @pytest.mark.parametrize("mock_data_path", [False, True], ids=["false_case", "true_case"], indirect=True)
@@ -475,7 +478,7 @@ def test_preprocess_missing_optional_columns(
         f"Column '{missing_col}' is missing from the dataframe. "
         "This may impact filtering operations and downstream processing."
     )
-    _res = preprocess_data(cur_df)
+    _res = Preprocess().preprocess_data(cur_df)
 
     # Check that a warning was raised with the expected message
     assert len(recwarn) == 1
@@ -494,7 +497,7 @@ def test_preprocess_empty_dataframe_warning(mock_data_frame: pd.DataFrame, recwa
     empty_df = mock_data_frame.copy()
     empty_df = empty_df.iloc[0:0]
     # Should trigger the warning since the dataframe is empty
-    result = preprocess_data(empty_df)
+    result = Preprocess().preprocess_data(empty_df)
 
     # Check that the result is still empty
     assert result.empty

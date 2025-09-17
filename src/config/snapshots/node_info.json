@@ -18,9 +18,11 @@
       "bf16",
       "fp64",
       "gh200",
+      "grace_a02",
       "gracehopper",
       "ib",
       "localscratch",
+      "neoverse_v2",
       "sm_52",
       "sm_61",
       "sm_70",
@@ -43,7 +45,7 @@
     ],
     "cores": 72,
     "ram": 560,
-    "cpus": "1x NVIDIA Grace Hopper Superchip (72 core)",
+    "cpus": "1x Grace A02 (72 core)",
     "general_use": true,
     "gpu_model": "NVIDIA Grace Hopper Superchip",
     "gpu_count": 1,
@@ -2057,7 +2059,7 @@
     "node_group": "ials-gpu",
     "partitions": [
       "gpu-preempt",
-      "ials-gpu"
+      "gpupod-l40s"
     ],
     "features": [
       "10gbps",
@@ -2122,6 +2124,7 @@
       "altivec",
       "fp64",
       "p923",
+      "power9",
       "power9le",
       "ppc64le",
       "sm_52",
@@ -2165,6 +2168,7 @@
       "altivec",
       "fp64",
       "p923",
+      "power9",
       "power9le",
       "ppc64le",
       "sm_52",
@@ -2216,6 +2220,7 @@
       "fp64",
       "ib",
       "p922",
+      "power9",
       "power9le",
       "ppc64le",
       "sm_52",
@@ -2327,6 +2332,7 @@
     ],
     "node_group": "umd-cscdr-arm",
     "partitions": [
+      "arm",
       "arm-preempt",
       "umd-cscdr-arm"
     ],
@@ -2334,12 +2340,13 @@
       "10gbps",
       "25gbps",
       "aarch64",
+      "ampere_altra_q80_30",
       "arm64",
-      "armn1"
+      "neoverse_n1"
     ],
     "cores": 80,
     "ram": 250,
-    "cpus": "1x Neoverse-N1 (80 core)",
+    "cpus": "1x Ampere Altra Q80-30 (80 core)",
     "general_use": false,
     "gpu_model": null,
     "gpu_count": 0,
@@ -2628,8 +2635,10 @@
       "bf16",
       "fp64",
       "gh200",
+      "grace_a02",
       "gracehopper",
       "localscratch",
+      "neoverse_v2",
       "sm_52",
       "sm_61",
       "sm_70",
@@ -2652,11 +2661,97 @@
     ],
     "cores": 72,
     "ram": 560,
-    "cpus": "1x NVIDIA Grace Hopper Superchip (72 core)",
+    "cpus": "1x Grace A02 (72 core)",
     "general_use": true,
     "gpu_model": "NVIDIA Grace Hopper Superchip",
     "gpu_count": 1,
     "vram": 80,
+    "open_hardware": null,
+    "owner": "",
+    "owner_email": ""
+  },
+  {
+    "nodes_folded": "uri-arm-gpu002",
+    "count": 1,
+    "nodes": [
+      "uri-arm-gpu002"
+    ],
+    "node_group": "uri-arm-gpu",
+    "partitions": [
+      "arm-gpu"
+    ],
+    "features": [
+      "10gbps",
+      "25gbps",
+      "aarch64",
+      "arm64",
+      "bf16",
+      "fp64",
+      "gh200",
+      "grace_a02",
+      "gracehopper",
+      "neoverse_v2",
+      "sm_52",
+      "sm_61",
+      "sm_70",
+      "sm_75",
+      "sm_80",
+      "sm_86",
+      "sm_87",
+      "sm_89",
+      "sm_90",
+      "vram102",
+      "vram11",
+      "vram12",
+      "vram16",
+      "vram23",
+      "vram32",
+      "vram40",
+      "vram48",
+      "vram8",
+      "vram80"
+    ],
+    "cores": 72,
+    "ram": 560,
+    "cpus": "1x Grace A02 (72 core)",
+    "general_use": true,
+    "gpu_model": "NVIDIA Grace Hopper Superchip",
+    "gpu_count": 1,
+    "vram": 80,
+    "open_hardware": null,
+    "owner": "",
+    "owner_email": ""
+  },
+  {
+    "nodes_folded": "uri-arm[001-006]",
+    "count": 6,
+    "nodes": [
+      "uri-arm001",
+      "uri-arm002",
+      "uri-arm003",
+      "uri-arm004",
+      "uri-arm005",
+      "uri-arm006"
+    ],
+    "node_group": "uri-arm",
+    "partitions": [
+      "arm"
+    ],
+    "features": [
+      "10gbps",
+      "25gbps",
+      "aarch64",
+      "arm64",
+      "grace_a02",
+      "neoverse_v2"
+    ],
+    "cores": 144,
+    "ram": 470,
+    "cpus": "2x Grace A02 (144 core)",
+    "general_use": false,
+    "gpu_model": null,
+    "gpu_count": 0,
+    "vram": null,
     "open_hardware": null,
     "owner": "",
     "owner_email": ""
@@ -3057,6 +3152,83 @@
     "owner_email": ""
   },
   {
+    "nodes_folded": "uri-cpu[062-067]",
+    "count": 6,
+    "nodes": [
+      "uri-cpu062",
+      "uri-cpu063",
+      "uri-cpu064",
+      "uri-cpu065",
+      "uri-cpu066",
+      "uri-cpu067"
+    ],
+    "node_group": "uri-cpu",
+    "partitions": [
+      "cpu-preempt",
+      "uri-cpu"
+    ],
+    "features": [
+      "10gbps",
+      "25gbps",
+      "avx512",
+      "intel",
+      "intel6730p",
+      "sapphirerapids",
+      "x86_64",
+      "x86_64_v2",
+      "x86_64_v3",
+      "x86_64_v4"
+    ],
+    "cores": 64,
+    "ram": 250,
+    "cpus": "2x Intel(R) Xeon(R) 6730P (64 core)",
+    "general_use": false,
+    "gpu_model": null,
+    "gpu_count": 0,
+    "vram": null,
+    "open_hardware": true,
+    "owner": "URI",
+    "owner_email": ""
+  },
+  {
+    "nodes_folded": "uri-cpu[068-073]",
+    "count": 6,
+    "nodes": [
+      "uri-cpu068",
+      "uri-cpu069",
+      "uri-cpu070",
+      "uri-cpu071",
+      "uri-cpu072",
+      "uri-cpu073"
+    ],
+    "node_group": "uri-cpu",
+    "partitions": [
+      "cpu"
+    ],
+    "features": [
+      "10gbps",
+      "25gbps",
+      "avx512",
+      "intel",
+      "intel6730p",
+      "sapphirerapids",
+      "x86_64",
+      "x86_64_v2",
+      "x86_64_v3",
+      "x86_64_v4"
+    ],
+    "cores": 64,
+    "ram": 250,
+    "cpus": "2x Intel(R) Xeon(R) 6730P (64 core)",
+    "general_use": true,
+    "gpu_model": null,
+    "gpu_count": 0,
+    "vram": null,
+    "open_hardware": true,
+    "owner": "URI",
+    "owner_email": ""
+  },
+  {
     "nodes_folded": "uri-gpu[001-002]",
     "count": 2,
     "nodes": [
@@ -3402,6 +3574,7 @@
       "25gbps",
       "altivec",
       "p923",
+      "power9",
       "power9le",
       "ppc64le"
     ],

@@ -1,6 +1,6 @@
 import pandas as pd
 from pathlib import Path
-from src.preprocess.preprocess import preprocess_data
+from src.preprocess import Preprocess
 from src.database import DatabaseConnection
 from src.config.constants import DEFAULT_MIN_ELAPSED_SECONDS
 from src.config.enum_constants import (
@@ -18,13 +18,14 @@ from datetime import datetime, timedelta
 def load_and_preprocess_jobs(
     db_path: str | Path,
     table_name: str = "Jobs",
-    dates_back: int | None = None,
+    days_back: int | None = None,
     include_failed_cancelled_jobs: bool = False,
     include_cpu_only_jobs: bool = False,
     include_custom_qos_jobs: bool = False,
     min_elapsed_seconds: int = DEFAULT_MIN_ELAPSED_SECONDS,
     random_state: pd._typing.RandomState | None = None,
     sample_size: int | None = None,
+    anonymize: bool = False,
 ) -> pd.DataFrame:
     """
     Load jobs DataFrame from a DuckDB database with standard filtering and preprocess it.
@@ -35,7 +36,7 @@ def load_and_preprocess_jobs(
     Args:
         db_path (str or Path): Path to the DuckDB database.
         table_name (str, optional): Table name to query. Defaults to 'Jobs'.
-        dates_back (int, optional): Number of days back to filter jobs based on StartTime.
+        days_back (int, optional): Number of days back to filter jobs based on StartTime.
             Defaults to None. If None, will not filter by startTime.
         include_failed_cancelled_jobs (bool, optional): If True, include jobs with FAILED or CANCELLED status.
             Defaults to False.
@@ -46,6 +47,8 @@ def load_and_preprocess_jobs(
             Defaults to DEFAULT_MIN_ELAPSED_SECONDS.
         random_state (pd._typing.RandomState, optional): Random state for reproducibility. Defaults to None.
         sample_size (int, optional): Number of rows to sample from the DataFrame. Defaults to None (no sampling).
+        anonymize (bool, optional): Whether to anonymize the DataFrame. Defaults to False.
+
 
     Returns:
         pd.DataFrame: Preprocessed DataFrame containing the filtered job data.
@@ -59,7 +62,7 @@ def load_and_preprocess_jobs(
     if isinstance(db_path, Path):
         db_path = db_path.resolve()
     try:
-        db = DatabaseConnection(str(db_path))
+        db = DatabaseConnection(str(db_path), anonymize=anonymize)
         qos_values = "(" + ",".join(f"'{obj.value}'" for obj in QOSEnum) + ")"
         excluded_columns = "(" + ", ".join(f"{obj.value}" for obj in ExcludedColumnsEnum) + ")"
 
@@ -74,8 +77,8 @@ def load_and_preprocess_jobs(
             f"Partition != '{AdminPartitionEnum.BUILDING.value}'",
             f"QOS != '{QOSEnum.UPDATES.value}'",
         ]
-        if dates_back is not None:
-            cutoff = datetime.now() - timedelta(days=dates_back)
+        if days_back is not None:
+            cutoff = datetime.now() - timedelta(days=days_back)
             conditions_arr.append(f"StartTime >= '{cutoff}'")
         if not include_custom_qos_jobs:
             conditions_arr.append(f"QOS in {qos_values}")
@@ -87,7 +90,7 @@ def load_and_preprocess_jobs(
 
         query = f"SELECT * EXCLUDE {excluded_columns} FROM {table_name} WHERE {' AND '.join(conditions_arr)}"
         jobs_df = db.fetch_query(query=query)
-        processed_data = preprocess_data(jobs_df, apply_filter=False)
+        processed_data = Preprocess().preprocess_data(jobs_df, apply_filter=False, anonymize=anonymize)
         if sample_size is not None:
             processed_data = processed_data.sample(n=sample_size, random_state=random_state)
         return processed_data
@@ -101,6 +104,7 @@ def load_and_preprocess_jobs_custom_query(
     custom_query: str | None = None,
     random_state: pd._typing.RandomState | None = None,
     sample_size: int | None = None,
+    anonymize: bool = False,
 ) -> pd.DataFrame:
     """
     Load jobs DataFrame from a DuckDB database using a custom SQL query and preprocess it.
@@ -115,6 +119,7 @@ def load_and_preprocess_jobs_custom_query(
         custom_query (str, optional): Custom SQL query to execute. If None, defaults to "SELECT * FROM {table_name}".
         random_state (pd._typing.RandomState, optional): Random state for reproducibility. Defaults to None.
         sample_size (int, optional): Number of rows to sample from the DataFrame. Defaults to None (no sampling).
+        anonymize (bool, optional): Whether to anonymize the DataFrame. Defaults to False.
 
     Returns:
         pd.DataFrame: Preprocessed DataFrame containing the data returned by the custom query.
@@ -135,7 +140,7 @@ def load_and_preprocess_jobs_custom_query(
     if isinstance(db_path, Path):
         db_path = db_path.resolve()
     try:
-        db = DatabaseConnection(str(db_path))
+        db = DatabaseConnection(str(db_path), anonymize=anonymize)
 
         if custom_query is None:
             custom_query = f"SELECT * FROM {table_name}"
@@ -143,15 +148,16 @@ def load_and_preprocess_jobs_custom_query(
         jobs_df = db.fetch_query(custom_query)
 
         # Use permissive preprocessing settings to preserve all data from the custom query.
-        processed_data = preprocess_data(
+        processed_data = Preprocess().preprocess_data(
             jobs_df,
             min_elapsed_seconds=0,
             include_failed_cancelled_jobs=True,
             include_cpu_only_jobs=True,
             include_custom_qos_jobs=True,
+            anonymize=anonymize,
         )
         if sample_size is not None:
             processed_data = processed_data.sample(n=sample_size, random_state=random_state)
         return processed_data
     except Exception as e:
-        raise RuntimeError(f"Failed to load jobs DataFrame: {e}") from e
+        raise RuntimeError(f"Failed to load jobs DataFrame. {e}") from e

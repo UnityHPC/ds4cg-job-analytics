@@ -18,6 +18,7 @@ import seaborn as sns
 from matplotlib.container import BarContainer
 from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Patch
+from matplotlib.lines import Line2D
 from pydantic import ValidationError
 
 from .models import ColumnVisualizationKwargsModel
@@ -293,7 +294,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         max_time = col_data.max()
         total_days = (max_time - min_time).days + 1
 
-        plt.figure(figsize=(7, 7))
+        plt.figure(figsize=(10, 5))
         plt.tight_layout()
         # If jobs span more than 2 days, plot jobs per day
         if total_days > 2:
@@ -320,6 +321,26 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
                 ax.set_xticklabels(shown_labels, rotation=45, ha="right")
             else:
                 plt.xticks(rotation=45, ha="right")
+
+            # --- Legend with average, median, and first date ---
+            mean_count = float(jobs_per_day.mean())
+            median_count = float(jobs_per_day.median())
+            # Horizontal reference lines
+            ax.axhline(mean_count, color="red", linestyle="--", linewidth=1, alpha=0.8)
+            ax.axhline(median_count, color="purple", linestyle=":", linewidth=1, alpha=0.8)
+            legend_handles = [
+                Line2D([0], [0], color="red", linestyle="--", label=f"Avg: {mean_count:.1f}"),
+                Line2D([0], [0], color="purple", linestyle=":", label=f"Median: {median_count:.1f}"),
+                Patch(facecolor="none", edgecolor="none", label=f"Days span: {total_days}"),
+            ]
+            ax.legend(
+                handles=legend_handles,
+                loc="best",
+                frameon=True,
+                fontsize=9,
+                title="Summary",
+                title_fontsize=10,
+            )
             if output_dir_path is not None:
                 plt.savefig(output_dir_path / f"{col}_days_lineplot.png", bbox_inches="tight")
         else:
@@ -331,7 +352,7 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             plt.gca().xaxis.set_major_locator(plt.MaxNLocator(12))
             plt.xlabel("Hour")
             plt.ylabel("Number of jobs")
-            plt.title(f"Histogram of Numer of Jobs per hour for {col}")
+            plt.title(f"Histogram of Number of Jobs per hour for {col}")
             plt.grid(True, which="both", axis="both", linestyle="--", alpha=0.5)
 
             # Set x-axis labels: show date at midnight, hour otherwise
@@ -347,6 +368,25 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             step = max(1, len(tick_labels) // 12)
             ax.set_xticks(tick_locs[::step])
             ax.set_xticklabels([tick_labels[i] for i in range(0, len(tick_labels), step)], rotation=45, ha="right")
+
+            # --- Legend with average, median, and first date ---
+            mean_count = float(jobs_per_hour.mean())
+            median_count = float(jobs_per_hour.median())
+            ax.axhline(mean_count, color="red", linestyle="--", linewidth=1, alpha=0.8)
+            ax.axhline(median_count, color="purple", linestyle=":", linewidth=1, alpha=0.8)
+            legend_handles = [
+                Line2D([0], [0], color="red", linestyle="--", label=f"Avg: {mean_count:.1f}"),
+                Line2D([0], [0], color="purple", linestyle=":", label=f"Median: {median_count:.1f}"),
+                Patch(facecolor="none", edgecolor="none", label=f"Days span: {total_days}"),
+            ]
+            ax.legend(
+                handles=legend_handles,
+                loc="upper right",
+                frameon=True,
+                fontsize=9,
+                title="Summary",
+                title_fontsize=10,
+            )
 
             if output_dir_path is not None:
                 plt.savefig(output_dir_path / f"{col}_hourly_lineplot.png", bbox_inches="tight")
@@ -472,24 +512,14 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             for label, p in zip(exit_code_counts.index, pct_values, strict=True)
         ]
 
-        plt.figure(figsize=(5, 7))
-
         # Prepare legend labels for all slices
         legend_labels = [
             f"{label}: {count} ({p:.1f}%)"
             for label, count, p in zip(exit_code_counts.index, exit_code_counts, pct_values, strict=True)
         ]
 
-        # Create a gridspec to reserve space for the legend above the pie
-        fig = plt.gcf()
-        fig.clf()
-
-        # Use 3 rows: title, legend, pie
-        gs = GridSpec(3, 1, height_ratios=[0.05, 0.75, 0.25], hspace=0.0)
-        ax_title = fig.add_subplot(gs[0])
-        ax_pie = fig.add_subplot(gs[1])
-        ax_legend = fig.add_subplot(gs[2])
-
+        # Create figure with extra horizontal space for legend on the right
+        fig, ax_pie = plt.subplots(figsize=(10, 6))
         wedges, *_ = ax_pie.pie(
             exit_code_counts,
             labels=labels,
@@ -498,33 +528,29 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             colors=sns.color_palette("pastel")[0 : len(exit_code_counts)],
             explode=explode,
         )
-
         ax_pie.axis("equal")
+        # Use a figure-level title so it spans the entire figure width (including legend space)
+        fig.suptitle(f"Job Status Distribution ({col})", fontsize=14, y=0.98)
 
-        # Hide the legend and title axes
-        ax_legend.axis("off")
-        ax_title.axis("off")
-
-        ax_title.text(
-            0.5,
-            0.5,
-            f"Job Status Distribution ({col})",
-            ha="center",
-            va="center",
-            fontsize=14,
-        )
-        plt.grid(axis="y", linestyle="--", alpha=0.5)
-        # Add a legend below the pie chart
-        ax_legend.legend(
+        # Place legend to the right of the pie chart
+        legend = ax_pie.legend(
             wedges,
             legend_labels,
             title="Job Status",
-            loc="center",
-            bbox_to_anchor=(0.5, 0.5),
+            loc="center left",
+            bbox_to_anchor=(1.02, 0.5),
             fontsize=10,
             title_fontsize=11,
+            borderaxespad=0.0,
+            frameon=True,
         )
-        plt.tight_layout()
+        # Slight transparency for legend background for readability
+        legend.get_frame().set_alpha(0.9)
+
+        # Adjust layout so legend isn't clipped
+        plt.subplots_adjust(right=0.78, top=0.88)
+        # tight_layout with rect leaves space for suptitle
+        fig.tight_layout(rect=(0, 0, 0.98, 0.90))
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
         plt.show()
@@ -735,26 +761,21 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             str(label) if p >= threshold_pct else "" for label, p in zip(gpu_counts.index, pct_values, strict=True)
         ]
 
-        plt.figure(figsize=(5, 7))
-
-        # Prepare legend labels for all slices
+        # Prepare legend labels for all slices (limit to top 10 for readability)
         legend_labels = [
             f"{label} GPU{'s' if int(label) != 1 else ''}: {count} ({p:.1f}%)"
             for label, count, p in zip(gpu_counts.index, gpu_counts, pct_values, strict=True)
+        ][:10]
+
+        # Build figure with room on right for legend
+        fig, ax_pie = plt.subplots(figsize=(9, 5))
+
+        # Format labels as "x GPU(s)" for each wedge (suppress small slices label text per earlier threshold rule)
+        formatted_labels = [
+            f"{label} GPU{'s' if int(label) != 1 else ''}" if lab != "" else ""
+            for label, lab in zip(gpu_counts.index, labels, strict=True)
         ]
 
-        # Create a gridspec to reserve space for the legend above the pie
-        fig = plt.gcf()
-        fig.clf()
-
-        # Use 3 rows: title, legend, pie
-        gs = GridSpec(3, 1, height_ratios=[0.05, 0.75, 0.25], hspace=0.0)
-        ax_title = fig.add_subplot(gs[0])
-        ax_pie = fig.add_subplot(gs[1])
-        ax_legend = fig.add_subplot(gs[2])
-
-        # Format labels as "x GPU(s)" for each wedge
-        formatted_labels = [f"{label} GPU{'s' if int(label) != 1 else ''}" if label != "" else "" for label in labels]
         wedges, *_ = ax_pie.pie(
             gpu_counts,
             labels=formatted_labels,
@@ -764,29 +785,27 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
             explode=explode,
         )
         ax_pie.axis("equal")
-        # Hide the legend and title axes
-        ax_legend.axis("off")
-        ax_title.axis("off")
-        ax_title.text(
-            0.5,
-            0.5,
-            f"GPU Count Distribution ({col})",
-            ha="center",
-            va="center",
-            fontsize=14,
-        )
-        plt.grid(axis="y", linestyle="--", alpha=0.5)
-        # Add a legend below the pie chart
-        ax_legend.legend(
+
+        # Figure-level title spanning entire width
+        fig.suptitle(f"GPU Count Distribution ({col})", fontsize=14, y=0.97)
+
+        # Legend to the right
+        legend = ax_pie.legend(
             wedges,
             legend_labels,
             title="GPU Count",
-            loc="center",
-            bbox_to_anchor=(0.5, 0.5),
+            loc="center left",
+            bbox_to_anchor=(0.7, 0.5),
             fontsize=10,
             title_fontsize=11,
+            frameon=True,
+            borderaxespad=0.0,
         )
-        plt.tight_layout()
+        legend.get_frame().set_alpha(0.9)
+
+        # Adjust layout so legend not clipped
+        plt.subplots_adjust(right=0.78, top=0.88)
+        fig.tight_layout(rect=(0, 0, 0.98, 0.90))
         if output_dir_path is not None:
             plt.savefig(output_dir_path / f"{col}_piechart.png", bbox_inches="tight")
         plt.show()
@@ -1130,8 +1149,9 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
 
         # Bin the data by closest category (floor to the largest category <= value)
         bins = [-0.1] + VRAM_CATEGORIES  # -0.1 to include 0 exactly
-        binned = pd.cut(col_data, bins=bins, labels=vram_labels, right=True, include_lowest=True)
+        binned = pd.cut(col_data, bins=bins, labels=vram_labels, right=False, include_lowest=True)
         binned[col_data == 0] = "0"
+        binned[col_data > max(VRAM_CATEGORIES)] = str(max(VRAM_CATEGORIES))
 
         bin_counts = binned.value_counts(sort=False, dropna=False)
         bin_percents = bin_counts / bin_counts.sum() * 100
@@ -1168,8 +1188,8 @@ class ColumnVisualizer(DataVisualizer[ColumnVisualizationKwargsModel]):
         ax.set_xticks(x_ticks)
         ax.set_xticklabels(vram_labels)
         ax.set_xlabel("GPU Memory (GiB)")
-        ax.set_ylabel("Percent of Jobs")
-        ax.set_title(f"Histogram of GPU VRAM Usage ({col})")
+        ax.set_ylabel("Percentage of Jobs")
+        ax.set_title("Histogram of GPU VRAM Usage")
         plt.grid(axis="y", linestyle="--", alpha=0.5)
 
         # --- Bar labels with gap above tallest label ---

@@ -1,8 +1,17 @@
 [
   {
+    "name": "arm",
+    "type": "cpu",
+    "node_count": 9,
+    "maxtime": "14 days",
+    "deftime": "1 hour",
+    "max_ram": 470,
+    "max_cpus": 144
+  },
+  {
     "name": "arm-gpu",
     "type": "gpu",
-    "node_count": 3,
+    "node_count": 4,
     "maxtime": "14 days",
     "deftime": "1 hour",
     "max_ram": 560,
@@ -83,7 +92,7 @@
   {
     "name": "cpu",
     "type": "cpu",
-    "node_count": 147,
+    "node_count": 153,
     "maxtime": "2 days",
     "deftime": "1 hour",
     "max_ram": 1510,
@@ -92,7 +101,7 @@
   {
     "name": "cpu-preempt",
     "type": "cpu",
-    "node_count": 138,
+    "node_count": 144,
     "maxtime": "2 days",
     "deftime": "1 hour",
     "max_ram": 1510,
@@ -155,7 +164,7 @@
   {
     "name": "gpupod-l40s",
     "type": "gpu",
-    "node_count": 10,
+    "node_count": 13,
     "maxtime": "14 days",
     "deftime": "1 hour",
     "max_ram": 500,
@@ -164,11 +173,11 @@
   {
     "name": "ials-gpu",
     "type": "gpu",
-    "node_count": 31,
+    "node_count": 28,
     "maxtime": "14 days",
     "deftime": "1 hour",
-    "max_ram": 500,
-    "max_cpus": 32
+    "max_ram": 180,
+    "max_cpus": 24
   },
   {
     "name": "jdelhommelle",
@@ -272,7 +281,7 @@
   {
     "name": "uri-cpu",
     "type": "cpu",
-    "node_count": 43,
+    "node_count": 49,
     "maxtime": "30 days",
     "deftime": "1 hour",
     "max_ram": 1000,

@@ -1,5 +1,6 @@
 import shutil
 import tempfile
+import os
 from collections.abc import Generator
 
 import pandas as pd
@@ -9,6 +10,7 @@ from src.database import DatabaseConnection
 from .mock_data.convert_csv_to_db import convert_csv_to_db
 from src.config.enum_constants import QOSEnum, AdminPartitionEnum, AdminsAccountEnum, PartitionTypeEnum, StatusEnum
 from src.config.remote_config import PartitionInfoFetcher
+from src.config.paths import PREPROCESSING_ERRORS_LOG_FILE
 
 
 def preprocess_mock_data(
@@ -117,3 +119,29 @@ def mock_data_frame(mock_data_path: str) -> Generator[pd.DataFrame]:
     finally:
         if mem_db is not None:
             mem_db.disconnect()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _cleanup_preprocess_log_after_tests() -> Generator[None, None, None]:
+    """Automatically remove the temporary preprocessing log file created during tests.
+
+    This fixture only performs cleanup when RUN_ENV=TEST and the log file path points to
+    a temporary directory (created in paths.py). The file and its directory are removed
+    after the entire test session if tests complete successfully.
+    """
+    run_env = os.getenv("RUN_ENV")
+    is_test_env = run_env == "TEST"
+    try:
+        yield
+    finally:
+        if is_test_env and PREPROCESSING_ERRORS_LOG_FILE.exists():
+            tmp_dir = PREPROCESSING_ERRORS_LOG_FILE.parent
+            try:
+                # Remove the log file and its parent temp directory
+                PREPROCESSING_ERRORS_LOG_FILE.unlink(missing_ok=True)  # type: ignore[arg-type]
+                # Only remove directory if empty
+                if not any(tmp_dir.iterdir()):
+                    tmp_dir.rmdir()
+            except Exception:
+                # Silently ignore cleanup errors to not interfere with test results
+                pass

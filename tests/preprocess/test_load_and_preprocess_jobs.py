@@ -1,7 +1,7 @@
 import pytest
 import pandas
 from src.utilities import load_and_preprocess_jobs, load_and_preprocess_jobs_custom_query
-from .conftest import preprocess_mock_data
+from ..conftest import preprocess_mock_data
 from src.config.enum_constants import OptionalColumnsEnum, RequiredColumnsEnum
 from datetime import datetime, timedelta
 
@@ -35,7 +35,7 @@ def test_filter_date_back(mock_data_path: str, dates_back: int) -> None:
     Test with multiple different dates_back for higher test coverage.
     """
     temp = preprocess_mock_data(mock_data_path, min_elapsed_seconds=0)
-    res = load_and_preprocess_jobs(db_path=mock_data_path, dates_back=dates_back)
+    res = load_and_preprocess_jobs(db_path=mock_data_path, days_back=dates_back)
     cutoff = datetime.now() - timedelta(days=dates_back)
     ground_truth_jobs = temp[(temp["StartTime"] >= cutoff)].copy()
     expect_job_ids = ground_truth_jobs["JobID"].to_numpy()
@@ -50,7 +50,7 @@ def test_filter_min_elapsed(mock_data_path: str) -> None:
     Test for filtering by days back and minimum elapsed time.
     """
     temp = preprocess_mock_data(mock_data_path, min_elapsed_seconds=13000)
-    res = load_and_preprocess_jobs(db_path=mock_data_path, min_elapsed_seconds=13000, dates_back=90)
+    res = load_and_preprocess_jobs(db_path=mock_data_path, min_elapsed_seconds=13000, days_back=90)
     cutoff = datetime.now() - timedelta(days=90)
     ground_truth_jobs = temp[(temp["StartTime"] >= cutoff)].copy()
     expect_job_ids = ground_truth_jobs["JobID"].to_numpy()
@@ -73,7 +73,7 @@ def test_filter_date_back_include_all(mock_data_path: str) -> None:
     )
     res = load_and_preprocess_jobs(
         db_path=mock_data_path,
-        dates_back=90,
+        days_back=90,
         min_elapsed_seconds=0,
         include_cpu_only_jobs=True,
         include_failed_cancelled_jobs=True,
@@ -101,7 +101,7 @@ def test_missing_required_columns_error_raised(mock_data_path: str, missing_col:
     col_str = ", ".join(col_names)
     query = f"SELECT {col_str} FROM Jobs"
     with pytest.raises(
-        RuntimeError, match=f"Failed to load jobs DataFrame: 'Column {missing_col} does not exist in dataframe.'"
+        RuntimeError, match=f"Failed to load jobs DataFrame. 'Column {missing_col} does not exist in dataframe.'"
     ):
         _res = load_and_preprocess_jobs_custom_query(db_path=mock_data_path, custom_query=query)
 

@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import duckdb
 import pandas as pd
@@ -13,20 +14,22 @@ class DatabaseConnection:
 
     """
 
-    def __init__(self, db_url: str, read_only: bool = True) -> None:
+    def __init__(self, db_url: str, read_only: bool = True, anonymize: bool = False) -> None:
         """
         Initialize the DatabaseConnection object.
 
         Args:
             db_url (str): The URL of the DuckDB database.
             read_only (bool): If True, the connection will be read-only. Defaults to True.
+            anonymize (bool): If True, printed logs will be anonymized. Defaults to False.
 
         Returns:
             None
         """
         self.db_url = db_url
         self.connection: duckdb.DuckDBPyConnection | None = self._connect(read_only=read_only)
-        print(f"Connected to {self.db_url}")
+        self.anonymize = anonymize
+        print(f"Connected to {self.db_url if not self.anonymize else Path(self.db_url).name}")
 
     def _connect(self, read_only: bool) -> duckdb.DuckDBPyConnection:
         """Establish a connection to the DuckDB database.
@@ -42,11 +45,15 @@ class DatabaseConnection:
 
     def disconnect(self) -> None:
         """Close the connection to the DuckDB database."""
-        if self.connection is not None:
+        if hasattr(self, "connection") and self.connection is not None:
             self.connection.close()
             self.connection = None
-            if os.getenv("RUN_ENV") != "TEST":
-                print(f"Disconnected from {self.db_url}")
+
+    def __del__(self) -> None:
+        """Ensure the connection is closed when the object is deleted."""
+        self.disconnect()
+        if os.getenv("RUN_ENV") != "TEST":
+            print(f"Disconnected from {self.db_url if not self.anonymize else Path(self.db_url).name}")
 
     def is_connected(self) -> bool:
         """
