@@ -8,6 +8,7 @@ High-performance GPUs are a critical resource on shared clusters, but they are o
 
 ## Project Overview
 This project includes:
+- [**Project Poster**](assets/DS4CG_Unity_Efficiency_Poster.pdf): A visual summary of the project's motivation, methods, and results.
 - Python scripts and modules for data preprocessing, analysis, and report generation
 - Jupyter notebooks for interactive analysis and visualization
 - Automated report generation scripts (see the `feature/reports` branch for the latest versions)
